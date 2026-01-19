@@ -883,7 +883,19 @@
                 tbody.innerHTML = '';
 
                 if (etfs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-secondary">暂无关联ETF</td></tr>';
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="8" class="text-center p-4">
+                                <div class="text-secondary mb-2">
+                                    <i class="bi bi-info-circle"></i> 该股票在主流ETF中持仓占比 < 5%
+                                </div>
+                                <small class="text-muted">
+                                    策略要求：仅显示持仓占比 ≥ 5% 的ETF<br>
+                                    如该股票是中小盘股，可能不在主流ETF的前10大持仓中
+                                </small>
+                            </td>
+                        </tr>
+                    `;
                     return;
                 }
 

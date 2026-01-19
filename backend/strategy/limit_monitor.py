@@ -352,15 +352,22 @@ class LimitUpMonitor:
         # 先获取映射中的ETF
         mapped_etfs = self.stock_etf_mapping.get(normalized_code, [])
 
-        if not mapped_etfs:
-            # 如果没有映射，返回空列表（不使用推荐ETF）
-            return []
+        # 获取ETF名称映射
+        etf_names = {e['etf_code']: e['etf_name'] for e in mapped_etfs}
+
+        # 确定要扫描的ETF列表
+        if mapped_etfs:
+            # 如果有预构建的映射，使用映射中的ETF
+            etf_codes_to_scan = [e['etf_code'] for e in mapped_etfs]
+        else:
+            # 如果没有映射，扫描所有关注的ETF
+            etf_codes_to_scan = self._get_watch_etf_codes()
+            # 为这些ETF添加名称
+            etf_names = self._get_etf_name_map(etf_codes_to_scan)
 
         results = []
 
-        for etf in mapped_etfs:
-            etf_code = etf['etf_code']
-
+        for etf_code in etf_codes_to_scan:
             # 获取真实持仓权重（使用标准化代码）
             weight_info = self.get_stock_weight_in_etf(normalized_code, etf_code)
 
@@ -368,8 +375,8 @@ class LimitUpMonitor:
             if weight_info['weight'] >= self.DEFAULT_MIN_WEIGHT:
                 results.append({
                     'etf_code': etf_code,
-                    'etf_name': etf['etf_name'],
-                    'category': etf.get('category', '宽基'),
+                    'etf_name': etf_names.get(etf_code, f'ETF{etf_code}'),
+                    'category': self._get_etf_category(etf_code),
                     'weight': weight_info['weight'],
                     'rank': weight_info['rank'],
                     'in_top10': weight_info['in_top10'],
@@ -379,11 +386,44 @@ class LimitUpMonitor:
         # 按实际权重降序排序
         results.sort(key=lambda x: x['weight'], reverse=True)
 
-        logger.info(f"{normalized_code} 符合策略的ETF: {len(results)}个")
-        for r in results:
-            logger.info(f"  - {r['etf_name']}: 权重{r['weight']*100:.2f}%, 排名第{r['rank']}")
+        if results:
+            logger.info(f"{normalized_code} 符合策略的ETF: {len(results)}个")
+            for r in results:
+                logger.info(f"  - {r['etf_name']}: 权重{r['weight']*100:.2f}%, 排名第{r['rank']}")
+        else:
+            logger.debug(f"{normalized_code} 未找到持仓>=5%的ETF")
 
         return results
+
+    def _get_etf_name_map(self, etf_codes: List[str]) -> Dict[str, str]:
+        """获取ETF代码到名称的映射"""
+        name_map = {
+            "510300": "沪深300ETF", "510500": "中证500ETF", "510050": "上证50ETF",
+            "159915": "创业板ETF", "588000": "科创50ETF", "159901": "深证100ETF",
+            "512100": "中证1000ETF", "159995": "芯片ETF", "512480": "计算机ETF",
+            "515000": "5GETF", "516160": "新能源车ETF", "515790": "光伏ETF",
+            "512590": "酒ETF", "159928": "消费ETF", "512170": "医药ETF",
+            "512880": "证券ETF", "512800": "银行ETF", "588200": "科创100ETF"
+        }
+        return {code: name_map.get(code, f'ETF{code}') for code in etf_codes}
+
+    def _get_etf_category(self, etf_code: str) -> str:
+        """根据ETF代码获取分类"""
+        broad_based = ["510300", "510500", "510050", "159915", "588000", "159901", "512100", "588200"]
+        tech = ["159995", "512480", "515000", "516160", "515790"]
+        consumer = ["512590", "159928", "512170"]
+        financial = ["512880", "512800"]
+
+        if etf_code in broad_based:
+            return "宽基"
+        elif etf_code in tech:
+            return "科技"
+        elif etf_code in consumer:
+            return "消费"
+        elif etf_code in financial:
+            return "金融"
+        else:
+            return "其他"
 
     def evaluate_signal_quality(self, limit_info: Dict,
                                  etf_info: Dict) -> Tuple[str, str]:

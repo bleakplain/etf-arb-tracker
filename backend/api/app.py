@@ -207,18 +207,22 @@ async def get_related_etfs(code: str):
     """
     获取股票相关的ETF列表
 
+    只返回该股票持仓占比 >= 5% 的 ETF，确保策略有效性
+
     Args:
         code: 股票代码
 
     Returns:
-        相关ETF列表
+        相关ETF列表（仅包含持仓>=5%的ETF）
     """
     mon = get_monitor()
-    etfs = mon.find_related_etfs(code)
 
-    # 如果没有找到映射，根据股票类型推荐通用ETF
+    # 使用带真实权重验证的方法，只返回持仓占比 >= 5% 的 ETF
+    etfs = mon.find_related_etfs_with_real_weight(code)
+
+    # 如果没有符合条件的ETF，返回空列表
     if not etfs:
-        etfs = _get_recommended_etfs(code)
+        return []
 
     # 获取ETF实时行情
     etf_codes = [e['etf_code'] for e in etfs]
@@ -233,6 +237,8 @@ async def get_related_etfs(code: str):
                 "etf_code": etf_code,
                 "etf_name": etf['etf_name'],
                 "weight": etf['weight'],
+                "rank": etf.get('rank', -1),
+                "in_top10": etf.get('in_top10', False),
                 "category": etf.get('category', '宽基'),
                 "price": quote['price'],
                 "change_pct": quote['change_pct'],
@@ -245,6 +251,8 @@ async def get_related_etfs(code: str):
                 "etf_code": etf_code,
                 "etf_name": etf['etf_name'],
                 "weight": etf['weight'],
+                "rank": etf.get('rank', -1),
+                "in_top10": etf.get('in_top10', False),
                 "category": etf.get('category', '宽基'),
                 "price": 0,
                 "change_pct": 0,
@@ -552,71 +560,8 @@ async def get_etf_categories():
     return categories
 
 
-def _get_recommended_etfs(stock_code: str) -> List[Dict]:
-    """
-    根据股票类型推荐全面ETF列表
-    包含宽基ETF、行业ETF等
-
-    Args:
-        stock_code: 股票代码
-
-    Returns:
-        推荐的ETF列表，包含多类ETF
-    """
-    # 根据股票代码前缀判断类型并推荐对应ETF
-    if stock_code.startswith('688') or stock_code.startswith('300'):
-        # 科创板/创业板
-        return [
-            {"etf_code": "588000", "etf_name": "科创50ETF", "weight": 0.05, "category": "宽基"},
-            {"etf_code": "588200", "etf_name": "科创100ETF", "weight": 0.04, "category": "宽基"},
-            {"etf_code": "159915", "etf_name": "创业板ETF", "weight": 0.05, "category": "宽基"},
-            {"etf_code": "159995", "etf_name": "芯片ETF", "weight": 0.04, "category": "科技"},
-            {"etf_code": "512480", "etf_name": "计算机ETF", "weight": 0.03, "category": "科技"},
-            {"etf_code": "516160", "etf_name": "新能源车ETF", "weight": 0.03, "category": "科技"},
-            {"etf_code": "510300", "etf_name": "沪深300ETF", "weight": 0.02, "category": "宽基"}
-        ]
-    elif stock_code.startswith('6') or stock_code.startswith('60'):
-        # 沪市主板
-        return [
-            {"etf_code": "510300", "etf_name": "沪深300ETF", "weight": 0.04, "category": "宽基"},
-            {"etf_code": "510050", "etf_name": "上证50ETF", "weight": 0.03, "category": "宽基"},
-            {"etf_code": "510500", "etf_name": "中证500ETF", "weight": 0.03, "category": "宽基"},
-            {"etf_code": "512800", "etf_name": "银行ETF", "weight": 0.02, "category": "金融"},
-            {"etf_code": "512880", "etf_name": "证券ETF", "weight": 0.02, "category": "金融"},
-            {"etf_code": "512590", "etf_name": "酒ETF", "weight": 0.02, "category": "消费"},
-            {"etf_code": "159928", "etf_name": "消费ETF", "weight": 0.02, "category": "消费"}
-        ]
-    elif stock_code.startswith('00') or stock_code.startswith('001') or stock_code.startswith('002'):
-        # 深市主板
-        return [
-            {"etf_code": "159915", "etf_name": "创业板ETF", "weight": 0.05, "category": "宽基"},
-            {"etf_code": "510300", "etf_name": "沪深300ETF", "weight": 0.04, "category": "宽基"},
-            {"etf_code": "159901", "etf_name": "深证100ETF", "weight": 0.03, "category": "宽基"},
-            {"etf_code": "159995", "etf_name": "芯片ETF", "weight": 0.03, "category": "科技"},
-            {"etf_code": "512590", "etf_name": "酒ETF", "weight": 0.02, "category": "消费"},
-            {"etf_code": "159928", "etf_name": "消费ETF", "weight": 0.02, "category": "消费"},
-            {"etf_code": "512170", "etf_name": "医药ETF", "weight": 0.02, "category": "消费"}
-        ]
-    elif stock_code.startswith('8') or stock_code.startswith('4'):
-        # 北交所
-        return [
-            {"etf_code": "510300", "etf_name": "沪深300ETF", "weight": 0.02, "category": "宽基"},
-            {"etf_code": "510500", "etf_name": "中证500ETF", "weight": 0.02, "category": "宽基"},
-            {"etf_code": "512100", "etf_name": "中证1000ETF", "weight": 0.02, "category": "宽基"}
-        ]
-    else:
-        # 默认返回全面ETF列表
-        return [
-            {"etf_code": "510300", "etf_name": "沪深300ETF", "weight": 0.04, "category": "宽基"},
-            {"etf_code": "510500", "etf_name": "中证500ETF", "weight": 0.03, "category": "宽基"},
-            {"etf_code": "510050", "etf_name": "上证50ETF", "weight": 0.03, "category": "宽基"},
-            {"etf_code": "159915", "etf_name": "创业板ETF", "weight": 0.03, "category": "宽基"},
-            {"etf_code": "588000", "etf_name": "科创50ETF", "weight": 0.03, "category": "宽基"},
-            {"etf_code": "159995", "etf_name": "芯片ETF", "weight": 0.02, "category": "科技"},
-            {"etf_code": "516160", "etf_name": "新能源车ETF", "weight": 0.02, "category": "科技"},
-            {"etf_code": "512880", "etf_name": "证券ETF", "weight": 0.02, "category": "金融"},
-            {"etf_code": "512590", "etf_name": "酒ETF", "weight": 0.02, "category": "消费"}
-        ]
+# _get_recommended_etfs 函数已移除，API现在使用 find_related_etfs_with_real_weight
+# 该方法只返回持仓占比 >= 5% 的 ETF，确保策略有效性
 
 
 def start_server(host: str = "0.0.0.0", port: int = 8000):
