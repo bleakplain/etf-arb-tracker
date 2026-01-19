@@ -1,0 +1,91 @@
+# 自选股配置文件
+# 添加您关注的核心个股，系统将监控这些股票对应的ETF套利机会
+
+# 格式说明：
+# code: 股票代码（6位数字）
+# name: 股票名称
+# market: 市场（sz=深圳, sh=上海）
+# notes: 备注（可选）
+
+my_stocks:
+  # 科技板块
+  - code: "300750"
+    name: "宁德时代"
+    market: "sz"
+    notes: "新能源龙头"
+
+  - code: "002594"
+    name: "比亚迪"
+    market: "sz"
+    notes: "新能源汽车"
+
+  - code: "600519"
+    name: "贵州茅台"
+    market: "sh"
+    notes: "白酒龙头"
+
+  - code: "000858"
+    name: "五粮液"
+    market: "sz"
+    notes: "白酒"
+
+  # 芯片半导体
+  - code: "600036"
+    name: "招商银行"
+    market: "sh"
+    notes: "银行"
+
+  - code: "601318"
+    name: "中国平安"
+    market: "sh"
+    notes: "保险"
+
+  # 新兴产业
+  - code: "300059"
+    name: "东方财富"
+    market: "sz"
+    notes: "券商+互联网"
+
+  - code: "002475"
+    name: "立讯精密"
+    market: "sz"
+    notes: "消费电子"
+
+  - code: "300760"
+    name: "迈瑞医疗"
+    market: "sz"
+    notes: "医疗器械"
+
+  # AI相关
+  - code: "300033"
+    name: "同花顺"
+    market: "sz"
+    notes: "金融科技AI"
+
+  - code: "688111"
+    name: "金山办公"
+    market: "sh"
+    notes: "AI应用"
+
+# 关注的ETF列表（可选，系统会自动根据持仓匹配）
+watch_etfs:
+  - code: "510300"
+    name: "沪深300ETF"
+
+  - code: "510500"
+    name: "中证500ETF"
+
+  - code: "159915"
+    name: "创业板ETF"
+
+  - code: "588000"
+    name: "科创50ETF"
+
+  - code: "512480"
+    name: "计算机ETF"
+
+  - code: "159995"
+    name: "芯片ETF"
+
+  - code: "516160"
+    name: "新能源车ETF"
