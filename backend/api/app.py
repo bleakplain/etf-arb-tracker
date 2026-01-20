@@ -451,7 +451,7 @@ _LIMIT_UP_CACHE_TTL = 30  # 涨停股缓存30秒
 @app.get("/api/limit-up", response_model=List[LimitUpStockInfo])
 async def get_limit_up_stocks():
     """
-    获取今日所有涨停股票（带缓存）
+    获取今日所有涨停股票（带缓存，复用股票行情缓存）
 
     Returns:
         涨停股票列表
@@ -464,9 +464,19 @@ async def get_limit_up_stocks():
     if _limit_up_cache is not None and (current_time - _limit_up_cache_time) < _LIMIT_UP_CACHE_TTL:
         return _limit_up_cache
 
-    # 获取新数据
+    # 获取新数据 - 复用StockQuoteFetcher的缓存数据
     fetcher = LimitUpStocksFetcher()
-    stocks = fetcher.get_today_limit_ups()
+
+    # 尝试从监控器获取缓存的股票数据
+    try:
+        mon = get_monitor()
+        # 获取缓存的股票数据DataFrame
+        stock_df = mon.stock_fetcher._get_spot_data()
+        # 使用缓存数据筛选涨停股
+        stocks = fetcher.get_today_limit_ups(stock_df)
+    except:
+        # 如果监控器未初始化，fallback到原方式
+        stocks = fetcher.get_today_limit_ups()
 
     result = [
         LimitUpStockInfo(
