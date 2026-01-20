@@ -15,6 +15,7 @@ from loguru import logger
 from datetime import datetime
 import os
 import sys
+import time
 
 # 添加项目路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -121,8 +122,8 @@ def get_monitor() -> LimitUpMonitor:
 async def startup_event():
     """应用启动时的初始化"""
     logger.info("API服务启动")
-    # 预加载监控器
-    get_monitor()
+    # 不再预加载监控器，改为懒加载
+    # 后台线程会自动初始化数据
 
 
 @app.get("/")
@@ -441,18 +442,33 @@ async def get_stock_etf_mapping():
     return mon.stock_etf_mapping
 
 
+# 涨停股缓存
+_limit_up_cache = None
+_limit_up_cache_time = None
+_LIMIT_UP_CACHE_TTL = 30  # 涨停股缓存30秒
+
+
 @app.get("/api/limit-up", response_model=List[LimitUpStockInfo])
 async def get_limit_up_stocks():
     """
-    获取今日所有涨停股票
+    获取今日所有涨停股票（带缓存）
 
     Returns:
         涨停股票列表
     """
+    global _limit_up_cache, _limit_up_cache_time
+
+    current_time = time.time()
+
+    # 检查缓存
+    if _limit_up_cache is not None and (current_time - _limit_up_cache_time) < _LIMIT_UP_CACHE_TTL:
+        return _limit_up_cache
+
+    # 获取新数据
     fetcher = LimitUpStocksFetcher()
     stocks = fetcher.get_today_limit_ups()
 
-    return [
+    result = [
         LimitUpStockInfo(
             code=s['code'],
             name=s['name'],
@@ -466,6 +482,12 @@ async def get_limit_up_stocks():
         )
         for s in stocks
     ]
+
+    # 更新缓存
+    _limit_up_cache = result
+    _limit_up_cache_time = current_time
+
+    return result
 
 
 @app.get("/api/stocks/{code}/kline")

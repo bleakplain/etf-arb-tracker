@@ -294,7 +294,7 @@
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#limitup">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#limitup" onclick="loadLimitUpStocks()">
                     <i class="bi bi-fire"></i> 涨停股 <span class="badge bg-danger" id="limitupCount">0</span>
                 </button>
             </li>
@@ -593,10 +593,10 @@
 
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
+            // 只加载首屏关键数据
             loadStatus();
             loadStocks();
             loadSignals();
-            loadLimitUpStocks();
             updateCurrentTime();
 
             // 定时更新
