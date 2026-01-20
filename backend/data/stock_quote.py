@@ -135,9 +135,15 @@ class StockQuoteFetcher:
             date_str = fields[30]
             time_str = fields[31]
 
-            # 计算涨跌
-            change = current_price - prev_close
-            change_pct = (change / prev_close * 100) if prev_close > 0 else 0
+            # 如果当前价为0（未开盘或停牌），使用昨收价代替
+            if current_price == 0 and prev_close > 0:
+                current_price = prev_close
+                change = 0
+                change_pct = 0
+            else:
+                # 计算涨跌
+                change = current_price - prev_close
+                change_pct = (change / prev_close * 100) if prev_close > 0 else 0
 
             # 判断是否涨停
             is_limit_up = self._is_limit_up(full_code, current_price, prev_close)
@@ -317,15 +323,22 @@ class StockQuoteFetcher:
             return None
 
         try:
+            name = fields[0]
             prev_close = float(fields[2]) if fields[2] else 0
             current_price = float(fields[3]) if fields[3] else 0
 
-            change = current_price - prev_close
-            change_pct = (change / prev_close * 100) if prev_close > 0 else 0
+            # 如果当前价为0（未开盘或停牌），使用昨收价代替
+            if current_price == 0 and prev_close > 0:
+                current_price = prev_close
+                change = 0
+                change_pct = 0
+            else:
+                change = current_price - prev_close
+                change_pct = (change / prev_close * 100) if prev_close > 0 else 0
 
             return {
                 'code': full_code[2:],
-                'name': fields[0],
+                'name': name,
                 'price': current_price,
                 'prev_close': prev_close,
                 'change': change,

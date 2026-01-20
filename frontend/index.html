@@ -67,11 +67,21 @@
         }
 
         .price-up {
-            color: var(--danger-color);
+            color: #f87171;
+            font-weight: 600;
         }
 
         .price-down {
-            color: var(--success-color);
+            color: #4ade80;
+            font-weight: 600;
+        }
+
+        code {
+            background-color: #334155;
+            color: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
         }
 
         .limit-up-badge {
@@ -110,24 +120,35 @@
         }
 
         .table {
-            color: var(--text-primary);
+            color: #e2e8f0;
             font-size: 13px;
+            background-color: #1e293b;
         }
 
         .table thead th {
-            background-color: #1e293b;
-            border-color: #334155;
+            background-color: #334155;
+            color: #f1f5f9;
+            border-color: #475569;
+            font-weight: 600;
             position: sticky;
             top: 0;
+            z-index: 10;
+            text-align: left;
         }
 
         .table tbody td {
             border-color: #334155;
-            padding: 8px;
+            padding: 10px 8px;
+            background-color: #1e293b;
+            color: #e2e8f0;
         }
 
-        .table-hover tbody tr:hover {
-            background-color: rgba(51, 65, 85, 0.3);
+        .table tbody tr:nth-child(even) td {
+            background-color: #1a2738;
+        }
+
+        .table-hover tbody tr:hover td {
+            background-color: #2d3b4e !important;
         }
 
         .metric-card {
@@ -492,7 +513,7 @@
                         <div class="card-body">
                             <div class="table-responsive">
                                 <table class="table table-sm table-hover">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr>
                                             <th>分类</th>
                                             <th>ETF代码</th>
@@ -515,7 +536,7 @@
                             <div id="etfHoldingsDetail" class="mt-3" style="display: none;">
                                 <h6 class="border-bottom pb-2">前十大持仓</h6>
                                 <div class="table-responsive">
-                                    <table class="table table-sm table-light">
+                                    <table class="table table-sm">
                                         <thead>
                                             <tr>
                                                 <th>排名</th>
