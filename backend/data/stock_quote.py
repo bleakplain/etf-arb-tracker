@@ -1,10 +1,9 @@
 """
 A股实时行情数据获取模块
-使用AKShare获取实时行情数据
+使用多数据源（efinance + akshare）自动故障转移
 优化：后台定时刷新 + 读取缓存
 """
 
-import akshare as ak
 import pandas as pd
 import time
 import atexit
@@ -15,7 +14,7 @@ import threading
 
 
 class StockQuoteFetcher:
-    """A股行情数据获取器 - 基于AKShare，后台定时刷新"""
+    """A股行情数据获取器 - 多数据源自动故障转移"""
 
     # 类变量，用于缓存行情数据
     _cache_lock = threading.Lock()
@@ -26,9 +25,10 @@ class StockQuoteFetcher:
     _refresh_thread = None
     _running = False
     _initialized = False
+    _multi_source_fetcher = None  # 多数据源管理器
 
     def __init__(self):
-        self.data_source = 'AKShare'
+        self.data_source = 'MultiSource'
         # 启动时初始化，确保有数据
         self._ensure_initialized()
 
@@ -36,6 +36,9 @@ class StockQuoteFetcher:
         """确保数据已初始化"""
         if not StockQuoteFetcher._initialized:
             logger.info("首次启动，正在初始化A股行情数据...")
+            # 延迟导入多数据源管理器，避免循环导入
+            from backend.data.multi_source_fetcher import get_multi_source_fetcher
+            StockQuoteFetcher._multi_source_fetcher = get_multi_source_fetcher()
             self._fetch_data()
             StockQuoteFetcher._initialized = True
             # 启动后台刷新线程
@@ -44,13 +47,21 @@ class StockQuoteFetcher:
             atexit.register(self._stop_background_refresh)
 
     def _fetch_data(self) -> pd.DataFrame:
-        """实际获取数据的方法"""
+        """实际获取数据的方法 - 使用多数据源自动故障转移"""
         try:
-            logger.debug("正在从AKShare获取A股实时行情...")
+            if self._multi_source_fetcher is None:
+                from backend.data.multi_source_fetcher import get_multi_source_fetcher
+                self._multi_source_fetcher = get_multi_source_fetcher()
+
+            logger.debug("正在从多数据源获取A股实时行情...")
             start_time = time.time()
-            df = ak.stock_zh_a_spot_em()
+            df = self._multi_source_fetcher.fetch_stock_spot()
             elapsed = time.time() - start_time
-            logger.info(f"成功获取 {len(df)} 只A股的实时行情数据 (耗时: {elapsed:.1f}秒)")
+
+            if df.empty:
+                raise ValueError("获取数据为空")
+
+            logger.info(f"成功获取 {len(df)} 只A股的实时行情数据 (耗时: {elapsed:.2f}秒)")
 
             with self._cache_lock:
                 self._spot_cache = df
@@ -207,7 +218,7 @@ class StockQuoteFetcher:
                 'is_limit_up': is_limit_up,
                 'is_limit_down': is_limit_down,
                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'data_source': 'AKShare'
+                'data_source': self._get_current_source()
             }
 
         except (ValueError, TypeError) as e:
@@ -345,6 +356,20 @@ class StockQuoteFetcher:
             self._spot_cache = None
             self._cache_time = None
             logger.debug("行情数据缓存已清除")
+
+    def _get_current_source(self) -> str:
+        """获取当前使用的数据源"""
+        if self._multi_source_fetcher:
+            best = self._multi_source_fetcher.get_best_source()
+            if best:
+                return best.name
+        return 'MultiSource'
+
+    def get_data_source_metrics(self) -> Dict:
+        """获取数据源性能指标"""
+        if self._multi_source_fetcher:
+            return self._multi_source_fetcher.get_metrics()
+        return {}
 
 
 # 测试代码
