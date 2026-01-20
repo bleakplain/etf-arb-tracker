@@ -12,7 +12,6 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import yaml
 import time
 import json
 from datetime import datetime, timedelta
@@ -24,6 +23,7 @@ from backend.data.stock_quote import StockQuoteFetcher
 from backend.data.etf_quote import ETFQuoteFetcher
 from backend.data.etf_holder import ETFHolderFetcher
 from backend.data.etf_holdings import ETFHoldingsFetcher
+from config import Config
 
 
 @dataclass
@@ -61,22 +61,16 @@ class TradingSignal:
 class LimitUpMonitor:
     """涨停监控器"""
 
-    # 策略参数默认值
-    DEFAULT_MIN_WEIGHT = 0.05      # 最小持仓权重 5%
-    DEFAULT_MIN_SEAL_AMOUNT = 10   # 最小封单量 10亿
-    DEFAULT_MIN_TIME_TO_CLOSE = 1800  # 距收盘最小时间 30分钟
-    DEFAULT_MIN_ETF_VOLUME = 5000  # ETF最小日成交额 5000万
-
-    def __init__(self, config_path: str = "config/settings.yaml"):
+    def __init__(self, config: Config = None):
         """初始化监控器"""
-        self.config = self._load_config(config_path)
+        self.config = config or Config.load()
         self.stock_fetcher = StockQuoteFetcher()
         self.etf_fetcher = ETFQuoteFetcher()
         self.holder_fetcher = ETFHolderFetcher()
         self.holdings_fetcher = ETFHoldingsFetcher()
 
         # 加载自选股
-        self.watch_stocks = self._load_watch_stocks()
+        self.watch_stocks = self.config.my_stocks
         # 加载ETF映射
         self.stock_etf_mapping = self._load_or_build_mapping()
 
@@ -90,35 +84,6 @@ class LimitUpMonitor:
         logger.info(f"监控股票数量: {len(self.watch_stocks)}")
         logger.info(f"覆盖ETF数量: {len(self.get_all_etfs())}")
 
-    def _load_config(self, config_path: str) -> dict:
-        """加载配置文件"""
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = yaml.safe_load(f)
-            logger.info(f"配置文件加载成功: {config_path}")
-            return config
-        except Exception as e:
-            logger.warning(f"加载配置文件失败: {e}，使用默认配置")
-            # 返回默认配置
-            return {
-                'strategy': {
-                    'min_weight': self.DEFAULT_MIN_WEIGHT,
-                    'min_order_amount': self.DEFAULT_MIN_SEAL_AMOUNT,
-                    'min_time_to_close': self.DEFAULT_MIN_TIME_TO_CLOSE,
-                    'min_etf_volume': self.DEFAULT_MIN_ETF_VOLUME,
-                }
-            }
-
-    def _load_watch_stocks(self) -> List[Dict]:
-        """加载自选股列表"""
-        try:
-            with open("config/stocks.yaml", 'r', encoding='utf-8') as f:
-                data = yaml.safe_load(f)
-            return data.get('my_stocks', [])
-        except Exception as e:
-            logger.warning(f"加载自选股失败: {e}")
-            return []
-
     def _load_or_build_mapping(self) -> Dict:
         """加载或构建股票-ETF映射"""
         # 先尝试加载已有映射
@@ -130,32 +95,13 @@ class LimitUpMonitor:
 
         # 如果没有，构建新的映射
         logger.info("未找到已有映射，开始构建...")
-        stock_codes = [s['code'] for s in self.watch_stocks]
-        etf_codes = self._get_watch_etf_codes()
+        stock_codes = [s.code for s in self.watch_stocks]
+        etf_codes = [e.code for e in self.config.watch_etfs]
 
         mapping = self.holder_fetcher.build_stock_etf_mapping(stock_codes, etf_codes)
         self.holder_fetcher.save_mapping(mapping)
 
         return mapping
-
-    def _get_watch_etf_codes(self) -> List[str]:
-        """获取关注的ETF代码列表"""
-        try:
-            with open("config/stocks.yaml", 'r', encoding='utf-8') as f:
-                data = yaml.safe_load(f)
-            return [e['code'] for e in data.get('watch_etfs', [])]
-        except:
-            # 默认ETF列表：主要宽基和行业ETF
-            return [
-                # 宽基
-                "510300", "510500", "510050", "159915", "588000", "159901", "512100",
-                # 科技
-                "159995", "512480", "515000", "516160", "515790",
-                # 消费
-                "512590", "159928", "512170",
-                # 金融
-                "512880", "512800"
-            ]
 
     def get_all_etfs(self) -> List[str]:
         """获取所有相关ETF代码"""
@@ -372,7 +318,7 @@ class LimitUpMonitor:
             weight_info = self.get_stock_weight_in_etf(normalized_code, etf_code)
 
             # 策略核心：只返回持仓占比 >= 5% 的ETF
-            if weight_info['weight'] >= self.DEFAULT_MIN_WEIGHT:
+            if weight_info['weight'] >= self.config.strategy.min_weight:
                 results.append({
                     'etf_code': etf_code,
                     'etf_name': etf_names.get(etf_code, f'ETF{etf_code}'),
@@ -513,16 +459,13 @@ class LimitUpMonitor:
             return None
 
         # 5. 检查时间限制（避免尾盘风险）
-        strategy = self.config.get('strategy', {})
-        min_time = strategy.get('min_time_to_close', self.DEFAULT_MIN_TIME_TO_CLOSE)
         time_to_close = self.stock_fetcher.get_time_to_close()
-
-        if time_to_close < min_time and time_to_close != -1:
+        if time_to_close < self.config.strategy.min_time_to_close and time_to_close != -1:
             logger.info(f"⚠️  距收盘仅{time_to_close//60}分钟，时间不足，跳过")
             return None
 
         # 6. 检查ETF流动性
-        min_volume = strategy.get('min_etf_volume', self.DEFAULT_MIN_ETF_VOLUME) * 10000
+        min_volume = self.config.strategy.min_etf_volume * 10000
         if not self.etf_fetcher.check_liquidity(best_etf['etf_code'], min_volume):
             logger.info(f"⚠️  {best_etf['etf_name']} 流动性不足，跳过")
             return None
@@ -656,8 +599,6 @@ class LimitUpMonitor:
 
 def main():
     """主函数"""
-    # 配置日志
-    logger.add("logs/monitor_{time}.log", rotation="100 MB")
 
     # 创建监控器
     monitor = LimitUpMonitor()

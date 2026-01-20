@@ -16,6 +16,7 @@ import requests
 from loguru import logger
 
 from backend.strategy.limit_monitor import TradingSignal
+from config import Config
 
 
 class NotificationSender:
@@ -365,46 +366,41 @@ class MultiChannelSender(NotificationSender):
         return success_count > 0
 
 
-def create_sender_from_config(config: dict) -> MultiChannelSender:
+def create_sender(config: Config) -> MultiChannelSender:
     """
     根据配置创建发送器
 
     Args:
-        config: 通知配置字典
+        config: 应用配置
 
     Returns:
         多渠道发送器
     """
     sender = MultiChannelSender()
 
-    notification_config = config.get('notification', {})
-
     # 钉钉
-    dingtalk_config = notification_config.get('dingtalk', {})
-    if dingtalk_config.get('enabled', False):
+    if config.alert.dingtalk.enabled:
         dingtalk_sender = DingTalkSender(
-            webhook=dingtalk_config.get('webhook', ''),
-            secret=dingtalk_config.get('secret', '')
+            webhook=config.alert.dingtalk.webhook,
+            secret=config.alert.dingtalk.secret
         )
         sender.add_sender(dingtalk_sender)
 
     # 邮件
-    email_config = notification_config.get('email', {})
-    if email_config.get('enabled', False):
+    if config.alert.email.enabled:
         email_sender = EmailSender(
-            smtp_server=email_config.get('smtp_server', ''),
-            smtp_port=email_config.get('smtp_port', 465),
-            sender=email_config.get('sender', ''),
-            password=email_config.get('password', ''),
-            receivers=email_config.get('receivers', [])
+            smtp_server=config.alert.email.smtp_server,
+            smtp_port=config.alert.email.smtp_port,
+            sender=config.alert.email.sender,
+            password=config.alert.email.password,
+            receivers=config.alert.email.receivers
         )
         sender.add_sender(email_sender)
 
     # 企业微信
-    wechat_config = notification_config.get('wechat_work', {})
-    if wechat_config.get('enabled', False):
+    if config.alert.wechat_work.enabled:
         wechat_sender = WeChatWorkSender(
-            webhook=wechat_config.get('webhook', '')
+            webhook=config.alert.wechat_work.webhook
         )
         sender.add_sender(wechat_sender)
 
