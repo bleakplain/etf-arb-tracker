@@ -184,7 +184,7 @@ async def get_stocks():
         自选股行情列表
     """
     mon = get_monitor()
-    stock_codes = [s['code'] for s in mon.watch_stocks]
+    stock_codes = [s.code for s in mon.watch_stocks]
 
     quotes = mon.stock_fetcher.get_batch_quotes(stock_codes)
 

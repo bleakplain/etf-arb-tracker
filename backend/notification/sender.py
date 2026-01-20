@@ -366,7 +366,7 @@ class MultiChannelSender(NotificationSender):
         return success_count > 0
 
 
-def create_sender(config: Config) -> MultiChannelSender:
+def create_sender_from_config(config) -> MultiChannelSender:
     """
     根据配置创建发送器
 

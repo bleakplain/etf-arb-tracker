@@ -518,7 +518,7 @@ class LimitUpMonitor:
 
         for stock in self.watch_stocks:
             try:
-                signal = self.generate_signal(stock['code'])
+                signal = self.generate_signal(stock.code)
                 if signal:
                     signals.append(signal)
                     self.signal_history.append(signal)
@@ -526,7 +526,7 @@ class LimitUpMonitor:
                 time.sleep(0.1)  # 避免请求过快
 
             except Exception as e:
-                logger.error(f"扫描股票 {stock['code']} 失败: {e}")
+                logger.error(f"扫描股票 {stock.code} 失败: {e}")
 
         logger.info(f"扫描完成，生成 {len(signals)} 个信号")
 
