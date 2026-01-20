@@ -1,32 +1,26 @@
 """
 涨停股数据获取模块
-自动获取当日所有涨停股票
-使用新浪财经涨停板数据接口
+使用AKShare获取当日所有涨停股票
 """
 
-import requests
-import json
+import akshare as ak
+import pandas as pd
 from typing import List, Dict
-from datetime import datetime, time
+from datetime import datetime
 from loguru import logger
 
 
 class LimitUpStocksFetcher:
-    """涨停股票数据获取器"""
+    """涨停股票数据获取器 - 基于AKShare"""
 
     def __init__(self):
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'http://finance.sina.com.cn'
-        }
+        self.data_source = 'AKShare'
 
     def get_today_limit_ups(self) -> List[Dict]:
         """
         获取今日所有涨停股票
 
-        使用新浪财经涨停板数据接口
-        URL: http://hq.sinajs.cn/list=s_sh000001,s_sz399001 (获取大盘)
-        URL: http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData
+        使用AKShare获取A股实时行情，筛选涨停股
 
         Returns:
             [
@@ -35,181 +29,79 @@ class LimitUpStocksFetcher:
                     'name': '股票名称',
                     'price': 涨停价格,
                     'change_pct': 涨跌幅,
-                    'limit_time': 封板时间,
-                    'seal_amount': 封单金额(元),
-                    'turnover': 换手率,
+                    'open': 开盘价,
+                    'high': 最高价,
+                    'low': 最低价,
                     'volume': 成交量(手),
-                    'amount': 成交额(元)
+                    'amount': 成交额(元),
+                    'turnover': 换手率,
+                    'limit_time': 封板时间,
+                    'seal_amount': 封单金额
                 },
                 ...
             ]
         """
         try:
-            # 方案1: 使用新浪财经涨停板数据API
-            # 这个API专门返回涨停板股票
-            url = "http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData"
+            logger.info("正在从AKShare获取涨停股票数据...")
 
-            # 涨停板数据参数
-            params = {
-                'page': '1',
-                'num': '500',
-                'sort': 'symbol',
-                'asc': '0',
-                'node': 'hs_a',  # 沪深A股
-                '_s_r_a': 'page',
-                'page_num': '1',
-                'scalar': '0.95',  # 涨幅阈值 9.5%以上
-                'filters': '[(\" market\",\"!\",\"3\"),(\" market\",\"!\",\"4\"),(\" zt\",\">=\",\"0\")]',
-                # zt字段: 1=涨停, 0=非涨停
-            }
+            # 获取沪深A股实时行情
+            stock_df = ak.stock_zh_a_spot_em()
 
-            # 获取所有A股行情，然后筛选涨停股
-            all_stocks = self._get_all_stocks_from_sina()
-
-            if not all_stocks:
-                logger.warning("新浪财经数据获取失败，尝试备用方案")
-                return self._get_limit_ups_from_eastmoney()
+            if stock_df.empty:
+                logger.error("获取A股行情数据失败")
+                return []
 
             # 筛选涨停股
             limit_up_stocks = []
-            for stock in all_stocks:
-                if self._is_limit_up(stock['code'], stock['change_pct']):
-                    limit_up_stocks.append(stock)
 
-            logger.info(f"从 {len(all_stocks)} 只股票中筛选出 {len(limit_up_stocks)} 只涨停股")
+            for _, row in stock_df.iterrows():
+                code = str(row.get('代码', ''))
+                change_pct = float(row.get('涨跌幅', 0)) or 0
+
+                # 判断是否涨停
+                if self._is_limit_up(code, change_pct):
+                    limit_up_stocks.append(self._parse_limit_up_row(row))
+
+            logger.info(f"从 {len(stock_df)} 只股票中筛选出 {len(limit_up_stocks)} 只涨停股")
             return limit_up_stocks
 
         except Exception as e:
             logger.error(f"获取涨停股异常: {e}")
-            return self._get_limit_ups_from_eastmoney()
-
-    def _get_all_stocks_from_sina(self) -> List[Dict]:
-        """从新浪财经获取所有A股行情"""
-        stocks = []
-
-        try:
-            # 使用新浪财经批量接口获取所有A股
-            # 沪市600xxx, 601xxx, 603xxx, 688xxx
-            # 深市000xxx, 002xxx, 003xxx, 300xxx
-
-            # 获取涨幅榜前300名（涨停股肯定在里面）
-            url = "http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData"
-
-            for market_type in ['sh_a', 'sz_a']:
-                params = {
-                    'page': '1',
-                    'num': '300',
-                    'sort': 'changepercent',
-                    'asc': '0',
-                    'node': market_type
-                }
-
-                try:
-                    response = requests.get(url, params=params, headers=self.headers, timeout=10)
-                    response.encoding = 'gbk'
-
-                    # 新浪返回的是JSONP格式，需要解析
-                    text = response.text.strip()
-                    if text.startswith('var hq_str_'):
-                        # 这是实时行情格式
-                        continue
-
-                    # 尝试解析JSON
-                    if text.startswith('/*'):
-                        # 去掉JSONP包装
-                        text = text[text.index('(')+1:text.rindex(')')]
-
-                    data = json.loads(text) if text else []
-
-                    for item in data:
-                        change_pct = float(item.get('changepercent', 0))
-
-                        stocks.append({
-                            'code': item.get('symbol', ''),
-                            'name': item.get('name', ''),
-                            'price': float(item.get('trade', 0)),
-                            'change_pct': change_pct,
-                            'open': float(item.get('open', 0)),
-                            'high': float(item.get('high', 0)),
-                            'low': float(item.get('low', 0)),
-                            'volume': int(float(item.get('volume', 0))),  # 股
-                            'amount': float(item.get('amount', 0)),  # 元
-                            'turnover': 0,
-                            'limit_time': '',
-                            'seal_amount': 0
-                        })
-
-                except Exception as e:
-                    logger.debug(f"获取{market_type}数据失败: {e}")
-                    continue
-
-            return stocks
-
-        except Exception as e:
-            logger.error(f"从新浪获取股票数据失败: {e}")
             return []
 
-    def _get_limit_ups_from_eastmoney(self) -> List[Dict]:
-        """备用方案：从东方财富获取涨停股"""
+    def _parse_limit_up_row(self, row: pd.Series) -> Dict:
+        """解析涨停股数据行"""
         try:
-            # 使用东方财富涨停板页面API
-            url = "http://push2.eastmoney.com/api/qt/clist/get"
+            code = str(row.get('代码', ''))
+            name = str(row.get('名称', ''))
+            price = float(row.get('最新价', 0)) or 0
+            change_pct = float(row.get('涨跌幅', 0)) or 0
+            open_price = float(row.get('今开', 0)) or 0
+            high = float(row.get('最高', 0)) or 0
+            low = float(row.get('最低', 0)) or 0
+            volume = int(float(row.get('成交量', 0))) or 0  # 手
+            amount = float(row.get('成交额', 0)) or 0  # 元
+            turnover = float(row.get('换手率', 0)) or 0  # %
 
-            # 涨停板数据参数
-            params = {
-                'pn': '1',
-                'pz': '200',
-                'po': '1',
-                'np': '1',
-                'ut': 'bd1d9ddb04089700cf9c27f6f7426281',
-                'fltt': '2',
-                'invt': '2',
-                'fid': 'f3',  # 按涨跌幅排序
-                'fs': 'b:MK0021,b:MK0022,b:MK0023,b:MK0024',  # 沪深A股所有板块
-                # MK0021=沪主板, MK0022=深主板, MK0023=创业板, MK0024=科创板
-                'fields': 'f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f12,f13,f14,f15,f16,f17,f18,f20,f21,f23,f24,f25,f26,f22,f33,f11,f62,f128,f136,f115,f152'
+            return {
+                'code': code,
+                'name': name,
+                'price': price,
+                'change_pct': change_pct,
+                'open': open_price,
+                'high': high,
+                'low': low,
+                'volume': volume,
+                'amount': amount,
+                'turnover': turnover,
+                'limit_time': '',  # AKShare暂不提供封板时间
+                'seal_amount': 0,   # AKShare暂不提供封单金额
+                'data_source': 'AKShare'
             }
 
-            response = requests.get(url, params=params, headers=self.headers, timeout=15)
-            data = response.json()
-
-            if data.get('rc') != 0:
-                logger.error(f"东方财富API返回错误: {data}")
-                return []
-
-            stocks = []
-            diff = data.get('data', {}).get('diff', [])
-
-            for item in diff:
-                # f3 = 涨跌幅(万分之)，需要除以100
-                change_pct = item.get('f3', 0) / 100
-                code = item.get('f12', '')
-
-                # 严格判断涨停
-                if not self._is_limit_up(code, change_pct):
-                    continue
-
-                stocks.append({
-                    'code': code,  # 纯数字代码，不带前缀
-                    'name': item.get('f14', ''),
-                    'price': item.get('f2', 0) / 1000,  # f2价格(毫)
-                    'change_pct': change_pct,
-                    'open': item.get('f17', 0) / 1000,
-                    'high': item.get('f15', 0) / 1000,
-                    'low': item.get('f16', 0) / 1000,
-                    'volume': item.get('f5', 0),  # 成交量(手)
-                    'amount': item.get('f6', 0),   # 成交额(元)
-                    'turnover': item.get('f8', 0) / 100 if item.get('f8') else 0,  # 换手率(百)
-                    'limit_time': '',
-                    'seal_amount': 0
-                })
-
-            logger.info(f"从东方财富获取到 {len(stocks)} 只涨停股")
-            return stocks
-
-        except Exception as e:
-            logger.error(f"从东方财富获取涨停股失败: {e}")
-            return []
+        except (ValueError, TypeError) as e:
+            logger.error(f"解析涨停股数据失败: {e}")
+            return {}
 
     def _is_limit_up(self, code: str, change_pct: float) -> bool:
         """
@@ -217,32 +109,64 @@ class LimitUpStocksFetcher:
 
         Args:
             code: 股票代码
-            change_pct: 涨跌幅（小数形式，如0.0995表示9.95%）
+            change_pct: 涨跌幅（百分比形式，如9.95表示9.95%）
 
         Returns:
             是否涨停
         """
-        if change_pct < 0.095:  # 涨幅小于9.5%，肯定不是涨停
+        if change_pct < 9.5:  # 涨幅小于9.5%，肯定不是涨停
             return False
 
         # 根据板块判断涨停限制
         if code.startswith('688') or code.startswith('300'):
             # 科创板/创业板: 20%涨停
             # 允许一点误差（四舍五入）
-            return change_pct >= 0.195
+            return change_pct >= 19.5
         elif code.startswith('8') or code.startswith('4'):
             # 北交所: 30%涨停
-            return change_pct >= 0.295
+            return change_pct >= 29.5
         elif code.startswith('30'):
             # 创业板: 20%涨停
-            return change_pct >= 0.195
+            return change_pct >= 19.5
         elif code.startswith('6') or code.startswith('00') or code.startswith('60'):
             # 主板: 10%涨停
             # ST股票是5%，但这里简化处理
-            return change_pct >= 0.095
+            return change_pct >= 9.5
         else:
             # 其他情况，按10%计算
-            return change_pct >= 0.095
+            return change_pct >= 9.5
+
+    def get_limit_ups_by_sector(self, sector: str = None) -> List[Dict]:
+        """
+        按板块获取涨停股
+
+        Args:
+            sector: 板块代码 ('sh'=上海, 'sz'=深圳, 'cyb'=创业板, 'kcb'=科创板)
+                   如果为None，返回所有涨停股
+
+        Returns:
+            该板块的涨停股列表
+        """
+        all_limit_ups = self.get_today_limit_ups()
+
+        if not sector:
+            return all_limit_ups
+
+        # 根据板块筛选
+        if sector == 'sh':
+            # 上海市场：60xxxx, 688xxx
+            return [s for s in all_limit_ups if s['code'].startswith('6')]
+        elif sector == 'sz':
+            # 深圳市场：00xxxx, 30xxxx
+            return [s for s in all_limit_ups if s['code'].startswith(('0', '3'))]
+        elif sector == 'cyb':
+            # 创业板：30xxxx
+            return [s for s in all_limit_ups if s['code'].startswith('30')]
+        elif sector == 'kcb':
+            # 科创板：688xxx
+            return [s for s in all_limit_ups if s['code'].startswith('688')]
+        else:
+            return all_limit_ups
 
     def get_hot_concepts(self) -> List[Dict]:
         """
@@ -255,36 +179,61 @@ class LimitUpStocksFetcher:
             ]
         """
         try:
-            url = "http://push2.eastmoney.com/api/qt/clist/get"
-            params = {
-                'pn': '1',
-                'pz': '50',
-                'po': '1',
-                'np': '1',
-                'ut': 'bd1d9ddb04089700cf9c27f6f7426281',
-                'fltt': '2',
-                'invt': '2',
-                'fid': 'f3',
-                'fs': 'm:90+t:2',  # 概念板块
-                'fields': 'f12,f14,f2,f3,f62'
-            }
+            logger.info("正在从AKShare获取热门概念板块...")
 
-            response = requests.get(url, params=params, headers=self.headers, timeout=10)
-            data = response.json()
+            # AKShare获取概念板块行情
+            concept_df = ak.stock_board_concept_name_em()
 
-            concepts = []
-            for item in data.get('data', {}).get('diff', []):
-                concepts.append({
-                    'code': item.get('f12', ''),
-                    'name': item.get('f14', ''),
-                    'change_pct': item.get('f3', 0) / 100,
-                    'lead_stock': item.get('f62', '')  # 龙头股票
+            if concept_df.empty:
+                logger.warning("获取概念板块数据为空")
+                return []
+
+            # 按涨幅排序，取前50
+            hot_concepts = []
+            for _, row in concept_df.head(50).iterrows():
+                hot_concepts.append({
+                    'code': str(row.get('板块代码', '')),
+                    'name': str(row.get('板块名称', '')),
+                    'change_pct': float(row.get('涨跌幅', 0)) or 0,
+                    'lead_stock': str(row.get('领涨股票', '')) if '领涨股票' in row else '',
+                    'data_source': 'AKShare'
                 })
 
-            return concepts
+            logger.info(f"获取到 {len(hot_concepts)} 个热门概念板块")
+            return hot_concepts
 
         except Exception as e:
             logger.error(f"获取热门概念失败: {e}")
+            return []
+
+    def get_industry_performance(self) -> List[Dict]:
+        """
+        获取行业板块表现
+
+        Returns:
+            [{'name': '行业名称', 'change_pct': 涨幅, 'count': 涨停股数量}, ...]
+        """
+        try:
+            # 获取行业板块行情
+            industry_df = ak.stock_board_industry_name_em()
+
+            if industry_df.empty:
+                return []
+
+            industries = []
+            for _, row in industry_df.iterrows():
+                industries.append({
+                    'code': str(row.get('板块代码', '')),
+                    'name': str(row.get('板块名称', '')),
+                    'change_pct': float(row.get('涨跌幅', 0)) or 0,
+                    'lead_stock': str(row.get('领涨股票', '')) if '领涨股票' in row else '',
+                    'data_source': 'AKShare'
+                })
+
+            return industries
+
+        except Exception as e:
+            logger.error(f"获取行业板块表现失败: {e}")
             return []
 
 
@@ -307,3 +256,14 @@ if __name__ == "__main__":
                   f"¥{stock['price']:.2f} (+{stock['change_pct']:.2f}%)")
     else:
         print("\n当前无涨停股或非交易时间")
+
+    # 测试热门概念
+    print("\n" + "=" * 60)
+    print("热门概念板块")
+    print("=" * 60)
+
+    concepts = fetcher.get_hot_concepts()
+    if concepts:
+        print(f"\n前10个热门概念:")
+        for i, concept in enumerate(concepts[:10], 1):
+            print(f"{i}. {concept['name']} - {concept['change_pct']:+.2f}%")
