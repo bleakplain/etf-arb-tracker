@@ -1,6 +1,6 @@
 """
 A股实时行情数据获取模块
-使用多数据源（efinance + akshare）自动故障转移
+使用新的数据管理器架构（腾讯免费数据源）
 优化：后台定时刷新 + 读取缓存
 """
 
@@ -13,8 +13,28 @@ from loguru import logger
 import threading
 
 
+def _safe_float(value, default=0.0):
+    """安全地转换为float，处理'-'等无效值"""
+    try:
+        if value is None or value == '' or value == '-':
+            return default
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_int(value, default=0):
+    """安全地转换为int，处理'-'等无效值"""
+    try:
+        if value is None or value == '' or value == '-':
+            return default
+        return int(float(value))
+    except (ValueError, TypeError):
+        return default
+
+
 class StockQuoteFetcher:
-    """A股行情数据获取器 - 多数据源自动故障转移"""
+    """A股行情数据获取器 - 使用新数据管理器架构"""
 
     # 类变量，用于缓存行情数据
     _cache_lock = threading.Lock()
@@ -25,10 +45,11 @@ class StockQuoteFetcher:
     _refresh_thread = None
     _running = False
     _initialized = False
-    _multi_source_fetcher = None  # 多数据源管理器
+    _data_manager = None  # 数据管理器
 
-    def __init__(self):
-        self.data_source = 'MultiSource'
+    def __init__(self, config: Optional[Dict] = None):
+        self.data_source = 'DataManager'
+        self._config = config or {}
         # 启动时初始化，确保有数据
         self._ensure_initialized()
 
@@ -36,9 +57,9 @@ class StockQuoteFetcher:
         """确保数据已初始化"""
         if not StockQuoteFetcher._initialized:
             logger.info("首次启动，正在初始化A股行情数据...")
-            # 延迟导入多数据源管理器，避免循环导入
-            from backend.data.multi_source_fetcher import get_multi_source_fetcher
-            StockQuoteFetcher._multi_source_fetcher = get_multi_source_fetcher()
+            # 导入数据管理器
+            from backend.data.data_manager import get_data_manager
+            StockQuoteFetcher._data_manager = get_data_manager(self._config)
             self._fetch_data()
             StockQuoteFetcher._initialized = True
             # 启动后台刷新线程
@@ -47,19 +68,28 @@ class StockQuoteFetcher:
             atexit.register(self._stop_background_refresh)
 
     def _fetch_data(self) -> pd.DataFrame:
-        """实际获取数据的方法 - 使用多数据源自动故障转移"""
+        """实际获取数据的方法 - 使用数据管理器"""
         try:
-            if self._multi_source_fetcher is None:
-                from backend.data.multi_source_fetcher import get_multi_source_fetcher
-                self._multi_source_fetcher = get_multi_source_fetcher()
+            if self._data_manager is None:
+                from backend.data.data_manager import get_data_manager
+                self._data_manager = get_data_manager(self._config)
 
-            logger.debug("正在从多数据源获取A股实时行情...")
+            logger.debug("正在从数据管理器获取A股实时行情...")
             start_time = time.time()
-            df = self._multi_source_fetcher.fetch_stock_spot()
+            df = self._data_manager.fetch_stock_spot()
             elapsed = time.time() - start_time
 
             if df.empty:
-                raise ValueError("获取数据为空")
+                # 数据源返回空，可能是临时网络问题，检查是否有可用缓存
+                with self._cache_lock:
+                    if self._spot_cache is not None:
+                        cache_age = time.time() - self._cache_time
+                        # 如果缓存不超过5分钟，仍然使用
+                        if cache_age < 300:
+                            logger.warning(f"数据源暂时不可用，使用缓存数据 (缓存年龄: {cache_age:.1f}秒)")
+                            return self._spot_cache
+
+                raise ValueError("获取数据为空且无可用缓存")
 
             logger.info(f"成功获取 {len(df)} 只A股的实时行情数据 (耗时: {elapsed:.2f}秒)")
 
@@ -72,9 +102,11 @@ class StockQuoteFetcher:
         except Exception as e:
             logger.error(f"获取A股行情失败: {e}")
             # 如果有旧缓存，返回旧缓存
-            if self._spot_cache is not None:
-                logger.warning("使用缓存的行情数据")
-                return self._spot_cache
+            with self._cache_lock:
+                if self._spot_cache is not None:
+                    cache_age = time.time() - self._cache_time
+                    logger.warning(f"使用缓存的行情数据 (缓存年龄: {cache_age:.1f}秒)")
+                    return self._spot_cache
             return pd.DataFrame()
 
     def _background_refresh_worker(self):
@@ -179,25 +211,24 @@ class StockQuoteFetcher:
     def _parse_stock_row(self, row: pd.Series) -> Dict:
         """解析单行股票数据"""
         try:
-            # AKShare字段映射
+            # 数据字段映射
             code = str(row.get('代码', ''))
             name = str(row.get('名称', ''))
-            price = float(row.get('最新价', 0)) or 0
-            prev_close = float(row.get('昨收', 0)) or 0
-            open_price = float(row.get('今开', 0)) or 0
-            high = float(row.get('最高', 0)) or 0
-            low = float(row.get('最低', 0)) or 0
-            volume = int(float(row.get('成交量', 0))) or 0  # AKShare返回的是手
-            amount = float(row.get('成交额', 0)) or 0  # 元
-            change_pct = float(row.get('涨跌幅', 0)) or 0
+            price = _safe_float(row.get('最新价'))
+            prev_close = _safe_float(row.get('昨收'))
+            open_price = _safe_float(row.get('今开'))
+            high = _safe_float(row.get('最高'))
+            low = _safe_float(row.get('最低'))
+            volume = _safe_int(row.get('成交量'))  # 手
+            amount = _safe_float(row.get('成交额'))  # 元
+            change = _safe_float(row.get('涨跌额', price - prev_close))
+            change_pct = _safe_float(row.get('涨跌幅'))
 
             # 如果当前价为0（未开盘或停牌），使用昨收价代替
             if price == 0 and prev_close > 0:
                 price = prev_close
                 change = 0
                 change_pct = 0
-            else:
-                change = price - prev_close
 
             # 判断是否涨停
             is_limit_up = self._is_limit_up(code, change_pct)
@@ -359,16 +390,14 @@ class StockQuoteFetcher:
 
     def _get_current_source(self) -> str:
         """获取当前使用的数据源"""
-        if self._multi_source_fetcher:
-            best = self._multi_source_fetcher.get_best_source()
-            if best:
-                return best.name
-        return 'MultiSource'
+        if self._data_manager:
+            return 'DataManager'
+        return 'Unknown'
 
     def get_data_source_metrics(self) -> Dict:
         """获取数据源性能指标"""
-        if self._multi_source_fetcher:
-            return self._multi_source_fetcher.get_metrics()
+        if self._data_manager:
+            return self._data_manager.get_metrics()
         return {}
 
 
@@ -403,10 +432,3 @@ if __name__ == "__main__":
     print(f"批量获取 {len(quotes)} 只股票，响应时间: {elapsed*1000:.1f}毫秒")
     for code, quote in quotes.items():
         print(f"{quote['name']}: {quote['price']:.2f} ({quote['change_pct']:+.2f}%)")
-
-    # 等待观察后台刷新
-    print("\n等待后台刷新...")
-    time.sleep(20)
-
-    status = fetcher.get_cache_status()
-    print(f"刷新后缓存状态: {status}")

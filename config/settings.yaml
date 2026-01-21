@@ -28,17 +28,48 @@ trading_hours:
 
 # 数据源配置
 data_sources:
-  # 行情数据源
-  quote:
-    - name: "sina"
-      url: "http://hq.sinajs.cn"
-    - name: "tencent"
-      url: "http://qt.gtimg.cn"
+  # 免费高频数据源（实时行情）
+  tencent:
+    enabled: true
+    priority: 1
+    description: "腾讯财经API，完全免费，支持批量查询（每次最多100只）"
+
+  sina:
+    enabled: false
+    priority: 2
+    description: "新浪财经API（已不可用，已禁用）"
+
+  # 付费低频数据源（财务数据、历史数据）
+  tushare:
+    enabled: false
+    priority: 10
+    token: ""  # 在环境变量 TUSHARE_TOKEN 中配置
+    description: "Tushare专业版，需要token，支持财务数据、历史数据"
 
   # ETF持仓数据源
   holdings:
     - name: "eastmoney"
       url: "http://fund.eastmoney.com"
+
+# 常用股票代码列表（用于数据源查询）
+# 如果数据源需要指定代码列表，将使用此列表
+common_stocks:
+  - code: "600519"
+    name: "贵州茅台"
+  - code: "000001"
+    name: "平安银行"
+  - code: "600036"
+    name: "招商银行"
+  - code: "601318"
+    name: "中国平安"
+  - code: "300750"
+    name: "宁德时代"
+  - code: "510300"
+    name: "沪深300ETF"
+  - code: "510500"
+    name: "中证500ETF"
+  - code: "159915"
+    name: "创业板ETF"
 
 # 消息通知配置
 notification:

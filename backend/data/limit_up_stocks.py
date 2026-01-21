@@ -1,21 +1,48 @@
 """
 涨停股数据获取模块
-使用AKShare获取当日所有涨停股票
+使用数据管理器获取当日所有涨停股票
 优化：复用StockQuoteFetcher的缓存数据
 """
 
-import akshare as ak
 import pandas as pd
 from typing import List, Dict
 from datetime import datetime
 from loguru import logger
 
 
+def _safe_float(value, default=0.0):
+    """安全地转换为float，处理'-'等无效值"""
+    try:
+        if value is None or value == '' or value == '-':
+            return default
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_int(value, default=0):
+    """安全地转换为int，处理'-'等无效值"""
+    try:
+        if value is None or value == '' or value == '-':
+            return default
+        return int(float(value))
+    except (ValueError, TypeError):
+        return default
+
+
 class LimitUpStocksFetcher:
     """涨停股票数据获取器 - 复用股票行情缓存"""
 
     def __init__(self):
-        self.data_source = 'AKShare'
+        self.data_source = 'DataManager'
+        self._data_manager = None
+
+    def _get_data_manager(self):
+        """获取数据管理器"""
+        if self._data_manager is None:
+            from backend.data.data_manager import get_data_manager
+            self._data_manager = get_data_manager()
+        return self._data_manager
 
     def get_today_limit_ups(self, stock_df: pd.DataFrame = None) -> List[Dict]:
         """
@@ -30,10 +57,11 @@ class LimitUpStocksFetcher:
             涨停股票列表
         """
         try:
-            # 如果没有传入数据，才去获取
+            # 如果没有传入数据，获取数据
             if stock_df is None or stock_df.empty:
-                logger.info("正在从AKShare获取涨停股票数据...")
-                stock_df = ak.stock_zh_a_spot_em()
+                logger.info("正在获取涨停股票数据...")
+                data_manager = self._get_data_manager()
+                stock_df = data_manager.fetch_stock_spot()
 
                 if stock_df.empty:
                     logger.error("获取A股行情数据失败")
@@ -41,11 +69,11 @@ class LimitUpStocksFetcher:
             else:
                 logger.debug(f"复用缓存数据，包含 {len(stock_df)} 只股票")
 
-            # 使用pandas向量化操作筛选涨停股（比循环快）
+            # 使用pandas向量化操作筛选涨停股
             mask = stock_df.apply(
                 lambda row: self._is_limit_up(
                     str(row.get('代码', '')),
-                    float(row.get('涨跌幅', 0)) or 0
+                    _safe_float(row.get('涨跌幅'))
                 ),
                 axis=1
             )
@@ -71,14 +99,14 @@ class LimitUpStocksFetcher:
         try:
             code = str(row.get('代码', ''))
             name = str(row.get('名称', ''))
-            price = float(row.get('最新价', 0)) or 0
-            change_pct = float(row.get('涨跌幅', 0)) or 0
-            open_price = float(row.get('今开', 0)) or 0
-            high = float(row.get('最高', 0)) or 0
-            low = float(row.get('最低', 0)) or 0
-            volume = int(float(row.get('成交量', 0))) or 0  # 手
-            amount = float(row.get('成交额', 0)) or 0  # 元
-            turnover = float(row.get('换手率', 0)) or 0  # %
+            price = _safe_float(row.get('最新价'))
+            change_pct = _safe_float(row.get('涨跌幅'))
+            open_price = _safe_float(row.get('今开'))
+            high = _safe_float(row.get('最高'))
+            low = _safe_float(row.get('最低'))
+            volume = _safe_int(row.get('成交量'))  # 手
+            amount = _safe_float(row.get('成交额'))  # 元
+            turnover = _safe_float(row.get('换手率')) if '换手率' in row else 0.0
 
             return {
                 'code': code,
@@ -93,7 +121,7 @@ class LimitUpStocksFetcher:
                 'turnover': turnover,
                 'limit_time': '',
                 'seal_amount': 0,
-                'data_source': 'AKShare'
+                'data_source': 'DataManager'
             }
 
         except (ValueError, TypeError) as e:
@@ -106,24 +134,21 @@ class LimitUpStocksFetcher:
 
         Args:
             code: 股票代码
-            change_pct: 涨跌幅（百分比形式，如9.95表示9.95%）
+            change_pct: 涨跌幅（小数形式，如0.0995表示9.95%）
 
         Returns:
             是否涨停
         """
-        if change_pct < 9.5:
+        # change_pct 使用小数形式，如 0.095 表示 9.5%
+        if change_pct < 0.095:
             return False
 
         if code.startswith('688') or code.startswith('300'):
-            return change_pct >= 19.5
+            return change_pct >= 0.195
         elif code.startswith('8') or code.startswith('4'):
-            return change_pct >= 29.5
-        elif code.startswith('30'):
-            return change_pct >= 19.5
-        elif code.startswith('6') or code.startswith('00') or code.startswith('60'):
-            return change_pct >= 9.5
+            return change_pct >= 0.295
         else:
-            return change_pct >= 9.5
+            return change_pct >= 0.095
 
     def get_limit_ups_by_sector(self, sector: str = None, stock_df: pd.DataFrame = None) -> List[Dict]:
         """
@@ -151,54 +176,6 @@ class LimitUpStocksFetcher:
             return [s for s in all_limit_ups if s['code'].startswith('688')]
         else:
             return all_limit_ups
-
-    def get_hot_concepts(self) -> List[Dict]:
-        """获取当日热门概念板块"""
-        try:
-            concept_df = ak.stock_board_concept_name_em()
-
-            if concept_df.empty:
-                return []
-
-            hot_concepts = []
-            for _, row in concept_df.head(50).iterrows():
-                hot_concepts.append({
-                    'code': str(row.get('板块代码', '')),
-                    'name': str(row.get('板块名称', '')),
-                    'change_pct': float(row.get('涨跌幅', 0)) or 0,
-                    'lead_stock': str(row.get('领涨股票', '')) if '领涨股票' in row else '',
-                    'data_source': 'AKShare'
-                })
-
-            return hot_concepts
-
-        except Exception as e:
-            logger.error(f"获取热门概念失败: {e}")
-            return []
-
-    def get_industry_performance(self) -> List[Dict]:
-        """获取行业板块表现"""
-        try:
-            industry_df = ak.stock_board_industry_name_em()
-
-            if industry_df.empty:
-                return []
-
-            industries = []
-            for _, row in industry_df.iterrows():
-                industries.append({
-                    'code': str(row.get('板块代码', '')),
-                    'name': str(row.get('板块名称', '')),
-                    'change_pct': float(row.get('涨跌幅', 0)) or 0,
-                    'lead_stock': str(row.get('领涨股票', '')) if '领涨股票' in row else '',
-                    'data_source': 'AKShare'
-                })
-
-            return industries
-
-        except Exception as e:
-            logger.error(f"获取行业板块表现失败: {e}")
-            return []
 
 
 # 测试代码

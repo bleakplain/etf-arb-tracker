@@ -1,6 +1,6 @@
 """
 ETF行情数据获取模块
-使用多数据源（efinance + akshare）自动故障转移
+使用新的数据管理器架构
 优化：后台定时刷新 + 读取缓存
 """
 
@@ -14,7 +14,7 @@ import threading
 
 
 class ETFQuoteFetcher:
-    """ETF行情获取器 - 多数据源自动故障转移"""
+    """ETF行情获取器 - 使用新数据管理器架构"""
 
     # 类变量，用于缓存ETF行情数据
     _cache_lock = threading.Lock()
@@ -25,10 +25,11 @@ class ETFQuoteFetcher:
     _refresh_thread = None
     _running = False
     _initialized = False
-    _multi_source_fetcher = None  # 多数据源管理器
+    _data_manager = None  # 数据管理器
 
-    def __init__(self):
-        self.data_source = 'MultiSource'
+    def __init__(self, config: dict = None):
+        self.data_source = 'DataManager'
+        self._config = config or {}
         self.etf_limits = {
             'default': 0.10,
             'bond': 0.10,
@@ -43,9 +44,9 @@ class ETFQuoteFetcher:
         """确保数据已初始化"""
         if not ETFQuoteFetcher._initialized:
             logger.info("首次启动，正在初始化ETF行情数据...")
-            # 延迟导入多数据源管理器，避免循环导入
-            from backend.data.multi_source_fetcher import get_multi_source_fetcher
-            ETFQuoteFetcher._multi_source_fetcher = get_multi_source_fetcher()
+            # 导入数据管理器
+            from backend.data.data_manager import get_data_manager
+            ETFQuoteFetcher._data_manager = get_data_manager(self._config)
             self._fetch_data()
             ETFQuoteFetcher._initialized = True
             # 启动后台刷新线程
@@ -54,15 +55,15 @@ class ETFQuoteFetcher:
             atexit.register(self._stop_background_refresh)
 
     def _fetch_data(self) -> pd.DataFrame:
-        """实际获取数据的方法 - 使用多数据源自动故障转移"""
+        """实际获取数据的方法 - 使用数据管理器"""
         try:
-            if self._multi_source_fetcher is None:
-                from backend.data.multi_source_fetcher import get_multi_source_fetcher
-                self._multi_source_fetcher = get_multi_source_fetcher()
+            if self._data_manager is None:
+                from backend.data.data_manager import get_data_manager
+                self._data_manager = get_data_manager(self._config)
 
-            logger.debug("正在从多数据源获取ETF实时行情...")
+            logger.debug("正在从数据管理器获取ETF实时行情...")
             start_time = time.time()
-            df = self._multi_source_fetcher.fetch_etf_spot()
+            df = self._data_manager.fetch_etf_spot()
             elapsed = time.time() - start_time
 
             if df.empty:
@@ -309,16 +310,14 @@ class ETFQuoteFetcher:
 
     def _get_current_source(self) -> str:
         """获取当前使用的数据源"""
-        if self._multi_source_fetcher:
-            best = self._multi_source_fetcher.get_best_source()
-            if best:
-                return best.name
-        return 'MultiSource'
+        if self._data_manager:
+            return 'DataManager'
+        return 'Unknown'
 
     def get_data_source_metrics(self) -> Dict:
         """获取数据源性能指标"""
-        if self._multi_source_fetcher:
-            return self._multi_source_fetcher.get_metrics()
+        if self._data_manager:
+            return self._data_manager.get_metrics()
         return {}
 
 

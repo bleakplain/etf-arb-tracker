@@ -69,13 +69,19 @@ notification:
 etf-arb-tracker/
 ├── backend/
 │   ├── data/                      # 数据获取模块
-│   │   ├── stock_quote.py         # A股行情（多数据源）
+│   │   ├── stock_quote.py         # A股行情（新架构）
 │   │   ├── etf_quote.py           # ETF行情
 │   │   ├── etf_holder.py          # 股票-ETF映射
 │   │   ├── etf_holdings.py        # ETF持仓数据
 │   │   ├── limit_up_stocks.py     # 涨停股获取
 │   │   ├── kline.py               # K线数据
-│   │   └── multi_source_fetcher.py # 多数据源管理器
+│   │   ├── data_manager.py        # 数据管理器（单例）
+│   │   ├── source_base.py         # 数据源基类
+│   │   └── sources/               # 数据源实现
+│   │       ├── __init__.py
+│   │       ├── tencent_source.py  # 腾讯财经数据源
+│   │       ├── sina_source.py     # 新浪财经数据源
+│   │       └── tushare_source.py  # Tushare数据源
 │   ├── strategy/
 │   │   └── limit_monitor.py       # 涨停监控策略引擎
 │   ├── notification/
@@ -463,11 +469,18 @@ tail -f logs/app_error.log
 
 | 数据类型 | 主要数据源 | 备用数据源 |
 |----------|-----------|-----------|
-| **A股行情** | EFinance | AKShare |
-| **ETF行情** | EFinance | AKShare |
-| **涨停股** | AKShare (东方财富) | - |
-| **K线数据** | AKShare | - |
+| **A股实时行情** | 腾讯财经（免费高频） | 新浪财经 |
+| **ETF实时行情** | 腾讯财经（免费高频） | 新浪财经 |
+| **涨停股** | 通过A股行情筛选 | - |
+| **K线数据** | 腾讯财经 | - |
 | **ETF持仓** | 天天基金 (fundf10.eastmoney.com) | 东方财富 (push2.eastmoney.com) |
+
+### 新架构特点
+
+- **免费高频优先**：实时行情优先使用免费的腾讯/新浪数据源
+- **智能故障转移**：主数据源失败时自动切换到备用源
+- **后台定时刷新**：数据缓存15秒自动刷新，业务读取响应<10ms
+- **性能监控**：自动记录每个数据源的成功率、响应时间
 
 > 本项目仅供学习研究使用，不构成投资建议。
 
