@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **领域层 (Domain Layer)**
+  - `backend/domain/interfaces.py` - 7个业务接口定义（IQuoteFetcher, IETFHolderProvider等）
+  - `backend/domain/value_objects.py` - 值对象（StockInfo, ETFReference, TradingSignal等）
+  - `backend/domain/models.py` - 领域模型（LimitUpInfo）
+- **基础设施层 (Infrastructure Layer)**
+  - `backend/infrastructure/cache/ttl_cache.py` - 可复用的TTL缓存组件
+  - 支持懒加载、自动过期、统计信息、LRU淘汰策略
+- **策略组件重构**
+  - `backend/strategy/limit_checker.py` - 涨停检查器（~70行）
+  - `backend/strategy/etf_selector.py` - ETF选择器（~170行）
+  - `backend/strategy/signal_generator.py` - 信号生成器（~110行）
+  - `backend/strategy/signal_repository.py` - 信号仓储（~70行）
+  - `backend/strategy/limit_monitor.py` - 重构为协调器模式（~300行）
+- **API状态管理**
+  - `backend/api/state.py` - API状态管理器（MonitorState, APIStateManager）
+  - 消除全局变量，提供线程安全的状态管理
+- **缓存适配器**
+  - `backend/data/cache_adapter.py` - 使用TTLCache的缓存适配器
+
+### Changed
+- **架构重构** - 参考《重构》方法进行系统性重构
+  - 最大类从567行减少到300行（↓47%）
+  - 消除3个全局变量（-100%）
+  - 减少约300行重复缓存代码（-67%）
+- **依赖倒置** - 高层模块依赖接口而非具体实现
+- **单一职责** - 每个类只负责一个明确的业务功能
+- **线程安全** - 状态管理器和缓存组件都是线程安全的
+- **可测试性** - 通过依赖注入和接口抽象提升可测试性
+
+### Fixed
+- 修复API层全局状态导致的测试困难问题
+- 修复重复缓存逻辑导致的维护困难问题
+
+## [0.3.0] - 2026-01-21
+
+### Added
+- **统一列名映射** (`backend/data/column_mappings.py`)
+  - 集中管理所有数据源的列名转换规则
+  - 支持 `TENCENT_COLUMN_MAPPING`, `SINA_COLUMN_MAPPING`, `TUSHARE_COLUMN_MAPPING`
+- **通用解析器模块** (`backend/data/parsers.py`)
+  - `parse_quote_row()` - 统一的行情行解析函数
+  - `batch_parse_quotes()` - 批量解析行情数据
+  - `add_limit_flags()` - 自动添加涨跌停标记
+- **信号评估器模块** (`backend/strategy/signal_evaluators.py`)
+  - 使用策略模式实现多种评估算法
+  - `DefaultSignalEvaluator` - 默认评估器
+  - `ConservativeEvaluator` - 保守型评估器（更严格标准）
+  - `AggressiveEvaluator` - 激进型评估器（更宽松标准）
+  - `SignalEvaluatorFactory` - 评估器工厂类
+- **数据源评分配置** (`ScoringConfig`)
+  - 可配置的成功率、速度、优先级权重
+  - 可调整的速度评分参数
+- **信号评估配置** (`SignalEvaluationConfig`)
+  - 可配置的置信度阈值（权重、排名）
+  - 可配置的风险阈值（时间、集中度）
+- **缓存配置类** (`CacheConfig`)
+  - 统一的缓存参数配置
+
+### Changed
+- **数据源代码简化**
+  - 三个数据源文件使用统一的列名映射
+  - 减少 200-300 行重复代码
+- **行情模块重构**
+  - `stock_quote.py` 和 `etf_quote.py` 使用通用解析器
+  - 简化 `_parse_stock_row` 和 `_parse_etf_row` 方法
+- **监控器改进**
+  - `LimitUpMonitor` 支持可配置的评估器类型
+  - 信号评估逻辑提取到独立的评估器类
+- **配置系统增强**
+  - `config/settings.yaml` 新增 `signal_evaluation` 配置段
+  - `Config` 类新增 `signal_evaluation` 属性
+
+### Fixed
+- 修复行情数据解析中 `data_source` 字段缺失的问题
+- 确保所有解析后的数据都包含数据源标识
+
 ## [0.2.0] - 2026-01-20
 
 ### Added
@@ -50,6 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Associated ETF list filtering (only ETFs with >=5% holdings)
 - Table styling optimization
 
-[Unreleased]: https://github.com/bleakplain/etf-arb-tracker/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/bleakplain/etf-arb-tracker/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/bleakplain/etf-arb-tracker/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/bleakplain/etf-arb-tracker/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bleakplain/etf-arb-tracker/releases/tag/v0.1.0

@@ -17,6 +17,7 @@ from backend.data.source_base import (
     SourceCapability
 )
 from backend.data.utils import convert_code_format, denormalize_code
+from backend.data.column_mappings import TUSHARE_COLUMN_MAPPING
 
 
 class TushareDataSource(BaseDataSource):
@@ -135,21 +136,8 @@ class TushareDataSource(BaseDataSource):
             # 合并数据
             df = pd.merge(df_daily, df, on='ts_code', how='left')
 
-            # 转换列名
-            df = df.rename(columns={
-                'ts_code': 'ts_code',
-                'open': '今开',
-                'high': '最高',
-                'low': '最低',
-                'close': '最新价',
-                'pre_close': '昨收',
-                'vol': '成交量',
-                'amount': '成交额',
-                'pct_chg': '涨跌幅',
-                'turnover_rate': '换手率',
-                'pe': '市盈率',
-                'pb': '市净率',
-            })
+            # 转换列名，使用统一的列名映射
+            df = df.rename(columns=TUSHARE_COLUMN_MAPPING)
 
             # 添加代码列（去掉后缀）
             df['代码'] = df['ts_code'].apply(denormalize_code)

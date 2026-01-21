@@ -15,7 +15,7 @@ from typing import List, Optional
 import requests
 from loguru import logger
 
-from backend.strategy.limit_monitor import TradingSignal
+from backend.domain.value_objects import TradingSignal
 from config import Config
 
 
@@ -409,7 +409,7 @@ def create_sender_from_config(config) -> MultiChannelSender:
 
 # 测试代码
 if __name__ == "__main__":
-    from backend.strategy.limit_monitor import TradingSignal
+    from backend.domain.value_objects import TradingSignal
 
     # 创建测试信号
     test_signal = TradingSignal(

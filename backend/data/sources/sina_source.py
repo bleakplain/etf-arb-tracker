@@ -23,6 +23,8 @@ from backend.data.utils import (
     is_limit_down,
     convert_code_format
 )
+from backend.data.column_mappings import SINA_COLUMN_MAPPING
+from backend.data.parsers import add_limit_flags
 
 
 class SinaDataSource(BaseDataSource):
@@ -189,33 +191,12 @@ class SinaDataSource(BaseDataSource):
                 self.metrics.record_failure()
                 return pd.DataFrame()
 
-            # 转换为DataFrame
+            # 转换为DataFrame，使用统一的列名映射
             df = pd.DataFrame(list(all_results.values()))
-            df = df.rename(columns={
-                'code': '代码',
-                'name': '名称',
-                'price': '最新价',
-                'prev_close': '昨收',
-                'open': '今开',
-                'high': '最高',
-                'low': '最低',
-                'volume': '成交量',
-                'amount': '成交额',
-                'change': '涨跌额',
-                'change_pct': '涨跌幅',
-                'turnover': '换手率',
-            })
+            df = df.rename(columns=SINA_COLUMN_MAPPING)
 
             # 添加涨停/跌停标记
-            if '涨跌幅' in df.columns:
-                df['is_limit_up'] = df.apply(
-                    lambda row: is_limit_up(row['代码'], row['涨跌幅']),
-                    axis=1
-                )
-                df['is_limit_down'] = df.apply(
-                    lambda row: is_limit_down(row['代码'], row['涨跌幅']),
-                    axis=1
-                )
+            df = add_limit_flags(df)
 
             elapsed = time.time() - start_time
             self.metrics.record_success(elapsed)

@@ -11,6 +11,13 @@ from loguru import logger
 import pandas as pd
 
 
+class CacheConfig:
+    """缓存配置类"""
+    DEFAULT_TTL = 30              # 默认缓存过期时间（秒）
+    DEFAULT_REFRESH_INTERVAL = 15 # 默认刷新间隔（秒）
+    SHUTDOWN_TIMEOUT = 2          # 线程关闭超时（秒）
+
+
 class BaseCachedFetcher:
     """
     带缓存的数据获取器基类
@@ -19,14 +26,17 @@ class BaseCachedFetcher:
     - 后台定时刷新
     - 缓存管理
     - 线程安全
+
+    子类需要实现：
+    - _fetch_data(): 实际获取数据的方法
     """
 
     # 类变量，由子类继承
     _cache_lock = threading.Lock()
     _cache = None
     _cache_time = None
-    _cache_ttl = 30
-    _refresh_interval = 15
+    _cache_ttl = CacheConfig.DEFAULT_TTL
+    _refresh_interval = CacheConfig.DEFAULT_REFRESH_INTERVAL
     _refresh_thread = None
     _running = False
     _initialized = False
@@ -89,7 +99,7 @@ class BaseCachedFetcher:
         if self._running:
             self._running = False
             if self._refresh_thread and self._refresh_thread.is_alive():
-                self._refresh_thread.join(timeout=2)
+                self._refresh_thread.join(timeout=CacheConfig.SHUTDOWN_TIMEOUT)
             logger.info(f"{self.__class__.__name__} 后台刷新线程已停止")
 
     def _get_cached_data(self, force_refresh: bool = False) -> pd.DataFrame:

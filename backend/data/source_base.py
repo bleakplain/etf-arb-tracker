@@ -13,6 +13,33 @@ import time
 import threading
 
 
+# 评分算法配置
+class ScoringConfig:
+    """数据源评分算法配置"""
+
+    # 评分权重
+    SUCCESS_RATE_WEIGHT = 0.5      # 成功率权重
+    SPEED_SCORE_WEIGHT = 0.3        # 速度评分权重
+    PRIORITY_SCORE_WEIGHT = 0.2     # 优先级评分权重
+
+    # 速度评分参数
+    SPEED_FULL_MARK_SECONDS = 1.0   # 满分速度（秒）
+    SPEED_ZERO_MARK_SECONDS = 5.0   # 零分速度（秒）
+
+    # 优先级评分参数
+    PRIORITY_MAX_VALUE = 100        # 最大优先级值
+
+    # 类型加分
+    FREE_HIGH_FREQ_BONUS = 0.2      # 免费高频数据源加分
+
+    # 状态判断参数
+    CONSECUTIVE_FAILURES_FOR_FAILED = 3   # 连续失败次数达到此值标记为FAILED
+    CONSECUTIVE_FAILURES_FOR_DEGRADED = 1 # 连续失败次数达到此值标记为DEGRADED
+
+    # 重试参数
+    DEFAULT_MIN_RETRY_INTERVAL = 30  # 默认最小重试间隔（秒）
+
+
 class SourceType(Enum):
     """数据源类型"""
     FREE_HIGH_FREQ = "free_high_freq"
@@ -114,9 +141,9 @@ class SourceMetrics:
 
     def _update_status(self):
         """更新数据源状态"""
-        if self.consecutive_failures >= 3:
+        if self.consecutive_failures >= ScoringConfig.CONSECUTIVE_FAILURES_FOR_FAILED:
             self.status = DataSourceStatus.FAILED
-        elif self.consecutive_failures >= 1 or self.failure_count > self.success_count:
+        elif self.consecutive_failures >= ScoringConfig.CONSECUTIVE_FAILURES_FOR_DEGRADED or self.failure_count > self.success_count:
             self.status = DataSourceStatus.DEGRADED
         else:
             self.status = DataSourceStatus.HEALTHY
@@ -166,6 +193,7 @@ class BaseDataSource(ABC):
         """
         获取数据源评分（用于排序）
         考虑因素：优先级、成功率、速度、数据类型匹配
+        使用 ScoringConfig 中的配置参数
         """
         if not self.is_available() or not self.supports(data_type):
             return -1.0
@@ -173,17 +201,23 @@ class BaseDataSource(ABC):
         success_rate = self.metrics.get_success_rate()
         avg_time = self.metrics.get_avg_time()
 
-        # 速度评分（假设1秒为满分，超过5秒为0分）
-        speed_score = max(0, 1 - (avg_time - 1) / 4)
+        # 速度评分（使用配置参数）
+        speed_range = ScoringConfig.SPEED_ZERO_MARK_SECONDS - ScoringConfig.SPEED_FULL_MARK_SECONDS
+        speed_score = max(0, 1 - (avg_time - ScoringConfig.SPEED_FULL_MARK_SECONDS) / speed_range)
 
-        # 优先级评分（优先级数字越小分数越高）
-        priority_score = max(0, 1 - self.priority / 100)
+        # 优先级评分（使用配置参数）
+        priority_score = max(0, 1 - self.priority / ScoringConfig.PRIORITY_MAX_VALUE)
 
-        # 类型匹配加分
-        type_bonus = 0.2 if self.source_type == SourceType.FREE_HIGH_FREQ else 0
+        # 类型匹配加分（使用配置参数）
+        type_bonus = ScoringConfig.FREE_HIGH_FREQ_BONUS if self.source_type == SourceType.FREE_HIGH_FREQ else 0
 
-        # 综合评分
-        return success_rate * 0.5 + speed_score * 0.3 + priority_score * 0.2 + type_bonus
+        # 综合评分（使用配置权重）
+        return (
+            success_rate * ScoringConfig.SUCCESS_RATE_WEIGHT +
+            speed_score * ScoringConfig.SPEED_SCORE_WEIGHT +
+            priority_score * ScoringConfig.PRIORITY_SCORE_WEIGHT +
+            type_bonus
+        )
 
     def reset_metrics(self):
         """重置指标"""

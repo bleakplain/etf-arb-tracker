@@ -120,3 +120,23 @@ risk_control:
 
   # 持仓天数上限
   max_hold_days: 3
+
+# 信号评估配置
+signal_evaluation:
+  # 置信度评估 - 权重阈值
+  confidence_high_weight: 0.10      # 权重>=10%为高置信度
+  confidence_low_weight: 0.05       # 权重<5%为低置信度
+
+  # 置信度评估 - 排名阈值
+  confidence_high_rank: 3           # 排名<=3为高置信度
+  confidence_low_rank: 10           # 排名>10为低置信度
+
+  # 风险评估 - 时间阈值（秒）
+  risk_high_time_seconds: 600       # 距收盘<10分钟为高风险
+  risk_low_time_seconds: 3600       # 距收盘>1小时为低风险
+
+  # 风险评估 - 持仓集中度阈值
+  risk_top10_ratio_high: 0.70       # 前10占比>70%为高风险
+
+  # 风险评估 - 时间因素（小时）
+  risk_morning_hour: 10             # 10点前涨停风险降低

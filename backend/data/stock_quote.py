@@ -10,7 +10,7 @@ from datetime import datetime, time as dt_time
 from loguru import logger
 
 from backend.data.cache_base import BaseCachedFetcher
-from backend.data.utils import safe_float, safe_int, is_limit_up, is_limit_down
+from backend.data.parsers import parse_quote_row, batch_parse_quotes
 
 
 class StockQuoteFetcher(BaseCachedFetcher):
@@ -113,47 +113,10 @@ class StockQuoteFetcher(BaseCachedFetcher):
 
     def _parse_stock_row(self, row: pd.Series) -> Dict:
         """解析单行股票数据"""
-        try:
-            # 数据字段映射
-            code = str(row.get('代码', ''))
-            name = str(row.get('名称', ''))
-            price = safe_float(row.get('最新价'))
-            prev_close = safe_float(row.get('昨收'))
-            open_price = safe_float(row.get('今开'))
-            high = safe_float(row.get('最高'))
-            low = safe_float(row.get('最低'))
-            volume = safe_int(row.get('成交量'))
-            amount = safe_float(row.get('成交额'))
-            change = safe_float(row.get('涨跌额', price - prev_close))
-            change_pct = safe_float(row.get('涨跌幅'))
-
-            # 如果当前价为0（未开盘或停牌），使用昨收价代替
-            if price == 0 and prev_close > 0:
-                price = prev_close
-                change = 0
-                change_pct = 0
-
-            return {
-                'code': code,
-                'name': name,
-                'price': price,
-                'prev_close': prev_close,
-                'open': open_price,
-                'high': high,
-                'low': low,
-                'volume': volume,
-                'amount': amount,
-                'change': change,
-                'change_pct': change_pct,
-                'is_limit_up': is_limit_up(code, change_pct),
-                'is_limit_down': is_limit_down(code, change_pct),
-                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'data_source': self._get_current_source()
-            }
-
-        except (ValueError, TypeError) as e:
-            logger.error(f"解析股票数据失败: {e}")
-            return None
+        quote = parse_quote_row(row, asset_type='stock')
+        if quote:
+            quote['data_source'] = self._get_current_source()
+        return quote
 
     def get_batch_quotes(self, stock_codes: List[str]) -> Dict[str, Dict]:
         """
@@ -174,12 +137,9 @@ class StockQuoteFetcher(BaseCachedFetcher):
             # 筛选指定的股票
             filtered_df = df[df['代码'].isin(stock_codes)]
 
-            results = {}
-            for _, row in filtered_df.iterrows():
-                code = str(row['代码'])
-                quote = self._parse_stock_row(row)
-                if quote:
-                    results[code] = quote
+            results = batch_parse_quotes(filtered_df, asset_type='stock')
+            for quote in results.values():
+                quote['data_source'] = self._get_current_source()
 
             logger.info(f"批量获取 {len(results)}/{len(stock_codes)} 只股票行情")
             return results
@@ -201,12 +161,9 @@ class StockQuoteFetcher(BaseCachedFetcher):
             if df.empty:
                 return {}
 
-            results = {}
-            for _, row in df.iterrows():
-                code = str(row['代码'])
-                quote = self._parse_stock_row(row)
-                if quote:
-                    results[code] = quote
+            results = batch_parse_quotes(df, asset_type='stock')
+            for quote in results.values():
+                quote['data_source'] = self._get_current_source()
 
             return results
 

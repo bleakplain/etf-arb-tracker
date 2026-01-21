@@ -68,45 +68,211 @@ notification:
 ```
 etf-arb-tracker/
 ├── backend/
+│   ├── domain/                     # 领域层 - 核心业务概念
+│   │   ├── interfaces.py           # 业务接口定义
+│   │   ├── value_objects.py        # 值对象（StockInfo, ETFReference等）
+│   │   └── models.py               # 领域模型（LimitUpInfo）
+│   ├── infrastructure/             # 基础设施层 - 技术支撑
+│   │   └── cache/
+│   │       └── ttl_cache.py        # TTL缓存组件
 │   ├── data/                      # 数据获取模块
-│   │   ├── stock_quote.py         # A股行情（新架构）
-│   │   ├── etf_quote.py           # ETF行情
-│   │   ├── etf_holder.py          # 股票-ETF映射
-│   │   ├── etf_holdings.py        # ETF持仓数据
-│   │   ├── limit_up_stocks.py     # 涨停股获取
-│   │   ├── kline.py               # K线数据
-│   │   ├── data_manager.py        # 数据管理器（单例）
-│   │   ├── source_base.py         # 数据源基类
-│   │   └── sources/               # 数据源实现
-│   │       ├── __init__.py
-│   │       ├── tencent_source.py  # 腾讯财经数据源
-│   │       ├── sina_source.py     # 新浪财经数据源
-│   │       └── tushare_source.py  # Tushare数据源
-│   ├── strategy/
-│   │   └── limit_monitor.py       # 涨停监控策略引擎
-│   ├── notification/
-│   │   └── sender.py              # 消息推送（钉钉/邮件/企业微信）
-│   └── api/
-│       └── app.py                 # FastAPI服务
-├── config/                        # 配置模块
-│   ├── __init__.py                # 统一配置入口
-│   ├── stocks.yaml                # 自选股配置
-│   ├── settings.yaml              # 系统配置
-│   ├── strategy.py                # 策略配置类
-│   ├── alert.py                   # 通知配置类
-│   └── logger.py                  # 日志配置类
+│   │   ├── stock_quote.py          # A股行情
+│   │   ├── etf_quote.py            # ETF行情
+│   │   ├── etf_holder.py           # 股票-ETF映射
+│   │   ├── etf_holdings.py         # ETF持仓数据
+│   │   ├── limit_up_stocks.py      # 涨停股获取
+│   │   ├── kline.py                # K线数据
+│   │   ├── data_manager.py         # 数据管理器（单例）
+│   │   ├── cache_base.py           # 缓存基类
+│   │   ├── cache_adapter.py        # 缓存适配器
+│   │   ├── column_mappings.py      # 统一列名映射
+│   │   ├── parsers.py              # 通用解析器
+│   │   ├── source_base.py          # 数据源基类
+│   │   └── sources/                # 数据源实现
+│   │       ├── tencent_source.py   # 腾讯财经数据源
+│   │       ├── sina_source.py      # 新浪财经数据源
+│   │       └── tushare_source.py   # Tushare数据源
+│   ├── strategy/                  # 策略模块
+│   │   ├── limit_monitor.py        # 涨停监控器（协调器）
+│   │   ├── limit_checker.py        # 涨停检查器
+│   │   ├── etf_selector.py         # ETF选择器
+│   │   ├── signal_generator.py     # 信号生成器
+│   │   ├── signal_repository.py    # 信号仓储
+│   │   └── signal_evaluators.py    # 信号评估器（策略模式）
+│   ├── notification/              # 通知模块
+│   │   └── sender.py               # 消息推送（钉钉/邮件/企业微信）
+│   └── api/                       # API模块
+│       ├── app.py                  # FastAPI服务
+│       └── state.py                # 状态管理器
+├── config/                         # 配置模块
+│   ├── __init__.py                 # 统一配置入口
+│   ├── stocks.yaml                 # 自选股配置
+│   ├── settings.yaml               # 系统配置
+│   ├── strategy.py                 # 策略配置类
+│   ├── alert.py                    # 通知配置类
+│   └── logger.py                   # 日志配置类
 ├── frontend/
-│   └── index.html                 # Web监控界面
-├── data/                          # 数据目录
-│   ├── stock_etf_mapping.json     # 股票-ETF映射缓存
-│   └── signals.json               # 交易信号历史
-├── logs/                          # 日志目录
-├── start.py                       # 命令行启动脚本
-├── run_server.sh                  # 服务启动脚本
-├── requirements.txt               # Python依赖
-├── CHANGELOG.md                   # 版本变更记录
-└── README.md                      # 本文档
+│   └── index.html                  # Web监控界面
+├── data/                           # 数据目录
+│   ├── stock_etf_mapping.json      # 股票-ETF映射缓存
+│   └── signals.json                # 交易信号历史
+├── logs/                           # 日志目录
+├── start.py                        # 命令行启动脚本
+├── run_server.sh                   # 服务启动脚本
+├── requirements.txt                # Python依赖
+├── CHANGELOG.md                    # 版本变更记录
+└── README.md                       # 本文档
 ```
+
+## 架构设计
+
+### 分层架构
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         API Layer                                │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  FastAPI Endpoints                                       │   │
+│  │  • /api/stocks      • /api/signals    • /api/status     │   │
+│  │  • /api/limit-up   • /api/kline      • /api/monitor     │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  State Manager (单例模式)                                 │   │
+│  │  • MonitorState: is_running, scan_count                  │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                                ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                      Application Layer                           │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │         LimitUpMonitor (协调器)                          │   │
+│  │         scan_all_stocks() → find_related_etfs()         │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐             │
+│  │ LimitChecker│ │ ETFSelector │ │SignalGen    │             │
+│  │ 检查涨停    │ │ 选择ETF     │ │ 生成信号    │             │
+│  └─────────────┘ └─────────────┘ └─────────────┘             │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │           SignalRepository (File Storage)                │   │
+│  │           data/signals.json                              │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                                ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                        Domain Layer                              │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐  │
+│  │ Interfaces       │  │ Value Objects    │  │ Models       │  │
+│  │ • IStockQuote    │  │ • StockInfo      │  │ • LimitUp    │  │
+│  │ • IETFQuote      │  │ • ETFReference   │  │   Info       │  │
+│  │ • ISignalEval    │  │ • TradingSignal  │  │              │  │
+│  └──────────────────┘  └──────────────────┘  └──────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                                ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                    Infrastructure Layer                          │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                   Data Sources                            │   │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐        │   │
+│  │  │ Tencent     │ │ Sina        │ │ Tushare     │        │   │
+│  │  │ Source      │ │ Source      │ │ Source      │        │   │
+│  │  │ (优先)      │ │ (备用)      │ │ (付费)      │        │   │
+│  │  └─────────────┘ └─────────────┘ └─────────────┘        │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  TTL Cache (15秒自动刷新)                                │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Notification Sender (钉钉/邮件/企业微信)                │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 数据流转
+
+```
+                    ┌──────────────┐
+                    │   用户请求   │
+                    └──────┬───────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  API: GET /api/stocks/{code}/related-etfs                       │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ 1. LimitUpMonitor.find_related_etfs_with_real_weight() │     │
+│  └───────────────────────────┬────────────────────────────┘     │
+└──────────────────────────────┼──────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Data Layer                                                      │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ ETFFetcher → ETFHolderMapper → get_real_weight()       │     │
+│  │            ┌─────────────────────────────────┐          │     │
+│  │            │ 查询 data/stock_etf_mapping.json │          │     │
+│  │            │ 验证持仓权重 >= 5%              │          │     │
+│  │            └─────────────────────────────────┘          │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ ETFFetcher.get_etf_batch_quotes() → TTLCache           │     │
+│  │ 获取ETF实时行情（15秒缓存）                              │     │
+│  └────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+                    ┌──────────────┐
+                    │  返回结果    │
+                    │  (ETF列表)   │
+                    └──────────────┘
+```
+
+### 监控流程
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      定时监控循环                                 │
+│                     (默认60秒间隔)                                │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                    ┌───────────▼──────────┐
+                    │ is_trading_time()?   │
+                    └───────────┬──────────┘
+                                │ Yes
+                    ┌───────────▼──────────┐
+                    │ scan_all_stocks()    │
+                    └───────────┬──────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        │                       │                       │
+┌───────▼───────┐     ┌────────▼────────┐     ┌────────▼────────┐
+│ LimitChecker  │     │  ETFSelector    │     │ SignalGenerator │
+│ 检查每个自选股 │────▶│  查找关联ETF    │────▶│  生成交易信号   │
+│ 是否涨停      │     │  (持仓>=5%)     │     │  评估置信/风险  │
+└───────────────┘     └─────────────────┘     └────────┬────────┘
+                                                              │
+                                        ┌─────────────────────┘
+                                        │
+                              ┌─────────▼─────────┐
+                              │ SignalRepository  │
+                              │ 保存信号历史      │
+                              └─────────┬─────────┘
+                                        │
+                              ┌─────────▼─────────┐
+                              │ NotificationSender│
+                              │ 推送通知          │
+                              └───────────────────┘
+```
+
+### 设计原则
+
+- **依赖倒置** - 高层模块依赖接口而非具体实现
+- **单一职责** - 每个类只负责一个明确的业务功能
+- **开闭原则** - 通过接口扩展功能，无需修改现有代码
+- **接口隔离** - 客户端只依赖所需的接口方法
 
 ## API 接口
 
@@ -118,7 +284,7 @@ etf-arb-tracker/
 |------|------|------|
 | `GET` | `/api/status` | 系统状态（监控状态、交易时间、信号数量） |
 | `GET` | `/api/stocks` | 自选股实时行情列表 |
-| `GET` | `/api/limit-up` | 今日所有涨停股票 |
+| `GET` | `/api/limit-up` | 今日所有涨停股票（带TTL缓存） |
 | `GET` | `/api/signals` | 交易信号历史（支持 `limit` 和 `today_only` 参数） |
 | `GET` | `/api/stocks/{code}/related-etfs` | 股票关联ETF（持仓≥5%） |
 | `GET` | `/api/stocks/{code}/kline` | 股票K线数据（支持 `days` 参数） |
@@ -127,8 +293,8 @@ etf-arb-tracker/
 | `GET` | `/api/etfs/categories` | ETF分类列表 |
 | `GET` | `/api/config` | 系统配置（敏感信息已隐藏） |
 | `POST` | `/api/monitor/scan` | 手动触发一次扫描 |
-| `POST` | `/api/monitor/start` | 启动持续监控 |
-| `POST` | `/api/monitor/stop` | 停止持续监控 |
+| `POST` | `/api/monitor/start` | 启动持续监控（使用状态管理器） |
+| `POST` | `/api/monitor/stop` | 停止持续监控（使用状态管理器） |
 | `GET` | `/api/health` | 健康检查 |
 | `GET` | `/` 或 `/frontend` | Web监控界面 |
 
@@ -174,6 +340,15 @@ etf-arb-tracker/
 2. **查找关联ETF** → 筛选持仓占比 ≥ 5% 的ETF
 3. **评估信号质量** → 综合权重、排名、流动性等因素
 4. **发送买入建议** → 多渠道推送通知
+
+### 策略组件
+
+| 组件 | 职责 | 文件 |
+|------|------|------|
+| `LimitChecker` | 检查股票涨停状态 | `limit_checker.py` |
+| `ETFSelector` | 查找符合条件的ETF | `etf_selector.py` |
+| `SignalGenerator` | 生成交易信号 | `signal_generator.py` |
+| `SignalRepository` | 持久化信号历史 | `signal_repository.py` |
 
 ### 策略验证
 
@@ -226,6 +401,17 @@ trading_hours:
   afternoon:
     start: "13:00"
     end: "15:00"
+
+# 信号评估配置
+signal_evaluation:
+  confidence_high_weight: 0.10    # 权重>=10%为高置信度
+  confidence_low_weight: 0.05     # 权重<5%为低置信度
+  confidence_high_rank: 3         # 排名<=3为高置信度
+  confidence_low_rank: 10         # 排名>10为低置信度
+  risk_high_time_seconds: 600     # 距收盘<10分钟为高风险
+  risk_low_time_seconds: 3600     # 距收盘>1小时为低风险
+  risk_top10_ratio_high: 0.70     # 前10占比>70%为高风险
+  risk_morning_hour: 10           # 10点前涨停风险降低
 
 # 通知配置
 notification:
@@ -374,22 +560,30 @@ flake8 backend/ config/ start.py
 mypy backend/
 ```
 
-### 运行测试
-
-```bash
-# 运行所有测试
-pytest
-
-# 运行特定测试
-pytest tests/test_limit_monitor.py
-```
-
 ### 添加新功能
 
-1. 数据源：在 `backend/data/` 添加新的 fetcher 类
-2. 策略：在 `backend/strategy/` 修改策略逻辑
-3. 通知：在 `backend/notification/` 添加新的通知渠道
-4. API：在 `backend/api/app.py` 添加新的接口
+1. **新增数据源**：实现 `BaseDataSource` 接口
+2. **新增策略组件**：在 `backend/strategy/` 添加新模块
+3. **新增通知渠道**：实现 `NotificationSender` 接口
+4. **新增API接口**：在 `backend/api/app.py` 添加路由
+
+### 扩展示例
+
+**添加新的信号评估器**
+
+```python
+# backend/strategy/signal_evaluators.py
+
+class MyCustomEvaluator(SignalEvaluator):
+    def evaluate(self, limit_info: Dict, etf_info: Dict) -> Tuple[str, str]:
+        # 自定义评估逻辑
+        confidence = "高" if etf_info['weight'] > 0.08 else "中"
+        risk_level = "低"
+        return confidence, risk_level
+
+# 注册到工厂
+SignalEvaluatorFactory._EVALUATORS['custom'] = MyCustomEvaluator
+```
 
 ## 故障排查
 
@@ -437,50 +631,17 @@ tail -f logs/monitor.log
 tail -f logs/app_error.log
 ```
 
-## 贡献指南
-
-欢迎贡献代码、报告问题或提出建议！
-
-### 报告问题
-
-在 [Issues](https://github.com/bleakplain/etf-arb-tracker/issues) 中报告问题时，请包含：
-
-- 问题描述和重现步骤
-- 系统环境（OS、Python 版本）
-- 相关日志输出
-- 预期行为 vs 实际行为
-
-### 提交代码
-
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
-
-### 代码审查标准
-
-- 代码符合 PEP 8 规范
-- 添加必要的测试用例
-- 更新相关文档
-- 通过所有现有测试
-
 ## 数据来源
+
+系统支持多数据源，优先使用免费高频数据源，自动故障转移：
 
 | 数据类型 | 主要数据源 | 备用数据源 |
 |----------|-----------|-----------|
-| **A股实时行情** | 腾讯财经（免费高频） | 新浪财经 |
-| **ETF实时行情** | 腾讯财经（免费高频） | 新浪财经 |
+| **A股实时行情** | 腾讯财经（免费高频） | 新浪财经、Tushare |
+| **ETF实时行情** | 腾讯财经（免费高频） | 新浪财经、Tushare |
 | **涨停股** | 通过A股行情筛选 | - |
 | **K线数据** | 腾讯财经 | - |
 | **ETF持仓** | 天天基金 (fundf10.eastmoney.com) | 东方财富 (push2.eastmoney.com) |
-
-### 新架构特点
-
-- **免费高频优先**：实时行情优先使用免费的腾讯/新浪数据源
-- **智能故障转移**：主数据源失败时自动切换到备用源
-- **后台定时刷新**：数据缓存15秒自动刷新，业务读取响应<10ms
-- **性能监控**：自动记录每个数据源的成功率、响应时间
 
 > 本项目仅供学习研究使用，不构成投资建议。
 

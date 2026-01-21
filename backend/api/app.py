@@ -20,11 +20,14 @@ import time
 # 添加项目路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.strategy.limit_monitor import LimitUpMonitor, TradingSignal
+from backend.strategy.limit_monitor import LimitUpMonitor, create_monitor_with_defaults
+from backend.domain.value_objects import TradingSignal
 from backend.notification.sender import create_sender_from_config
 from backend.data.limit_up_stocks import LimitUpStocksFetcher
 from backend.data.kline import KlineDataFetcher
 from backend.data.etf_holdings import ETFHoldingsFetcher
+from backend.api.state import get_api_state_manager
+from backend.infrastructure.cache import TTLCache
 
 
 # Pydantic模型
@@ -102,20 +105,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 全局监控器实例
-monitor: Optional[LimitUpMonitor] = None
-monitor_running = False
-
 # 获取项目根目录
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# 状态管理器和监控器实例（使用单例模式）
+_api_state_manager = get_api_state_manager()
+_monitor_instance: Optional[LimitUpMonitor] = None
+
+# 涨停股缓存
+_limit_up_cache = TTLCache(ttl=30, name="limit_up_cache")
 
 
 def get_monitor() -> LimitUpMonitor:
     """获取或创建监控器实例"""
-    global monitor
-    if monitor is None:
-        monitor = LimitUpMonitor()
-    return monitor
+    global _monitor_instance
+    if _monitor_instance is None:
+        _monitor_instance = create_monitor_with_defaults()
+    return _monitor_instance
+
+
+def get_state_manager():
+    """获取状态管理器"""
+    return _api_state_manager
 
 
 @app.on_event("startup")
@@ -156,6 +167,7 @@ async def get_status():
         监控状态信息
     """
     mon = get_monitor()
+    state = get_state_manager().monitor_state
     is_trading = mon.stock_fetcher.is_trading_time()
 
     # 统计今天的信号数量
@@ -166,7 +178,7 @@ async def get_status():
     ]
 
     return MonitorStatus(
-        is_running=monitor_running,
+        is_running=state.is_running,
         is_trading_time=is_trading,
         watch_stocks_count=len(mon.watch_stocks),
         covered_etfs_count=len(mon.get_all_etfs()),
@@ -347,22 +359,19 @@ async def start_monitor(background_tasks: BackgroundTasks):
     Returns:
         启动结果
     """
-    global monitor_running
+    state = get_state_manager().monitor_state
 
-    if monitor_running:
+    if not state.start():
         return {"status": "already_running", "message": "监控已在运行中"}
 
-    monitor_running = True
-
     def run_monitor():
-        global monitor_running
         mon = get_monitor()
         config = mon.config
         sender = create_sender_from_config(config)
 
         interval = config.get('strategy', {}).get('scan_interval', 60)
 
-        while monitor_running:
+        while state.is_running:
             try:
                 if mon.stock_fetcher.is_trading_time():
                     signals = mon.scan_all_stocks()
@@ -370,13 +379,12 @@ async def start_monitor(background_tasks: BackgroundTasks):
                         for signal in signals:
                             sender.send_signal(signal)
                         mon.save_signals()
+                    state.increment_scan_count()
 
-                import time
                 time.sleep(interval)
 
             except Exception as e:
                 logger.error(f"监控出错: {e}")
-                import time
                 time.sleep(interval)
 
     background_tasks.add_task(run_monitor)
@@ -395,8 +403,10 @@ async def stop_monitor():
     Returns:
         停止结果
     """
-    global monitor_running
-    monitor_running = False
+    state = get_state_manager().monitor_state
+
+    if not state.stop():
+        return {"status": "not_running", "message": "监控未在运行"}
 
     return {
         "status": "stopped",
@@ -442,12 +452,6 @@ async def get_stock_etf_mapping():
     return mon.stock_etf_mapping
 
 
-# 涨停股缓存
-_limit_up_cache = None
-_limit_up_cache_time = None
-_LIMIT_UP_CACHE_TTL = 30  # 涨停股缓存30秒
-
-
 @app.get("/api/limit-up", response_model=List[LimitUpStockInfo])
 async def get_limit_up_stocks():
     """
@@ -456,48 +460,36 @@ async def get_limit_up_stocks():
     Returns:
         涨停股票列表
     """
-    global _limit_up_cache, _limit_up_cache_time
+    # 使用TTLCache组件
+    def load_limit_up_stocks():
+        """加载涨停股数据"""
+        fetcher = LimitUpStocksFetcher()
 
-    current_time = time.time()
+        # 尝试从监控器获取缓存的股票数据
+        try:
+            mon = get_monitor()
+            stock_df = mon.stock_fetcher._get_spot_data()
+            stocks = fetcher.get_today_limit_ups(stock_df)
+        except:
+            stocks = fetcher.get_today_limit_ups()
 
-    # 检查缓存
-    if _limit_up_cache is not None and (current_time - _limit_up_cache_time) < _LIMIT_UP_CACHE_TTL:
-        return _limit_up_cache
+        return [
+            LimitUpStockInfo(
+                code=s['code'],
+                name=s['name'],
+                price=s['price'],
+                change_pct=s['change_pct'],
+                volume=s['volume'],
+                amount=s['amount'],
+                turnover=s['turnover'],
+                limit_time=s['limit_time'],
+                seal_amount=s['seal_amount']
+            )
+            for s in stocks
+        ]
 
-    # 获取新数据 - 复用StockQuoteFetcher的缓存数据
-    fetcher = LimitUpStocksFetcher()
-
-    # 尝试从监控器获取缓存的股票数据
-    try:
-        mon = get_monitor()
-        # 获取缓存的股票数据DataFrame
-        stock_df = mon.stock_fetcher._get_spot_data()
-        # 使用缓存数据筛选涨停股
-        stocks = fetcher.get_today_limit_ups(stock_df)
-    except:
-        # 如果监控器未初始化，fallback到原方式
-        stocks = fetcher.get_today_limit_ups()
-
-    result = [
-        LimitUpStockInfo(
-            code=s['code'],
-            name=s['name'],
-            price=s['price'],
-            change_pct=s['change_pct'],
-            volume=s['volume'],
-            amount=s['amount'],
-            turnover=s['turnover'],
-            limit_time=s['limit_time'],
-            seal_amount=s['seal_amount']
-        )
-        for s in stocks
-    ]
-
-    # 更新缓存
-    _limit_up_cache = result
-    _limit_up_cache_time = current_time
-
-    return result
+    # 使用统一的缓存组件
+    return _limit_up_cache.get_or_load("limit_up_stocks", load_limit_up_stocks)
 
 
 @app.get("/api/stocks/{code}/kline")

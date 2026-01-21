@@ -10,7 +10,7 @@ from datetime import datetime
 from loguru import logger
 
 from backend.data.cache_base import BaseCachedFetcher
-from backend.data.utils import safe_float, safe_int
+from backend.data.parsers import parse_quote_row, batch_parse_quotes
 
 
 class ETFQuoteFetcher(BaseCachedFetcher):
@@ -106,7 +106,11 @@ class ETFQuoteFetcher(BaseCachedFetcher):
                 return None
 
             row = etf_row.iloc[0]
-            return self._parse_etf_row(row)
+            quote = parse_quote_row(row, asset_type='etf')
+            if quote:
+                quote['data_source'] = self._get_current_source()
+                quote['iopv'] = self._get_iopv(code)
+            return quote
 
         except Exception as e:
             logger.error(f"获取ETF {etf_code} 行情失败: {e}")
@@ -114,47 +118,11 @@ class ETFQuoteFetcher(BaseCachedFetcher):
 
     def _parse_etf_row(self, row: pd.Series) -> Dict:
         """解析单行ETF数据"""
-        try:
-            code = str(row.get('代码', ''))
-            name = str(row.get('名称', ''))
-            price = safe_float(row.get('最新价'))
-            prev_close = safe_float(row.get('昨收'))
-            open_price = safe_float(row.get('今开'))
-            high = safe_float(row.get('最高'))
-            low = safe_float(row.get('最低'))
-            volume = safe_int(row.get('成交量'))
-            amount = safe_float(row.get('成交额'))
-            change_pct = safe_float(row.get('涨跌幅'))
-
-            if price == 0 and prev_close > 0:
-                price = prev_close
-                change = 0
-                change_pct = 0
-            else:
-                change = price - prev_close
-
-            return {
-                'code': code,
-                'name': name,
-                'price': price,
-                'prev_close': prev_close,
-                'open': open_price,
-                'high': high,
-                'low': low,
-                'volume': volume,
-                'amount': amount,
-                'change': change,
-                'change_pct': change_pct,
-                'asset_type': 'ETF',
-                'iopv': self._get_iopv(code),
-                'premium': None,
-                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'data_source': self._get_current_source()
-            }
-
-        except (ValueError, TypeError) as e:
-            logger.error(f"解析ETF数据失败: {e}")
-            return None
+        quote = parse_quote_row(row, asset_type='etf')
+        if quote:
+            quote['data_source'] = self._get_current_source()
+            quote['iopv'] = self._get_iopv(quote['code'])
+        return quote
 
     def _get_iopv(self, etf_code: str) -> float:
         """获取ETF的IOPV（暂时返回0）"""
@@ -179,12 +147,10 @@ class ETFQuoteFetcher(BaseCachedFetcher):
             # 筛选指定的ETF
             filtered_df = df[df['代码'].isin(etf_codes)]
 
-            results = {}
-            for _, row in filtered_df.iterrows():
-                code = str(row['代码'])
-                quote = self._parse_etf_row(row)
-                if quote:
-                    results[code] = quote
+            results = batch_parse_quotes(filtered_df, asset_type='etf')
+            for quote in results.values():
+                quote['data_source'] = self._get_current_source()
+                quote['iopv'] = self._get_iopv(quote['code'])
 
             logger.info(f"批量获取 {len(results)}/{len(etf_codes)} 只ETF行情")
             return results
@@ -206,12 +172,10 @@ class ETFQuoteFetcher(BaseCachedFetcher):
             if df.empty:
                 return {}
 
-            results = {}
-            for _, row in df.iterrows():
-                code = str(row['代码'])
-                quote = self._parse_etf_row(row)
-                if quote:
-                    results[code] = quote
+            results = batch_parse_quotes(df, asset_type='etf')
+            for quote in results.values():
+                quote['data_source'] = self._get_current_source()
+                quote['iopv'] = self._get_iopv(quote['code'])
 
             return results
 

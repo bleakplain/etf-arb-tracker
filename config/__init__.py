@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from config.logger import LoggerSettings, setup
-from config.strategy import StrategySettings, TradingHours, RiskControlSettings
+from config.strategy import StrategySettings, TradingHours, RiskControlSettings, SignalEvaluationConfig
 from config.alert import AlertSettings
 
 
@@ -97,6 +97,7 @@ class Config:
     strategy: StrategySettings
     trading_hours: TradingHours
     risk_control: RiskControlSettings
+    signal_evaluation: SignalEvaluationConfig
     alert: AlertSettings
     data_sources: DataSourcesSettings
     database: DatabaseSettings
@@ -149,6 +150,7 @@ class Config:
             strategy=StrategySettings.from_dict(config_data.get("strategy", {})),
             trading_hours=TradingHours.from_dict(config_data.get("trading_hours", {})),
             risk_control=RiskControlSettings.from_dict(config_data.get("risk_control", {})),
+            signal_evaluation=SignalEvaluationConfig.from_dict(config_data.get("signal_evaluation", {})),
             alert=AlertSettings.from_dict(config_data.get("notification", {})),
             data_sources=DataSourcesSettings.from_dict(config_data.get("data_sources", {})),
             database=DatabaseSettings.from_dict(config_data.get("database", {})),
