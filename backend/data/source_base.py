@@ -15,11 +15,11 @@ import threading
 
 class SourceType(Enum):
     """数据源类型"""
-    FREE_HIGH_FREQ = "free_high_freq"      # 免费高频（实时行情）
-    FREE_LOW_FREQ = "free_low_freq"        # 免费低频（历史数据）
-    PAID_HIGH_FREQ = "paid_high_freq"      # 付费高频
-    PAID_LOW_FREQ = "paid_low_freq"        # 付费低频（财务、基本面等）
-    FALLBACK = "fallback"                  # 兜底数据源
+    FREE_HIGH_FREQ = "free_high_freq"
+    FREE_LOW_FREQ = "free_low_freq"
+    PAID_HIGH_FREQ = "paid_high_freq"
+    PAID_LOW_FREQ = "paid_low_freq"
+    FALLBACK = "fallback"
 
 
 class DataSourceStatus(Enum):
@@ -27,17 +27,17 @@ class DataSourceStatus(Enum):
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     FAILED = "failed"
-    DISABLED = "disabled"                   # 未配置或被禁用
+    DISABLED = "disabled"
 
 
 class DataType(Enum):
     """数据类型"""
-    STOCK_REALTIME = "stock_realtime"      # 股票实时行情
-    ETF_REALTIME = "etf_realtime"          # ETF实时行情
-    STOCK_HISTORY = "stock_history"        # 股票历史数据
-    FINANCIAL = "financial"                # 财务数据
-    INDEX = "index"                        # 指数数据
-    FUND = "fund"                          # 基金数据
+    STOCK_REALTIME = "stock_realtime"
+    ETF_REALTIME = "etf_realtime"
+    STOCK_HISTORY = "stock_history"
+    FINANCIAL = "financial"
+    INDEX = "index"
+    FUND = "fund"
 
 
 @dataclass
@@ -66,9 +66,9 @@ class SourceMetrics:
     last_failure_time: Optional[datetime] = None
     consecutive_failures: int = 0
     last_attempt_time: Optional[datetime] = None
-    min_retry_interval: int = 30           # 最小重试间隔（秒）
+    min_retry_interval: int = 30
     rate_limit_reset_time: Optional[datetime] = None
-    rate_limit_remaining: int = 0          # 剩余配额
+    rate_limit_remaining: int = 0
 
     def record_success(self, elapsed: float):
         """记录成功请求"""
@@ -93,31 +93,8 @@ class SourceMetrics:
         if self.last_attempt_time is None:
             return True
 
-        elapsed_since_last_attempt = (datetime.now() - self.last_attempt_time).total_seconds()
-        return elapsed_since_last_attempt >= self.min_retry_interval
-
-    def check_rate_limit(self) -> bool:
-        """检查是否超过速率限制"""
-        if self.rate_limit_remaining <= 0:
-            if self.rate_limit_reset_time and datetime.now() < self.rate_limit_reset_time:
-                return False
-            # 重置配额
-            self.rate_limit_remaining = 100  # 默认值，子类可以覆盖
-        return True
-
-    def consume_rate_limit(self):
-        """消耗一次配额"""
-        if self.rate_limit_remaining > 0:
-            self.rate_limit_remaining -= 1
-
-    def _update_status(self):
-        """更新数据源状态"""
-        if self.consecutive_failures >= 3:
-            self.status = DataSourceStatus.FAILED
-        elif self.consecutive_failures >= 1 or self.failure_count > self.success_count:
-            self.status = DataSourceStatus.DEGRADED
-        else:
-            self.status = DataSourceStatus.HEALTHY
+        elapsed = (datetime.now() - self.last_attempt_time).total_seconds()
+        return elapsed >= self.min_retry_interval
 
     def get_avg_time(self) -> float:
         """获取平均响应时间"""
@@ -135,6 +112,15 @@ class SourceMetrics:
         """判断数据源是否可用"""
         return self.status not in [DataSourceStatus.FAILED, DataSourceStatus.DISABLED]
 
+    def _update_status(self):
+        """更新数据源状态"""
+        if self.consecutive_failures >= 3:
+            self.status = DataSourceStatus.FAILED
+        elif self.consecutive_failures >= 1 or self.failure_count > self.success_count:
+            self.status = DataSourceStatus.DEGRADED
+        else:
+            self.status = DataSourceStatus.HEALTHY
+
     def __repr__(self):
         return (f"SourceMetrics({self.name}, "
                 f"type={self.source_type.value}, "
@@ -149,7 +135,7 @@ class BaseDataSource(ABC):
     def __init__(self, name: str, source_type: SourceType, priority: int = 0):
         self.name = name
         self.source_type = source_type
-        self.priority = priority  # 优先级，数字越小优先级越高
+        self.priority = priority
         self.metrics = SourceMetrics(name=name, source_type=source_type)
         self.capability = self._get_capability()
         self._lock = threading.Lock()
@@ -161,7 +147,7 @@ class BaseDataSource(ABC):
 
     @abstractmethod
     def _check_config(self) -> bool:
-        """检查配置是否完整（如token等）"""
+        """检查配置是否完整"""
         pass
 
     def is_configured(self) -> bool:
@@ -194,9 +180,7 @@ class BaseDataSource(ABC):
         priority_score = max(0, 1 - self.priority / 100)
 
         # 类型匹配加分
-        type_bonus = 0
-        if self.source_type == SourceType.FREE_HIGH_FREQ:
-            type_bonus = 0.2  # 免费高频优先使用
+        type_bonus = 0.2 if self.source_type == SourceType.FREE_HIGH_FREQ else 0
 
         # 综合评分
         return success_rate * 0.5 + speed_score * 0.3 + priority_score * 0.2 + type_bonus
@@ -215,8 +199,8 @@ class QueryContext:
     data_type: DataType
     force_refresh: bool = False
     timeout: int = 30
-    fallback_on_error: bool = True          # 出错时是否降级到其他数据源
-    max_retries: int = 3                    # 最大重试次数
+    fallback_on_error: bool = True
+    max_retries: int = 3
 
 
 @dataclass

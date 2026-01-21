@@ -126,11 +126,60 @@ class DataManager:
             logger.debug(f"数据源 {source.name} 请求失败: {e}")
             return None
 
+    def _try_all_sources(
+        self,
+        data_type: DataType,
+        method_name: str,
+        *args,
+        codes_preprocessor=None,
+        result_processor=None,
+        **kwargs
+    ) -> pd.DataFrame:
+        """
+        尝试从所有可用数据源获取数据
+
+        Args:
+            data_type: 数据类型
+            method_name: 调用的方法名
+            codes_preprocessor: 代码预处理函数
+            result_processor: 结果处理函数
+            *args: 方法参数
+            **kwargs: 方法关键字参数
+
+        Returns:
+            DataFrame
+        """
+        available = self._get_available_sources(data_type)
+
+        if not available:
+            logger.error(f"没有可用的{data_type.value}数据源")
+            return pd.DataFrame()
+
+        last_error = None
+
+        for source in available:
+            logger.debug(f"尝试使用 {source.name} 获取数据...")
+
+            # 预处理代码
+            processed_args = list(args)
+            if codes_preprocessor:
+                processed_args = codes_preprocessor(source, args)
+
+            result = self._try_source(source, method_name, *processed_args, **kwargs)
+
+            if result is not None and not result.empty:
+                if result_processor:
+                    result_processor(source, result)
+                return result
+
+            last_error = f"{source.name} 失败"
+
+        logger.warning(f"所有数据源均失败: {last_error}")
+        return pd.DataFrame()
+
     def fetch_stock_spot(self, codes: Optional[List[str]] = None) -> pd.DataFrame:
         """
         获取股票实时行情
-
-        策略：优先使用免费高频数据源
 
         Args:
             codes: 股票代码列表，None表示获取所有
@@ -138,37 +187,28 @@ class DataManager:
         Returns:
             股票行情DataFrame
         """
-        available = self._get_available_sources(DataType.STOCK_REALTIME)
-
-        if not available:
-            logger.error("没有可用的股票行情数据源")
-            return pd.DataFrame()
-
-        last_error = None
-
-        for source in available:
-            logger.debug(f"尝试使用 {source.name} 获取股票行情...")
-
-            # 对于需要指定代码的数据源，需要提供codes
+        def preprocess_codes(source, args):
+            """预处理股票代码"""
+            codes = args[0] if args else None
             if codes is None and source.name in ['tencent', 'sina']:
-                # 尝试使用缓存的代码列表
                 codes = self._stock_codes_cache or self._get_common_stock_codes()
                 if not codes:
                     logger.warning(f"{source.name} 需要指定股票代码，跳过")
-                    continue
+                    return (None,)
+            return (codes,)
 
-            result = self._try_source(source, 'fetch_stock_spot', codes)
+        def process_result(source, result):
+            """处理结果"""
+            if '代码' in result.columns:
+                self._stock_codes_cache = result['代码'].tolist()[:2000]
 
-            if result is not None and not result.empty:
-                # 缓存股票代码列表
-                if '代码' in result.columns:
-                    self._stock_codes_cache = result['代码'].tolist()[:2000]
-                return result
-
-            last_error = f"{source.name} 失败"
-
-        logger.warning(f"所有数据源均失败: {last_error}")
-        return pd.DataFrame()
+        return self._try_all_sources(
+            DataType.STOCK_REALTIME,
+            'fetch_stock_spot',
+            codes,
+            codes_preprocessor=preprocess_codes,
+            result_processor=process_result
+        )
 
     def fetch_etf_spot(self, codes: Optional[List[str]] = None) -> pd.DataFrame:
         """
@@ -180,34 +220,22 @@ class DataManager:
         Returns:
             ETF行情DataFrame
         """
-        available = self._get_available_sources(DataType.ETF_REALTIME)
-
-        if not available:
-            logger.error("没有可用的ETF行情数据源")
-            return pd.DataFrame()
-
-        last_error = None
-
-        for source in available:
-            logger.debug(f"尝试使用 {source.name} 获取ETF行情...")
-
-            # 对于需要指定代码的数据源，需要提供codes
+        def preprocess_codes(source, args):
+            """预处理ETF代码"""
+            codes = args[0] if args else None
             if codes is None and source.name in ['tencent', 'sina']:
-                # 使用常用ETF代码列表
                 codes = self._get_common_etf_codes()
                 if not codes:
                     logger.warning(f"{source.name} 需要指定ETF代码，跳过")
-                    continue
+                    return (None,)
+            return (codes,)
 
-            result = self._try_source(source, 'fetch_etf_spot', codes)
-
-            if result is not None and not result.empty:
-                return result
-
-            last_error = f"{source.name} 失败"
-
-        logger.warning(f"所有数据源均失败: {last_error}")
-        return pd.DataFrame()
+        return self._try_all_sources(
+            DataType.ETF_REALTIME,
+            'fetch_etf_spot',
+            codes,
+            codes_preprocessor=preprocess_codes
+        )
 
     def fetch_stock_history(
         self,
@@ -218,8 +246,6 @@ class DataManager:
         """
         获取股票历史行情
 
-        策略：优先使用付费数据源
-
         Args:
             stock_code: 股票代码
             start_date: 开始日期 YYYYMMDD
@@ -228,27 +254,13 @@ class DataManager:
         Returns:
             历史行情DataFrame
         """
-        available = self._get_available_sources(DataType.STOCK_HISTORY)
-
-        if not available:
-            logger.error("没有可用的历史数据源")
-            return pd.DataFrame()
-
-        for source in available:
-            logger.debug(f"尝试使用 {source.name} 获取历史行情...")
-
-            result = self._try_source(
-                source,
-                'fetch_stock_history',
-                stock_code,
-                start_date,
-                end_date
-            )
-
-            if result is not None and not result.empty:
-                return result
-
-        return pd.DataFrame()
+        return self._try_all_sources(
+            DataType.STOCK_HISTORY,
+            'fetch_stock_history',
+            stock_code,
+            start_date,
+            end_date
+        )
 
     def fetch_financial(
         self,
@@ -258,8 +270,6 @@ class DataManager:
         """
         获取财务数据
 
-        策略：使用付费数据源
-
         Args:
             stock_code: 股票代码
             report_type: 报表类型 income/balance/cashflow
@@ -267,26 +277,12 @@ class DataManager:
         Returns:
             财务数据DataFrame
         """
-        available = self._get_available_sources(DataType.FINANCIAL)
-
-        if not available:
-            logger.error("没有可用的财务数据源")
-            return pd.DataFrame()
-
-        for source in available:
-            logger.debug(f"尝试使用 {source.name} 获取财务数据...")
-
-            result = self._try_source(
-                source,
-                'fetch_financial',
-                stock_code,
-                report_type
-            )
-
-            if result is not None and not result.empty:
-                return result
-
-        return pd.DataFrame()
+        return self._try_all_sources(
+            DataType.FINANCIAL,
+            'fetch_financial',
+            stock_code,
+            report_type
+        )
 
     def get_stock_list(self) -> pd.DataFrame:
         """获取所有股票列表"""

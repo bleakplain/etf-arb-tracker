@@ -7,7 +7,7 @@ import pandas as pd
 import time
 from typing import Dict, List, Optional
 from loguru import logger
-from datetime import datetime, date
+from datetime import datetime
 
 from backend.data.source_base import (
     BaseDataSource,
@@ -16,6 +16,7 @@ from backend.data.source_base import (
     DataSourceStatus,
     SourceCapability
 )
+from backend.data.utils import convert_code_format, denormalize_code
 
 
 class TushareDataSource(BaseDataSource):
@@ -36,7 +37,6 @@ class TushareDataSource(BaseDataSource):
             priority=priority
         )
         self.token = token
-        self._ts = None
         self._pro = None
         self._check_config()
 
@@ -56,7 +56,7 @@ class TushareDataSource(BaseDataSource):
             batch_query=True,
             max_batch_size=5000,
             requires_token=True,
-            rate_limit=200  # 免费用户每分钟200次
+            rate_limit=200
         )
 
     def _check_config(self) -> bool:
@@ -68,7 +68,6 @@ class TushareDataSource(BaseDataSource):
 
         try:
             import tushare as ts
-            self._ts = ts
             ts.set_token(self.token)
             self._pro = ts.pro_api()
             logger.info("Tushare数据源初始化成功")
@@ -81,36 +80,6 @@ class TushareDataSource(BaseDataSource):
             logger.warning(f"Tushare初始化失败: {e}")
             self.metrics.status = DataSourceStatus.DISABLED
             return False
-
-    def _normalize_code(self, code: str) -> str:
-        """
-        标准化股票代码为Tushare格式
-
-        Examples:
-            600519 -> 600519.SH
-            000001 -> 000001.SZ
-        """
-        if '.' in code:
-            return code
-
-        if code.startswith('6'):
-            return f"{code}.SH"
-        elif code.startswith(('0', '3', '8')):
-            return f"{code}.SZ"
-        else:
-            return code
-
-    def _denormalize_code(self, ts_code: str) -> str:
-        """
-        将Tushare格式代码转换为标准格式
-
-        Examples:
-            600519.SH -> 600519
-            000001.SZ -> 000001
-        """
-        return ts_code.split('.')[0]
-
-    # ========== 实时行情接口 ==========
 
     def fetch_stock_spot(self, stock_codes: Optional[List[str]] = None) -> pd.DataFrame:
         """
@@ -125,12 +94,9 @@ class TushareDataSource(BaseDataSource):
             return pd.DataFrame()
 
         try:
-            # 获取今日日期
             today = datetime.now().strftime("%Y%m%d")
 
-            # 如果没有指定股票代码，获取所有股票
             if stock_codes is None:
-                # 先获取股票列表
                 stock_list = self._pro.stock_basic(
                     exchange='',
                     list_status='L',
@@ -141,16 +107,16 @@ class TushareDataSource(BaseDataSource):
                     self.metrics.record_failure()
                     return pd.DataFrame()
 
-                ts_codes = stock_list['ts_code'].tolist()[:3000]  # 限制数量
+                ts_codes = stock_list['ts_code'].tolist()[:3000]
             else:
-                ts_codes = [self._normalize_code(c) for c in stock_codes]
+                ts_codes = [convert_code_format(c, 'tushare') for c in stock_codes]
 
             logger.debug(f"使用Tushare获取 {len(ts_codes)} 只股票行情...")
 
             # 获取每日基本行情
             df = self._pro.daily_basic(
                 trade_date=today,
-                ts_code=','.join(ts_codes[:2000]),  # API限制
+                ts_code=','.join(ts_codes[:2000]),
                 fields='ts_code,close,turnover_rate,volume_ratio,pe,pb'
             )
 
@@ -186,8 +152,8 @@ class TushareDataSource(BaseDataSource):
             })
 
             # 添加代码列（去掉后缀）
-            df['代码'] = df['ts_code'].apply(self._denormalize_code)
-            df['名称'] = ''  # 需要另外查询
+            df['代码'] = df['ts_code'].apply(denormalize_code)
+            df['名称'] = ''
 
             # 调整列顺序
             df = df[['代码', 'ts_code', '名称', '最新价', '昨收', '今开', '最高', '最低',
@@ -207,14 +173,11 @@ class TushareDataSource(BaseDataSource):
 
     def fetch_etf_spot(self, etf_codes: Optional[List[str]] = None) -> pd.DataFrame:
         """获取ETF实时行情"""
-        # ETF使用相同接口
         return self.fetch_stock_spot(etf_codes)
 
     def fetch_by_codes(self, codes: List[str]) -> pd.DataFrame:
         """批量获取指定代码的行情"""
         return self.fetch_stock_spot(codes)
-
-    # ========== 历史数据接口 ==========
 
     def fetch_stock_history(
         self,
@@ -239,7 +202,7 @@ class TushareDataSource(BaseDataSource):
             return pd.DataFrame()
 
         try:
-            ts_code = self._normalize_code(stock_code)
+            ts_code = convert_code_format(stock_code, 'tushare')
 
             if end_date is None:
                 end_date = datetime.now().strftime("%Y%m%d")
@@ -272,8 +235,6 @@ class TushareDataSource(BaseDataSource):
             logger.error(f"Tushare获取历史行情失败: {e}")
             return pd.DataFrame()
 
-    # ========== 财务数据接口 ==========
-
     def fetch_financial(
         self,
         stock_code: str,
@@ -293,7 +254,7 @@ class TushareDataSource(BaseDataSource):
             return pd.DataFrame()
 
         try:
-            ts_code = self._normalize_code(stock_code)
+            ts_code = convert_code_format(stock_code, 'tushare')
 
             if report_type == "income":
                 df = self._pro.income(ts_code=ts_code)

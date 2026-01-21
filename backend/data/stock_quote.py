@@ -5,67 +5,31 @@ A股实时行情数据获取模块
 """
 
 import pandas as pd
-import time
-import atexit
 from typing import Dict, List, Optional
 from datetime import datetime, time as dt_time
 from loguru import logger
-import threading
+
+from backend.data.cache_base import BaseCachedFetcher
+from backend.data.utils import safe_float, safe_int, is_limit_up, is_limit_down
 
 
-def _safe_float(value, default=0.0):
-    """安全地转换为float，处理'-'等无效值"""
-    try:
-        if value is None or value == '' or value == '-':
-            return default
-        return float(value)
-    except (ValueError, TypeError):
-        return default
-
-
-def _safe_int(value, default=0):
-    """安全地转换为int，处理'-'等无效值"""
-    try:
-        if value is None or value == '' or value == '-':
-            return default
-        return int(float(value))
-    except (ValueError, TypeError):
-        return default
-
-
-class StockQuoteFetcher:
+class StockQuoteFetcher(BaseCachedFetcher):
     """A股行情数据获取器 - 使用新数据管理器架构"""
 
-    # 类变量，用于缓存行情数据
-    _cache_lock = threading.Lock()
+    # 类变量
+    _cache_lock = None
     _spot_cache = None
     _cache_time = None
-    _cache_ttl = 30  # 缓存有效期30秒（业务读取容忍度）
-    _refresh_interval = 15  # 后台刷新间隔15秒
+    _cache_ttl = 30
+    _refresh_interval = 15
     _refresh_thread = None
     _running = False
     _initialized = False
-    _data_manager = None  # 数据管理器
+    _data_manager = None
 
     def __init__(self, config: Optional[Dict] = None):
         self.data_source = 'DataManager'
-        self._config = config or {}
-        # 启动时初始化，确保有数据
-        self._ensure_initialized()
-
-    def _ensure_initialized(self):
-        """确保数据已初始化"""
-        if not StockQuoteFetcher._initialized:
-            logger.info("首次启动，正在初始化A股行情数据...")
-            # 导入数据管理器
-            from backend.data.data_manager import get_data_manager
-            StockQuoteFetcher._data_manager = get_data_manager(self._config)
-            self._fetch_data()
-            StockQuoteFetcher._initialized = True
-            # 启动后台刷新线程
-            self._start_background_refresh()
-            # 注册退出处理
-            atexit.register(self._stop_background_refresh)
+        super().__init__(config)
 
     def _fetch_data(self) -> pd.DataFrame:
         """实际获取数据的方法 - 使用数据管理器"""
@@ -75,71 +39,34 @@ class StockQuoteFetcher:
                 self._data_manager = get_data_manager(self._config)
 
             logger.debug("正在从数据管理器获取A股实时行情...")
+            import time
             start_time = time.time()
             df = self._data_manager.fetch_stock_spot()
             elapsed = time.time() - start_time
 
             if df.empty:
-                # 数据源返回空，可能是临时网络问题，检查是否有可用缓存
-                with self._cache_lock:
-                    if self._spot_cache is not None:
-                        cache_age = time.time() - self._cache_time
-                        # 如果缓存不超过5分钟，仍然使用
-                        if cache_age < 300:
-                            logger.warning(f"数据源暂时不可用，使用缓存数据 (缓存年龄: {cache_age:.1f}秒)")
-                            return self._spot_cache
-
+                # 检查是否有可用缓存
+                if self._spot_cache is not None:
+                    cache_age = time.time() - self._cache_time
+                    if cache_age < 300:
+                        logger.warning(f"数据源暂时不可用，使用缓存数据 (缓存年龄: {cache_age:.1f}秒)")
+                        return self._spot_cache
                 raise ValueError("获取数据为空且无可用缓存")
 
             logger.info(f"成功获取 {len(df)} 只A股的实时行情数据 (耗时: {elapsed:.2f}秒)")
 
-            with self._cache_lock:
-                self._spot_cache = df
-                self._cache_time = time.time()
+            self._spot_cache = df
+            self._cache_time = time.time()
 
             return df
 
         except Exception as e:
             logger.error(f"获取A股行情失败: {e}")
-            # 如果有旧缓存，返回旧缓存
-            with self._cache_lock:
-                if self._spot_cache is not None:
-                    cache_age = time.time() - self._cache_time
-                    logger.warning(f"使用缓存的行情数据 (缓存年龄: {cache_age:.1f}秒)")
-                    return self._spot_cache
+            if self._spot_cache is not None:
+                cache_age = time.time() - self._cache_time
+                logger.warning(f"使用缓存的行情数据 (缓存年龄: {cache_age:.1f}秒)")
+                return self._spot_cache
             return pd.DataFrame()
-
-    def _background_refresh_worker(self):
-        """后台刷新工作线程"""
-        logger.info(f"后台刷新线程已启动，刷新间隔: {self._refresh_interval}秒")
-        while self._running:
-            try:
-                time.sleep(self._refresh_interval)
-                if self._running:
-                    self._fetch_data()
-            except Exception as e:
-                logger.error(f"后台刷新异常: {e}")
-        logger.info("后台刷新线程已停止")
-
-    def _start_background_refresh(self):
-        """启动后台刷新线程"""
-        if self._refresh_thread is None or not self._refresh_thread.is_alive():
-            self._running = True
-            self._refresh_thread = threading.Thread(
-                target=self._background_refresh_worker,
-                daemon=True,
-                name="StockQuoteRefresh"
-            )
-            self._refresh_thread.start()
-            logger.info("后台刷新线程已启动")
-
-    def _stop_background_refresh(self):
-        """停止后台刷新线程"""
-        if self._running:
-            self._running = False
-            if self._refresh_thread and self._refresh_thread.is_alive():
-                self._refresh_thread.join(timeout=2)
-            logger.info("后台刷新线程已停止")
 
     def _get_spot_data(self, force_refresh: bool = False) -> pd.DataFrame:
         """
@@ -151,31 +78,7 @@ class StockQuoteFetcher:
         Returns:
             包含所有A股行情的DataFrame
         """
-        current_time = time.time()
-
-        # 检查缓存
-        if not force_refresh and self._spot_cache is not None:
-            cache_age = current_time - self._cache_time
-            if cache_age < self._cache_ttl:
-                logger.debug(f"使用缓存数据 (缓存年龄: {cache_age:.1f}秒)")
-                return self._spot_cache
-
-        # 如果强制刷新或缓存过期，等待后台线程更新（最多等待5秒）
-        if force_refresh or (self._spot_cache is not None and current_time - self._cache_time >= self._cache_ttl):
-            logger.info("缓存已过期或强制刷新，触发后台更新...")
-            # 触发后台更新
-            with self._cache_lock:
-                if self._spot_cache is not None:
-                    cache_age = current_time - self._cache_time
-                    if cache_age < self._cache_ttl:
-                        return self._spot_cache
-
-        # 返回当前缓存（即使可能稍旧）
-        if self._spot_cache is not None:
-            return self._spot_cache
-
-        # 如果完全没有缓存，同步获取一次
-        return self._fetch_data()
+        return self._get_cached_data(force_refresh)
 
     def get_stock_quote(self, stock_code: str) -> Optional[Dict]:
         """
@@ -214,25 +117,21 @@ class StockQuoteFetcher:
             # 数据字段映射
             code = str(row.get('代码', ''))
             name = str(row.get('名称', ''))
-            price = _safe_float(row.get('最新价'))
-            prev_close = _safe_float(row.get('昨收'))
-            open_price = _safe_float(row.get('今开'))
-            high = _safe_float(row.get('最高'))
-            low = _safe_float(row.get('最低'))
-            volume = _safe_int(row.get('成交量'))  # 手
-            amount = _safe_float(row.get('成交额'))  # 元
-            change = _safe_float(row.get('涨跌额', price - prev_close))
-            change_pct = _safe_float(row.get('涨跌幅'))
+            price = safe_float(row.get('最新价'))
+            prev_close = safe_float(row.get('昨收'))
+            open_price = safe_float(row.get('今开'))
+            high = safe_float(row.get('最高'))
+            low = safe_float(row.get('最低'))
+            volume = safe_int(row.get('成交量'))
+            amount = safe_float(row.get('成交额'))
+            change = safe_float(row.get('涨跌额', price - prev_close))
+            change_pct = safe_float(row.get('涨跌幅'))
 
             # 如果当前价为0（未开盘或停牌），使用昨收价代替
             if price == 0 and prev_close > 0:
                 price = prev_close
                 change = 0
                 change_pct = 0
-
-            # 判断是否涨停
-            is_limit_up = self._is_limit_up(code, change_pct)
-            is_limit_down = self._is_limit_down(code, change_pct)
 
             return {
                 'code': code,
@@ -246,8 +145,8 @@ class StockQuoteFetcher:
                 'amount': amount,
                 'change': change,
                 'change_pct': change_pct,
-                'is_limit_up': is_limit_up,
-                'is_limit_down': is_limit_down,
+                'is_limit_up': is_limit_up(code, change_pct),
+                'is_limit_down': is_limit_down(code, change_pct),
                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'data_source': self._get_current_source()
             }
@@ -315,39 +214,12 @@ class StockQuoteFetcher:
             logger.error(f"获取所有股票行情失败: {e}")
             return {}
 
-    def _is_limit_up(self, code: str, change_pct: float) -> bool:
-        """判断是否涨停"""
-        if change_pct < 0.095:
-            return False
-
-        if code.startswith('688') or code.startswith('300'):
-            return change_pct >= 0.195
-        elif code.startswith('8') or code.startswith('4'):
-            return change_pct >= 0.295
-        else:
-            return change_pct >= 0.095
-
-    def _is_limit_down(self, code: str, change_pct: float) -> bool:
-        """判断是否跌停"""
-        if change_pct > -0.095:
-            return False
-
-        if code.startswith('688') or code.startswith('300'):
-            return change_pct <= -0.195
-        elif code.startswith('8') or code.startswith('4'):
-            return change_pct <= -0.295
-        else:
-            return change_pct <= -0.095
-
     def is_trading_time(self) -> bool:
         """判断是否在交易时间内"""
         now = datetime.now().time()
 
-        # 上午: 9:30-11:30
         morning_start = dt_time(9, 30)
         morning_end = dt_time(11, 30)
-
-        # 下午: 13:00-15:00
         afternoon_start = dt_time(13, 0)
         afternoon_end = dt_time(15, 0)
 
@@ -370,35 +242,23 @@ class StockQuoteFetcher:
         delta = close_time - now
         return int(delta.total_seconds())
 
+    @property
+    def _cache_lock(self):
+        """获取缓存锁"""
+        import threading
+        if not hasattr(self, '__cache_lock'):
+            self.__cache_lock = threading.Lock()
+        return self.__cache_lock
+
     def get_cache_status(self) -> Dict:
         """获取缓存状态"""
-        with self._cache_lock:
-            return {
-                'initialized': self._initialized,
-                'cache_exists': self._spot_cache is not None,
-                'cache_age': time.time() - self._cache_time if self._cache_time else None,
-                'cache_size': len(self._spot_cache) if self._spot_cache is not None else 0,
-                'refresh_thread_alive': self._refresh_thread.is_alive() if self._refresh_thread else False
-            }
+        return super().get_cache_status()
 
     def clear_cache(self):
         """清除缓存"""
-        with self._cache_lock:
-            self._spot_cache = None
-            self._cache_time = None
-            logger.debug("行情数据缓存已清除")
-
-    def _get_current_source(self) -> str:
-        """获取当前使用的数据源"""
-        if self._data_manager:
-            return 'DataManager'
-        return 'Unknown'
-
-    def get_data_source_metrics(self) -> Dict:
-        """获取数据源性能指标"""
-        if self._data_manager:
-            return self._data_manager.get_metrics()
-        return {}
+        super().clear_cache()
+        self._spot_cache = None
+        self._cache_time = None
 
 
 # 测试代码

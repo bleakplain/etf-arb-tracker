@@ -5,27 +5,27 @@ ETF行情数据获取模块
 """
 
 import pandas as pd
-import time
-import atexit
 from typing import Dict, List
 from datetime import datetime
 from loguru import logger
-import threading
+
+from backend.data.cache_base import BaseCachedFetcher
+from backend.data.utils import safe_float, safe_int
 
 
-class ETFQuoteFetcher:
+class ETFQuoteFetcher(BaseCachedFetcher):
     """ETF行情获取器 - 使用新数据管理器架构"""
 
-    # 类变量，用于缓存ETF行情数据
-    _cache_lock = threading.Lock()
+    # 类变量
+    _cache_lock = None
     _etf_cache = None
     _cache_time = None
-    _cache_ttl = 30  # 缓存有效期30秒
-    _refresh_interval = 15  # 后台刷新间隔15秒
+    _cache_ttl = 30
+    _refresh_interval = 15
     _refresh_thread = None
     _running = False
     _initialized = False
-    _data_manager = None  # 数据管理器
+    _data_manager = None
 
     def __init__(self, config: dict = None):
         self.data_source = 'DataManager'
@@ -37,22 +37,7 @@ class ETFQuoteFetcher:
             'cross': 0.10,
             'commodity': 0.10
         }
-        # 启动时初始化
-        self._ensure_initialized()
-
-    def _ensure_initialized(self):
-        """确保数据已初始化"""
-        if not ETFQuoteFetcher._initialized:
-            logger.info("首次启动，正在初始化ETF行情数据...")
-            # 导入数据管理器
-            from backend.data.data_manager import get_data_manager
-            ETFQuoteFetcher._data_manager = get_data_manager(self._config)
-            self._fetch_data()
-            ETFQuoteFetcher._initialized = True
-            # 启动后台刷新线程
-            self._start_background_refresh()
-            # 注册退出处理
-            atexit.register(self._stop_background_refresh)
+        super().__init__(config)
 
     def _fetch_data(self) -> pd.DataFrame:
         """实际获取数据的方法 - 使用数据管理器"""
@@ -62,6 +47,7 @@ class ETFQuoteFetcher:
                 self._data_manager = get_data_manager(self._config)
 
             logger.debug("正在从数据管理器获取ETF实时行情...")
+            import time
             start_time = time.time()
             df = self._data_manager.fetch_etf_spot()
             elapsed = time.time() - start_time
@@ -71,9 +57,8 @@ class ETFQuoteFetcher:
 
             logger.info(f"成功获取 {len(df)} 只ETF的实时行情数据 (耗时: {elapsed:.2f}秒)")
 
-            with self._cache_lock:
-                self._etf_cache = df
-                self._cache_time = time.time()
+            self._etf_cache = df
+            self._cache_time = time.time()
 
             return df
 
@@ -83,38 +68,6 @@ class ETFQuoteFetcher:
                 logger.warning("使用缓存的ETF行情数据")
                 return self._etf_cache
             return pd.DataFrame()
-
-    def _background_refresh_worker(self):
-        """后台刷新工作线程"""
-        logger.info(f"ETF后台刷新线程已启动，刷新间隔: {self._refresh_interval}秒")
-        while self._running:
-            try:
-                time.sleep(self._refresh_interval)
-                if self._running:
-                    self._fetch_data()
-            except Exception as e:
-                logger.error(f"ETF后台刷新异常: {e}")
-        logger.info("ETF后台刷新线程已停止")
-
-    def _start_background_refresh(self):
-        """启动后台刷新线程"""
-        if self._refresh_thread is None or not self._refresh_thread.is_alive():
-            self._running = True
-            self._refresh_thread = threading.Thread(
-                target=self._background_refresh_worker,
-                daemon=True,
-                name="ETFQuoteRefresh"
-            )
-            self._refresh_thread.start()
-            logger.info("ETF后台刷新线程已启动")
-
-    def _stop_background_refresh(self):
-        """停止后台刷新线程"""
-        if self._running:
-            self._running = False
-            if self._refresh_thread and self._refresh_thread.is_alive():
-                self._refresh_thread.join(timeout=2)
-            logger.info("ETF后台刷新线程已停止")
 
     def _get_etf_spot_data(self, force_refresh: bool = False) -> pd.DataFrame:
         """
@@ -126,21 +79,7 @@ class ETFQuoteFetcher:
         Returns:
             包含所有ETF行情的DataFrame
         """
-        current_time = time.time()
-
-        # 检查缓存
-        if not force_refresh and self._etf_cache is not None:
-            cache_age = current_time - self._cache_time
-            if cache_age < self._cache_ttl:
-                logger.debug(f"使用ETF缓存数据 (缓存年龄: {cache_age:.1f}秒)")
-                return self._etf_cache
-
-        # 如果完全没有缓存，同步获取一次
-        if self._etf_cache is None:
-            return self._fetch_data()
-
-        # 返回当前缓存
-        return self._etf_cache
+        return self._get_cached_data(force_refresh)
 
     def get_etf_quote(self, etf_code: str) -> Dict:
         """
@@ -178,14 +117,14 @@ class ETFQuoteFetcher:
         try:
             code = str(row.get('代码', ''))
             name = str(row.get('名称', ''))
-            price = float(row.get('最新价', 0)) or 0
-            prev_close = float(row.get('昨收', 0)) or 0
-            open_price = float(row.get('今开', 0)) or 0
-            high = float(row.get('最高', 0)) or 0
-            low = float(row.get('最低', 0)) or 0
-            volume = int(float(row.get('成交量', 0))) or 0  # 手
-            amount = float(row.get('成交额', 0)) or 0  # 元
-            change_pct = float(row.get('涨跌幅', 0)) or 0
+            price = safe_float(row.get('最新价'))
+            prev_close = safe_float(row.get('昨收'))
+            open_price = safe_float(row.get('今开'))
+            high = safe_float(row.get('最高'))
+            low = safe_float(row.get('最低'))
+            volume = safe_int(row.get('成交量'))
+            amount = safe_float(row.get('成交额'))
+            change_pct = safe_float(row.get('涨跌幅'))
 
             if price == 0 and prev_close > 0:
                 price = prev_close
@@ -290,35 +229,23 @@ class ETFQuoteFetcher:
         current_amount = quote.get('amount', 0)
         return current_amount >= min_amount / 4
 
+    @property
+    def _cache_lock(self):
+        """获取缓存锁"""
+        import threading
+        if not hasattr(self, '__cache_lock'):
+            self.__cache_lock = threading.Lock()
+        return self.__cache_lock
+
     def get_cache_status(self) -> Dict:
         """获取缓存状态"""
-        with self._cache_lock:
-            return {
-                'initialized': self._initialized,
-                'cache_exists': self._etf_cache is not None,
-                'cache_age': time.time() - self._cache_time if self._cache_time else None,
-                'cache_size': len(self._etf_cache) if self._etf_cache is not None else 0,
-                'refresh_thread_alive': self._refresh_thread.is_alive() if self._refresh_thread else False
-            }
+        return super().get_cache_status()
 
     def clear_cache(self):
         """清除缓存"""
-        with self._cache_lock:
-            self._etf_cache = None
-            self._cache_time = None
-            logger.debug("ETF行情数据缓存已清除")
-
-    def _get_current_source(self) -> str:
-        """获取当前使用的数据源"""
-        if self._data_manager:
-            return 'DataManager'
-        return 'Unknown'
-
-    def get_data_source_metrics(self) -> Dict:
-        """获取数据源性能指标"""
-        if self._data_manager:
-            return self._data_manager.get_metrics()
-        return {}
+        super().clear_cache()
+        self._etf_cache = None
+        self._cache_time = None
 
 
 # 测试代码

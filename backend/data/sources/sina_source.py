@@ -14,8 +14,14 @@ from backend.data.source_base import (
     BaseDataSource,
     SourceType,
     DataType,
-    DataSourceStatus,
     SourceCapability
+)
+from backend.data.utils import (
+    safe_float,
+    safe_int,
+    is_limit_up,
+    is_limit_down,
+    convert_code_format
 )
 
 
@@ -36,7 +42,6 @@ class SinaDataSource(BaseDataSource):
             source_type=SourceType.FREE_HIGH_FREQ,
             priority=priority
         )
-        # 新浪API地址
         self.list_url = 'http://hq.sinajs.cn/list='
         self.sse_list_url = 'http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData'
         self.session = requests.Session()
@@ -56,7 +61,7 @@ class SinaDataSource(BaseDataSource):
             realtime=True,
             historical=False,
             batch_query=True,
-            max_batch_size=200,  # 新浪支持更多
+            max_batch_size=200,
             requires_token=False,
             rate_limit=0
         )
@@ -64,24 +69,6 @@ class SinaDataSource(BaseDataSource):
     def _check_config(self) -> bool:
         """检查配置（新浪无需特殊配置）"""
         return True
-
-    def _convert_to_sina_code(self, stock_code: str) -> str:
-        """
-        转换股票代码为新浪API格式
-
-        Examples:
-            600519 -> sh600519
-            000001 -> sz000001
-            300750 -> sz300750
-        """
-        if stock_code.startswith('6'):
-            return f'sh{stock_code}'
-        elif stock_code.startswith(('0', '3')):
-            return f'sz{stock_code}'
-        elif stock_code.startswith('8') or stock_code.startswith('4'):
-            return f'bj{stock_code}'
-        else:
-            return stock_code
 
     def _parse_sina_response(self, stock_code: str, response_text: str) -> Optional[Dict]:
         """
@@ -91,7 +78,7 @@ class SinaDataSource(BaseDataSource):
         var hq_str_sh600519="贵州茅台,1370.99,1375.00,1370.00,...";
         """
         try:
-            sina_code = self._convert_to_sina_code(stock_code)
+            sina_code = convert_code_format(stock_code, 'sina')
             search_pattern = f'hq_str_{sina_code}="'
 
             start_idx = response_text.find(search_pattern)
@@ -101,14 +88,12 @@ class SinaDataSource(BaseDataSource):
             data_start = start_idx + len(search_pattern)
             data_end = response_text.find('";', data_start)
             if data_end == -1:
-                # 尝试其他结束标记
                 data_end = response_text.find('"', data_start)
                 if data_end == -1:
                     return None
 
             data_str = response_text[data_start:data_end]
 
-            # 检查是否为空
             if not data_str or data_str.strip() == '':
                 return None
 
@@ -117,21 +102,19 @@ class SinaDataSource(BaseDataSource):
             if len(fields) < 10:
                 return None
 
-            # 新浪API字段解析
-            # 0:名称, 1:当前价, 2:昨收, 3:今开, 4:成交量(手), 5:外盘
-            # 6:内盘, 7:买一, 8:买一量, 9:买二, 10:买二量 ...
-            # 20:时间, 21:涨跌, 22:涨跌幅%, 23:最高, 24:最低, 25:成交量(手), 26:成交额(元), 27:换手率%
+            # 新浪API字段解析: 0:名称, 1:当前价, 2:昨收, 3:今开, 4:成交量(手), 20:时间,
+            # 21:涨跌, 22:涨跌幅%, 23:最高, 24:最低, 26:成交额(元), 27:换手率%
             name = fields[0] if fields[0] else ''
-            price = self._safe_float(fields[1]) if len(fields) > 1 else 0.0
-            prev_close = self._safe_float(fields[2]) if len(fields) > 2 else 0.0
-            open_price = self._safe_float(fields[3]) if len(fields) > 3 else 0.0
-            volume = self._safe_int(fields[4]) if len(fields) > 4 else 0
-            high = self._safe_float(fields[23]) if len(fields) > 23 else 0.0
-            low = self._safe_float(fields[24]) if len(fields) > 24 else 0.0
-            amount = self._safe_float(fields[26]) if len(fields) > 26 else 0.0
-            change = self._safe_float(fields[21]) if len(fields) > 21 else 0.0
-            change_pct = self._safe_float(fields[22]) if len(fields) > 22 else 0.0
-            turnover = self._safe_float(fields[27]) if len(fields) > 27 else 0.0
+            price = safe_float(fields[1]) if len(fields) > 1 else 0.0
+            prev_close = safe_float(fields[2]) if len(fields) > 2 else 0.0
+            open_price = safe_float(fields[3]) if len(fields) > 3 else 0.0
+            volume = safe_int(fields[4]) if len(fields) > 4 else 0
+            high = safe_float(fields[23]) if len(fields) > 23 else 0.0
+            low = safe_float(fields[24]) if len(fields) > 24 else 0.0
+            amount = safe_float(fields[26]) if len(fields) > 26 else 0.0
+            change = safe_float(fields[21]) if len(fields) > 21 else 0.0
+            change_pct = safe_float(fields[22]) if len(fields) > 22 else 0.0
+            turnover = safe_float(fields[27]) if len(fields) > 27 else 0.0
             timestamp = fields[20] if len(fields) > 20 else datetime.now().strftime("%H:%M:%S")
 
             # 计算涨跌幅
@@ -160,48 +143,6 @@ class SinaDataSource(BaseDataSource):
             logger.debug(f"解析新浪API响应失败: {e}")
             return None
 
-    def _safe_float(self, value) -> float:
-        """安全地转换为float"""
-        try:
-            if value is None or value == '' or value == '-':
-                return 0.0
-            return float(value)
-        except (ValueError, TypeError):
-            return 0.0
-
-    def _safe_int(self, value) -> int:
-        """安全地转换为int"""
-        try:
-            if value is None or value == '' or value == '-':
-                return 0
-            return int(float(value))
-        except (ValueError, TypeError):
-            return 0
-
-    def _is_limit_up(self, code: str, change_pct: float) -> bool:
-        """判断是否涨停"""
-        if change_pct < 9.5:
-            return False
-
-        if code.startswith('688') or code.startswith('300'):
-            return change_pct >= 19.5
-        elif code.startswith('8') or code.startswith('4'):
-            return change_pct >= 29.5
-        else:
-            return change_pct >= 9.5
-
-    def _is_limit_down(self, code: str, change_pct: float) -> bool:
-        """判断是否跌停"""
-        if change_pct > -9.5:
-            return False
-
-        if code.startswith('688') or code.startswith('300'):
-            return change_pct <= -19.5
-        elif code.startswith('8') or code.startswith('4'):
-            return change_pct <= -29.5
-        else:
-            return change_pct <= -9.5
-
     def fetch_stock_spot(self, stock_codes: Optional[List[str]] = None) -> pd.DataFrame:
         """
         获取A股实时行情
@@ -212,7 +153,6 @@ class SinaDataSource(BaseDataSource):
 
         try:
             if stock_codes is None:
-                # 尝试获取上证所有股票
                 stock_codes = self._get_all_stock_codes()
 
             if not stock_codes:
@@ -222,13 +162,12 @@ class SinaDataSource(BaseDataSource):
 
             logger.debug(f"使用新浪API获取 {len(stock_codes)} 只股票行情...")
 
-            # 分批查询
-            batch_size = 150  # 新浪支持更多
+            batch_size = 150
             all_results = {}
 
             for i in range(0, len(stock_codes), batch_size):
                 batch = stock_codes[i:i + batch_size]
-                sina_codes = [self._convert_to_sina_code(code) for code in batch]
+                sina_codes = [convert_code_format(code, 'sina') for code in batch]
                 url = f"{self.list_url}{','.join(sina_codes)}"
 
                 try:
@@ -238,10 +177,9 @@ class SinaDataSource(BaseDataSource):
                     if response.status_code == 200:
                         for code in batch:
                             quote = self._parse_sina_response(code, response.text)
-                            if quote and quote['name']:  # 确保有名称
+                            if quote and quote['name']:
                                 all_results[code] = quote
 
-                    # 控制频率
                     time.sleep(0.15)
 
                 except Exception as e:
@@ -271,11 +209,11 @@ class SinaDataSource(BaseDataSource):
             # 添加涨停/跌停标记
             if '涨跌幅' in df.columns:
                 df['is_limit_up'] = df.apply(
-                    lambda row: self._is_limit_up(row['代码'], row['涨跌幅']),
+                    lambda row: is_limit_up(row['代码'], row['涨跌幅']),
                     axis=1
                 )
                 df['is_limit_down'] = df.apply(
-                    lambda row: self._is_limit_down(row['代码'], row['涨跌幅']),
+                    lambda row: is_limit_down(row['代码'], row['涨跌幅']),
                     axis=1
                 )
 
@@ -293,7 +231,6 @@ class SinaDataSource(BaseDataSource):
 
     def fetch_etf_spot(self, etf_codes: Optional[List[str]] = None) -> pd.DataFrame:
         """获取ETF实时行情"""
-        # ETF使用相同接口
         return self.fetch_stock_spot(etf_codes)
 
     def fetch_by_codes(self, codes: List[str]) -> pd.DataFrame:
@@ -306,29 +243,19 @@ class SinaDataSource(BaseDataSource):
         从新浪获取股票列表
         """
         try:
-            # 获取上证主板
             url = f"{self.sse_list_url}?num=3000&sort=symbol&asc=1&node=hs_a&_s_r_a=page"
             response = self.session.get(url, timeout=10)
 
             if response.status_code == 200:
-                # 解析JSON获取股票代码
-                try:
-                    import json
-                    data = json.loads(response.text)
-                    codes = []
-                    for item in data:
-                        code = item.get('symbol', '')
-                        if code and len(code) == 6:
-                            codes.append(code)
-                    logger.info(f"从新浪获取 {len(codes)} 只A股代码")
-                    return codes[:2000]  # 限制数量
-                except:
-                    pass
+                import json
+                data = json.loads(response.text)
+                codes = [item.get('symbol', '') for item in data if item.get('symbol') and len(item.get('symbol', '')) == 6]
+                logger.info(f"从新浪获取 {len(codes)} 只A股代码")
+                return codes[:2000]
 
         except Exception as e:
             logger.warning(f"从新浪获取股票列表失败: {e}")
 
-        # 返回空列表，让调用方决定如何处理
         return []
 
 

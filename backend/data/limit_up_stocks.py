@@ -9,25 +9,7 @@ from typing import List, Dict
 from datetime import datetime
 from loguru import logger
 
-
-def _safe_float(value, default=0.0):
-    """安全地转换为float，处理'-'等无效值"""
-    try:
-        if value is None or value == '' or value == '-':
-            return default
-        return float(value)
-    except (ValueError, TypeError):
-        return default
-
-
-def _safe_int(value, default=0):
-    """安全地转换为int，处理'-'等无效值"""
-    try:
-        if value is None or value == '' or value == '-':
-            return default
-        return int(float(value))
-    except (ValueError, TypeError):
-        return default
+from backend.data.utils import safe_float, safe_int, is_limit_up
 
 
 class LimitUpStocksFetcher:
@@ -48,16 +30,13 @@ class LimitUpStocksFetcher:
         """
         获取今日所有涨停股票
 
-        优化：传入已有的股票行情DataFrame，避免重复获取数据
-
         Args:
-            stock_df: 可选，已有的股票行情DataFrame（从StockQuoteFetcher缓存获取）
+            stock_df: 可选，已有的股票行情DataFrame
 
         Returns:
             涨停股票列表
         """
         try:
-            # 如果没有传入数据，获取数据
             if stock_df is None or stock_df.empty:
                 logger.info("正在获取涨停股票数据...")
                 data_manager = self._get_data_manager()
@@ -71,9 +50,9 @@ class LimitUpStocksFetcher:
 
             # 使用pandas向量化操作筛选涨停股
             mask = stock_df.apply(
-                lambda row: self._is_limit_up(
+                lambda row: is_limit_up(
                     str(row.get('代码', '')),
-                    _safe_float(row.get('涨跌幅'))
+                    safe_float(row.get('涨跌幅'))
                 ),
                 axis=1
             )
@@ -99,14 +78,14 @@ class LimitUpStocksFetcher:
         try:
             code = str(row.get('代码', ''))
             name = str(row.get('名称', ''))
-            price = _safe_float(row.get('最新价'))
-            change_pct = _safe_float(row.get('涨跌幅'))
-            open_price = _safe_float(row.get('今开'))
-            high = _safe_float(row.get('最高'))
-            low = _safe_float(row.get('最低'))
-            volume = _safe_int(row.get('成交量'))  # 手
-            amount = _safe_float(row.get('成交额'))  # 元
-            turnover = _safe_float(row.get('换手率')) if '换手率' in row else 0.0
+            price = safe_float(row.get('最新价'))
+            change_pct = safe_float(row.get('涨跌幅'))
+            open_price = safe_float(row.get('今开'))
+            high = safe_float(row.get('最高'))
+            low = safe_float(row.get('最低'))
+            volume = safe_int(row.get('成交量'))
+            amount = safe_float(row.get('成交额'))
+            turnover = safe_float(row.get('换手率')) if '换手率' in row else 0.0
 
             return {
                 'code': code,
@@ -127,28 +106,6 @@ class LimitUpStocksFetcher:
         except (ValueError, TypeError) as e:
             logger.error(f"解析涨停股数据失败: {e}")
             return {}
-
-    def _is_limit_up(self, code: str, change_pct: float) -> bool:
-        """
-        判断是否涨停
-
-        Args:
-            code: 股票代码
-            change_pct: 涨跌幅（小数形式，如0.0995表示9.95%）
-
-        Returns:
-            是否涨停
-        """
-        # change_pct 使用小数形式，如 0.095 表示 9.5%
-        if change_pct < 0.095:
-            return False
-
-        if code.startswith('688') or code.startswith('300'):
-            return change_pct >= 0.195
-        elif code.startswith('8') or code.startswith('4'):
-            return change_pct >= 0.295
-        else:
-            return change_pct >= 0.095
 
     def get_limit_ups_by_sector(self, sector: str = None, stock_df: pd.DataFrame = None) -> List[Dict]:
         """

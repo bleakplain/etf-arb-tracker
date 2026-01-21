@@ -14,9 +14,14 @@ from backend.data.source_base import (
     BaseDataSource,
     SourceType,
     DataType,
-    DataSourceStatus,
-    SourceCapability,
-    QueryResult
+    SourceCapability
+)
+from backend.data.utils import (
+    safe_float,
+    safe_int,
+    is_limit_up,
+    is_limit_down,
+    convert_code_format
 )
 
 
@@ -57,43 +62,22 @@ class TencentDataSource(BaseDataSource):
             batch_query=True,
             max_batch_size=100,
             requires_token=False,
-            rate_limit=0  # 无明确限制，但建议控制频率
+            rate_limit=0
         )
 
     def _check_config(self) -> bool:
         """检查配置（腾讯无需特殊配置）"""
         return True
 
-    def _convert_to_tencent_code(self, stock_code: str) -> str:
-        """
-        转换股票代码为腾讯API格式
-
-        Examples:
-            600519 -> sh600519
-            000001 -> sz000001
-            300750 -> sz300750
-        """
-        if stock_code.startswith('6'):
-            return f'sh{stock_code}'
-        elif stock_code.startswith(('0', '3')):
-            return f'sz{stock_code}'
-        elif stock_code.startswith('8') or stock_code.startswith('4'):
-            return f'bj{stock_code}'
-        else:
-            # 尝试智能判断
-            if len(stock_code) == 6:
-                return f'sh{stock_code}' if stock_code.startswith('6') else f'sz{stock_code}'
-            return stock_code
-
-    def _parse_response(self, stock_code: str, response_text: str, batch: bool = False) -> Optional[Dict]:
+    def _parse_response(self, stock_code: str, response_text: str) -> Optional[Dict]:
         """
         解析腾讯API响应
 
-        腾讯API返回格式（单只）：
+        腾讯API返回格式：
         v_sh600519="1~贵州茅台~600519~1370.99~...~-2.56~-0.19~..."
         """
         try:
-            tc_code = self._convert_to_tencent_code(stock_code)
+            tc_code = convert_code_format(stock_code, 'tencent')
             search_pattern = f'v_{tc_code}="'
 
             start_idx = response_text.find(search_pattern)
@@ -114,20 +98,22 @@ class TencentDataSource(BaseDataSource):
 
             # 解析字段
             name = fields[1] if len(fields) > 1 else ''
-            price = self._safe_float(fields[3]) if len(fields) > 3 else 0.0
-            prev_close = self._safe_float(fields[4]) if len(fields) > 4 else 0.0
-            open_price = self._safe_float(fields[5]) if len(fields) > 5 else 0.0
-            high = self._safe_float(fields[32]) if len(fields) > 32 else 0.0
-            low = self._safe_float(fields[33]) if len(fields) > 33 else 0.0
-            volume = self._safe_int(fields[35]) if len(fields) > 35 else 0  # 手
-            amount = self._safe_float(fields[34]) if len(fields) > 34 else 0.0  # 元
-            change = self._safe_float(fields[30]) if len(fields) > 30 else 0.0
-            change_pct = self._safe_float(fields[31]) if len(fields) > 31 else 0.0
+            price = safe_float(fields[3]) if len(fields) > 3 else 0.0
+            prev_close = safe_float(fields[4]) if len(fields) > 4 else 0.0
+            open_price = safe_float(fields[5]) if len(fields) > 5 else 0.0
+            high = safe_float(fields[32]) if len(fields) > 32 else 0.0
+            low = safe_float(fields[33]) if len(fields) > 33 else 0.0
+            volume = safe_int(fields[35]) if len(fields) > 35 else 0
+            amount = safe_float(fields[34]) if len(fields) > 34 else 0.0
+            change = safe_float(fields[30]) if len(fields) > 30 else 0.0
+            change_pct = safe_float(fields[31]) if len(fields) > 31 else 0.0
 
             # 计算涨跌幅
             if prev_close > 0 and change_pct == 0:
                 change = price - prev_close
                 change_pct = (change / prev_close) if prev_close > 0 else 0
+
+            timestamp = f"{fields[39]} {fields[19]}" if len(fields) > 39 else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             return {
                 'code': stock_code,
@@ -141,57 +127,13 @@ class TencentDataSource(BaseDataSource):
                 'amount': amount,
                 'change': change,
                 'change_pct': change_pct,
-                'timestamp': f"{fields[39]} {fields[19]}" if len(fields) > 39 else datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'timestamp': timestamp,
                 'data_source': 'Tencent'
             }
 
         except Exception as e:
             logger.error(f"解析腾讯API响应失败: {e}")
             return None
-
-    def _safe_float(self, value) -> float:
-        """安全地转换为float"""
-        try:
-            if value is None or value == '' or value == '-':
-                return 0.0
-            return float(value)
-        except (ValueError, TypeError):
-            return 0.0
-
-    def _safe_int(self, value) -> int:
-        """安全地转换为int"""
-        try:
-            if value is None or value == '' or value == '-':
-                return 0
-            return int(float(value))
-        except (ValueError, TypeError):
-            return 0
-
-    def _is_limit_up(self, code: str, change_pct: float) -> bool:
-        """判断是否涨停"""
-        if change_pct < 0.095:
-            return False
-
-        if code.startswith('688') or code.startswith('300'):
-            return change_pct >= 0.195
-        elif code.startswith('8') or code.startswith('4'):
-            return change_pct >= 0.295
-        else:
-            return change_pct >= 0.095
-
-    def _is_limit_down(self, code: str, change_pct: float) -> bool:
-        """判断是否跌停"""
-        if change_pct > -0.095:
-            return False
-
-        if code.startswith('688') or code.startswith('300'):
-            return change_pct <= -0.195
-        elif code.startswith('8') or code.startswith('4'):
-            return change_pct <= -0.295
-        else:
-            return change_pct <= -0.095
-
-    # ========== 实现数据获取接口 ==========
 
     def fetch_stock_spot(self, stock_codes: Optional[List[str]] = None) -> pd.DataFrame:
         """
@@ -203,7 +145,6 @@ class TencentDataSource(BaseDataSource):
         start_time = time.time()
 
         if stock_codes is None:
-            # 腾讯API不支持获取全市场数据
             if self._common_stock_codes:
                 stock_codes = self._common_stock_codes
             else:
@@ -214,13 +155,12 @@ class TencentDataSource(BaseDataSource):
         try:
             logger.debug(f"使用腾讯API获取 {len(stock_codes)} 只股票行情...")
 
-            # 分批查询
             batch_size = 100
             all_results = {}
 
             for i in range(0, len(stock_codes), batch_size):
                 batch = stock_codes[i:i + batch_size]
-                tc_codes = [self._convert_to_tencent_code(code) for code in batch]
+                tc_codes = [convert_code_format(code, 'tencent') for code in batch]
                 url = f"{self.base_url}={','.join(tc_codes)}"
 
                 try:
@@ -229,11 +169,10 @@ class TencentDataSource(BaseDataSource):
 
                     if response.status_code == 200:
                         for code in batch:
-                            quote = self._parse_response(code, response.text, batch=True)
+                            quote = self._parse_response(code, response.text)
                             if quote:
                                 all_results[code] = quote
 
-                    # 避免请求过快
                     time.sleep(0.2)
 
                 except Exception as e:
@@ -262,11 +201,11 @@ class TencentDataSource(BaseDataSource):
             # 添加涨停/跌停标记
             if '涨跌幅' in df.columns:
                 df['is_limit_up'] = df.apply(
-                    lambda row: self._is_limit_up(row['代码'], row['涨跌幅']),
+                    lambda row: is_limit_up(row['代码'], row['涨跌幅']),
                     axis=1
                 )
                 df['is_limit_down'] = df.apply(
-                    lambda row: self._is_limit_down(row['代码'], row['涨跌幅']),
+                    lambda row: is_limit_down(row['代码'], row['涨跌幅']),
                     axis=1
                 )
 
@@ -288,7 +227,6 @@ class TencentDataSource(BaseDataSource):
 
         注意：腾讯API需要指定ETF代码列表
         """
-        # ETF使用相同的接口
         return self.fetch_stock_spot(etf_codes)
 
     def fetch_by_codes(self, codes: List[str]) -> pd.DataFrame:
