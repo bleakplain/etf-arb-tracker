@@ -407,8 +407,11 @@ def create_monitor_with_defaults(config: Config = None, evaluator_type: str = "d
     from backend.data.etf_holder import ETFHolderFetcher
     from backend.data.etf_holdings import ETFHoldingsFetcher
 
+    # 获取自选股代码列表
+    watch_codes = [s.code for s in config.my_stocks] if config.my_stocks else []
+
     return LimitUpMonitor(
-        quote_fetcher=StockQuoteFetcher(),
+        quote_fetcher=StockQuoteFetcher(watch_stocks=watch_codes),
         etf_holder_provider=ETFHolderFetcher(),
         etf_holdings_provider=ETFHoldingsFetcher(),
         etf_quote_provider=ETFQuoteFetcher(),

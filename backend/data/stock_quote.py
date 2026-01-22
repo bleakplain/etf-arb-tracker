@@ -26,9 +26,11 @@ class StockQuoteFetcher(BaseCachedFetcher):
     _running = False
     _initialized = False
     _data_manager = None
+    _watch_stocks = None  # 自选股列表
 
-    def __init__(self, config: Optional[Dict] = None):
+    def __init__(self, config: Optional[Dict] = None, watch_stocks: Optional[List[str]] = None):
         self.data_source = 'DataManager'
+        self._watch_stocks = watch_stocks  # 先设置自选股列表
         super().__init__(config)
 
         # 从配置读取刷新参数
@@ -36,6 +38,13 @@ class StockQuoteFetcher(BaseCachedFetcher):
             refresh_config = config.get('refresh', {})
             self._refresh_interval = refresh_config.get('backend_cache_interval', 15)
             self._cache_ttl = refresh_config.get('backend_cache_ttl', 30)
+
+    def set_watch_stocks(self, stock_codes: List[str]):
+        """设置自选股列表"""
+        self._watch_stocks = stock_codes
+        logger.info(f"设置自选股列表: {len(stock_codes)} 只")
+        # 清除缓存，强制重新获取
+        self.clear_cache()
 
     def _fetch_data(self) -> pd.DataFrame:
         """实际获取数据的方法 - 使用数据管理器"""
@@ -47,7 +56,13 @@ class StockQuoteFetcher(BaseCachedFetcher):
             logger.debug("正在从数据管理器获取A股实时行情...")
             import time
             start_time = time.time()
-            df = self._data_manager.fetch_stock_spot()
+
+            # 如果设置了自选股列表，只获取自选股数据
+            if self._watch_stocks:
+                df = self._data_manager.fetch_stock_spot(self._watch_stocks)
+            else:
+                df = self._data_manager.fetch_stock_spot()
+
             elapsed = time.time() - start_time
 
             if df.empty:
