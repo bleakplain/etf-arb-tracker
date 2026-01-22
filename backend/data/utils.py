@@ -94,7 +94,7 @@ def convert_code_format(code: str, format_type: str) -> str:
 
     Args:
         code: 6位股票代码
-        format_type: 格式类型 ('sina', 'tencent', 'tushare', 'standard')
+        format_type: 格式类型 ('tencent', 'tushare', 'standard')
 
     Returns:
         转换后的代码
@@ -111,8 +111,8 @@ def convert_code_format(code: str, format_type: str) -> str:
             return f"{code}.SZ"
         return code
 
-    # sina 和 tencent 格式相同
-    if format_type in ('sina', 'tencent'):
+    # tencent 格式
+    if format_type == 'tencent':
         if code.startswith('6'):
             return f'sh{code}'
         elif code.startswith(('0', '3')):

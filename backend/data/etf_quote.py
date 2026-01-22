@@ -20,8 +20,8 @@ class ETFQuoteFetcher(BaseCachedFetcher):
     _cache_lock = None
     _etf_cache = None
     _cache_time = None
-    _cache_ttl = 30
-    _refresh_interval = 15
+    _cache_ttl = 30  # 默认缓存有效期30秒，可通过配置覆盖
+    _refresh_interval = 15  # 默认刷新间隔15秒，可通过配置覆盖
     _refresh_thread = None
     _running = False
     _initialized = False
@@ -38,6 +38,12 @@ class ETFQuoteFetcher(BaseCachedFetcher):
             'commodity': 0.10
         }
         super().__init__(config)
+
+        # 从配置读取刷新参数
+        if config:
+            refresh_config = config.get('refresh', {})
+            self._refresh_interval = refresh_config.get('backend_cache_interval', 15)
+            self._cache_ttl = refresh_config.get('backend_cache_ttl', 30)
 
     def _fetch_data(self) -> pd.DataFrame:
         """实际获取数据的方法 - 使用数据管理器"""

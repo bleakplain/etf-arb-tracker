@@ -2,6 +2,9 @@
 
 # 策略参数配置
 strategy:
+  # 扫描间隔（秒）- 控制后端监控扫描频率，防止请求过于频繁被封禁
+  scan_interval: 60
+
   # ETF中最小持仓权重（5%）
   min_weight: 0.05
 
@@ -33,23 +36,38 @@ data_sources:
     enabled: true
     priority: 1
     description: "腾讯财经API，完全免费，支持批量查询（每次最多100只）"
+    # 请求间隔（秒）- 防止请求过快被封禁
+    request_interval: 0.3
+    # 批量大小
+    batch_size: 100
 
-  sina:
-    enabled: false
-    priority: 2
-    description: "新浪财经API（已不可用，已禁用）"
+  eastmoney:
+    enabled: true
+    priority: 1
+    description: "东方财富API，用于获取涨停股列表"
+    # 请求间隔（秒）
+    request_interval: 0.5
 
   # 付费低频数据源（财务数据、历史数据）
   tushare:
     enabled: false
     priority: 10
-    token: ""  # 在环境变量 TUSHARE_TOKEN 中配置
+    token: "9baaa340c9eab5557513572741005eb35c07b52687093a1fa99ac956"
     description: "Tushare专业版，需要token，支持财务数据、历史数据"
 
   # ETF持仓数据源
   holdings:
     - name: "eastmoney"
       url: "http://fund.eastmoney.com"
+
+# 刷新频率配置（防封禁）
+refresh:
+  # 后端行情数据缓存刷新间隔（秒）
+  backend_cache_interval: 15
+  # 后端行情数据缓存有效期（秒）
+  backend_cache_ttl: 30
+  # 前端页面刷新间隔（秒）
+  frontend_refresh_interval: 5
 
 # 常用股票代码列表（用于数据源查询）
 # 如果数据源需要指定代码列表，将使用此列表

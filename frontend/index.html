@@ -668,7 +668,7 @@
                             <td><code>${stock.code}</code></td>
                             <td>${stock.name}</td>
                             <td class="${changeClass}">¥${stock.price.toFixed(2)}</td>
-                            <td class="${changeClass}">${changePrefix}${stock.change_pct.toFixed(2)}%</td>
+                            <td class="${changeClass}">${changePrefix}${(stock.change_pct * 100).toFixed(2)}%</td>
                             <td>${limitBadge}</td>
                             <td>
                                 <button class="btn btn-sm btn-outline-primary" onclick="showStockDetail('${stock.code}', '${stock.name}')">
@@ -715,7 +715,7 @@
                             <td><code>${stock.code}</code></td>
                             <td>${stock.name}</td>
                             <td class="price-up">¥${stock.price.toFixed(2)}</td>
-                            <td class="price-up">+${stock.change_pct.toFixed(2)}%</td>
+                            <td class="price-up">+${(stock.change_pct * 100).toFixed(2)}%</td>
                             <td>${amountStr}</td>
                             <td>${stock.turnover.toFixed(2)}%</td>
                             <td>
@@ -963,7 +963,7 @@
                             <td>${etf.etf_name}</td>
                             <td><span class="badge bg-light text-dark">${(etf.weight * 100).toFixed(2)}%</span></td>
                             <td>¥${etf.price.toFixed(3)}</td>
-                            <td class="${changeClass}">${etf.change_pct >= 0 ? '+' : ''}${etf.change_pct.toFixed(2)}%</td>
+                            <td class="${changeClass}">${etf.change_pct >= 0 ? '+' : ''}${(etf.change_pct * 100).toFixed(2)}%</td>
                             <td>${stockWeight}</td>
                             <td>
                                 <button class="btn btn-sm btn-outline-primary" onclick="showETFHoldings('${etf.etf_code}', '${code}')">

@@ -18,7 +18,7 @@ from backend.data.source_base import (
     QueryContext,
     QueryResult
 )
-from backend.data.sources import TencentDataSource, TushareDataSource
+from backend.data.sources import TencentDataSource, TushareDataSource, EastMoneyLimitUpSource
 
 
 class DataManager:
@@ -26,7 +26,7 @@ class DataManager:
     数据管理器 - 统一管理所有数据源
 
     策略：
-    1. 实时行情优先使用免费高频数据源（腾讯、新浪）
+    1. 实时行情优先使用免费高频数据源（腾讯、东方财富）
     2. 财务/历史数据使用付费数据源（Tushare）
     3. 自动故障转移
     4. 智能数据源选择
@@ -100,8 +100,17 @@ class DataManager:
         # 按优先级添加数据源
         if tencent_enabled:
             priority = sources_config.get('tencent', {}).get('priority', 1)
-            self.sources.append(TencentDataSource(priority=priority))
-            logger.info("已添加腾讯数据源")
+            request_interval = sources_config.get('tencent', {}).get('request_interval')
+            self.sources.append(TencentDataSource(priority=priority, request_interval=request_interval))
+            logger.info(f"已添加腾讯数据源 (请求间隔: {request_interval or 0.3}秒)")
+
+        # 添加东方财富涨停股数据源
+        eastmoney_enabled = sources_config.get('eastmoney', {}).get('enabled', True)
+        if eastmoney_enabled:
+            priority = sources_config.get('eastmoney', {}).get('priority', 1)
+            request_interval = sources_config.get('eastmoney', {}).get('request_interval')
+            self.sources.append(EastMoneyLimitUpSource(priority=priority, request_interval=request_interval))
+            logger.info(f"已添加东方财富数据源 (请求间隔: {request_interval or 0.5}秒)")
 
         if tushare_enabled and tushare_token:
             priority = sources_config.get('tushare', {}).get('priority', 10)
@@ -224,7 +233,7 @@ class DataManager:
         def preprocess_codes(source, args):
             """预处理股票代码"""
             codes = args[0] if args else None
-            if codes is None and source.name in ['tencent', 'sina']:
+            if codes is None and source.name == 'tencent':
                 codes = self._stock_codes_cache or self._get_common_stock_codes()
                 if not codes:
                     logger.warning(f"{source.name} 需要指定股票代码，跳过")
@@ -257,7 +266,7 @@ class DataManager:
         def preprocess_codes(source, args):
             """预处理ETF代码"""
             codes = args[0] if args else None
-            if codes is None and source.name in ['tencent', 'sina']:
+            if codes is None and source.name == 'tencent':
                 codes = self._get_common_etf_codes()
                 if not codes:
                     logger.warning(f"{source.name} 需要指定ETF代码，跳过")
@@ -431,7 +440,6 @@ if __name__ == "__main__":
     test_config = {
         'data_sources': {
             'tencent': {'enabled': True, 'priority': 1},
-            'sina': {'enabled': True, 'priority': 2},
             'tushare': {'enabled': False, 'priority': 10},
         }
     }

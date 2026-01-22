@@ -61,23 +61,6 @@ TENCENT_COLUMN_MAPPING: Dict[str, str] = {
 }
 
 
-# 新浪数据源列名映射
-SINA_COLUMN_MAPPING: Dict[str, str] = {
-    'code': '代码',
-    'name': '名称',
-    'price': '最新价',
-    'prev_close': '昨收',
-    'open': '今开',
-    'high': '最高',
-    'low': '最低',
-    'volume': '成交量',
-    'amount': '成交额',
-    'change': '涨跌额',
-    'change_pct': '涨跌幅',
-    'turnover': '换手率',
-}
-
-
 # Tushare数据源列名映射
 TUSHARE_COLUMN_MAPPING: Dict[str, str] = {
     'ts_code': 'ts_code',
@@ -106,14 +89,13 @@ def get_column_mapping(source_name: str) -> Dict[str, str]:
     获取指定数据源的列名映射
 
     Args:
-        source_name: 数据源名称 ('tencent', 'sina', 'tushare')
+        source_name: 数据源名称 ('tencent', 'tushare', 'eastmoney')
 
     Returns:
         列名映射字典 {内部字段: 标准中文列名}
     """
     mappings = {
         'tencent': TENCENT_COLUMN_MAPPING,
-        'sina': SINA_COLUMN_MAPPING,
         'tushare': TUSHARE_COLUMN_MAPPING,
     }
     return mappings.get(source_name, {})

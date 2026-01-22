@@ -38,7 +38,10 @@ class TencentDataSource(BaseDataSource):
     - 不支持全市场数据，需要指定股票代码
     """
 
-    def __init__(self, priority: int = 1):
+    # 默认请求间隔（秒）- 防止被封禁
+    DEFAULT_REQUEST_INTERVAL = 0.3
+
+    def __init__(self, priority: int = 1, request_interval: Optional[float] = None):
         super().__init__(
             name="tencent",
             source_type=SourceType.FREE_HIGH_FREQ,
@@ -50,6 +53,8 @@ class TencentDataSource(BaseDataSource):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
         self._common_stock_codes: Optional[List[str]] = None
+        # 请求间隔，防止被封禁
+        self._request_interval = request_interval or self.DEFAULT_REQUEST_INTERVAL
 
     def _get_capability(self) -> SourceCapability:
         """定义数据源能力"""
@@ -185,7 +190,7 @@ class TencentDataSource(BaseDataSource):
                             if quote:
                                 all_results[code] = quote
 
-                    time.sleep(0.2)
+                    time.sleep(self._request_interval)
 
                 except Exception as e:
                     logger.warning(f"批量请求失败: {e}")

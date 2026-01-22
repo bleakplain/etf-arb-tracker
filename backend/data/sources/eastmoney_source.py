@@ -28,7 +28,10 @@ class EastMoneyLimitUpSource(BaseDataSource):
     - 实时数据
     """
 
-    def __init__(self, priority: int = 1):
+    # 默认请求间隔（秒）- 防止被封禁
+    DEFAULT_REQUEST_INTERVAL = 0.5
+
+    def __init__(self, priority: int = 1, request_interval: Optional[float] = None):
         super().__init__(
             name="eastmoney_limit_up",
             source_type=SourceType.FREE_HIGH_FREQ,
@@ -40,6 +43,8 @@ class EastMoneyLimitUpSource(BaseDataSource):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Referer': 'http://quote.eastmoney.com'
         })
+        # 请求间隔，防止被封禁
+        self._request_interval = request_interval or self.DEFAULT_REQUEST_INTERVAL
 
     def _get_capability(self) -> SourceCapability:
         """定义数据源能力"""
@@ -79,11 +84,11 @@ class EastMoneyLimitUpSource(BaseDataSource):
                 'invt': 2,
                 'fid': 'f3',  # 按涨幅排序
                 'fs': 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23',  # 全市场
-                'fields': 'f12,f13,f14,f2,f3,f4,f5,f6,f7,f15,f16,f17,f18,f20,f21,f23,f24,f25,f26,f27,f28,f29,f30,f31,f33,f34,f35,f36,f37,f38,f39,f40,f41,f42,f43,f44,f45,f46,f47,f48,f49,f50,f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65,f66,f67,f68,f69,f70,f71,f72,f73,f74,f75,f76,f77,f78,f79,f80,f81,f82,f84,f85,f86,f87,f88,f89,f90,f91,f92,f93,f94,f95,f96,f97,f98,f99,f100,f101,f102,f103,f104,f105,f106,f107,f108,f109,f110,f111,f112,f113,f114,f115,f116,f117,f118,f119,f120,f121,f122,f123,f124,f125,f126',
+                'fields': 'f8,f9,f12,f13,f14,f2,f3,f4,f5,f6,f7,f15,f16,f17,f18,f20,f21,f23,f24,f25,f26,f27,f28,f29,f30,f31,f33,f34,f35,f36,f37,f38,f39,f40,f41,f42,f43,f44,f45,f46,f47,f48,f49,f50,f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65,f66,f67,f68,f69,f70,f71,f72,f73,f74,f75,f76,f77,f78,f79,f80,f81,f82,f84,f85,f86,f87,f88,f89,f90,f91,f92,f93,f94,f95,f96,f97,f98,f99,f100,f101,f102,f103,f104,f105,f106,f107,f108,f109,f110,f111,f112,f113,f114,f115,f116,f117,f118,f119,f120,f121,f122,f123,f124,f125,f126',
                 'fwt': '1',
                 'pn': page,
                 'pz': page_size,
-                'po': '1',
+                'po': '1',  # 1=升序(涨幅从小到大)，配合fid=f3过滤，实际返回涨幅榜前列；0=降序返回跌幅榜
                 'erp': '1',
             }
 
