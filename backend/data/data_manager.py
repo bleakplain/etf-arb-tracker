@@ -53,9 +53,19 @@ class DataManager:
         self._lock = threading.Lock()
 
         self._initialize_sources()
+        # 初始化常用股票代码列表
+        self._stock_codes_cache = self._get_common_stock_codes()
+        self._update_sources_common_codes()
         self._initialized = True
 
         logger.info("数据管理器初始化完成")
+
+    def _update_sources_common_codes(self):
+        """更新数据源的常用股票代码列表"""
+        if self._stock_codes_cache:
+            for source in self.sources:
+                if hasattr(source, 'set_common_stocks'):
+                    source.set_common_stocks(self._stock_codes_cache)
 
     def _initialize_sources(self):
         """初始化所有数据源"""
@@ -94,8 +104,21 @@ class DataManager:
         for source in self.sources:
             logger.info(f"  - {source.name} (type={source.source_type.value}, priority={source.priority})")
 
+    def _try_recover_failed_sources(self):
+        """尝试恢复 FAILED 状态的数据源"""
+        for source in self.sources:
+            if source.metrics.status == DataSourceStatus.FAILED:
+                # 检查是否超过最小重试间隔
+                if source.metrics.should_retry_now():
+                    logger.info(f"尝试恢复数据源: {source.name}")
+                    source.metrics.consecutive_failures = 0
+                    source.metrics._update_status()
+
     def _get_available_sources(self, data_type: DataType) -> List[BaseDataSource]:
         """获取支持指定数据类型的可用数据源"""
+        # 先尝试恢复 FAILED 状态的数据源
+        self._try_recover_failed_sources()
+
         available = []
         for source in self.sources:
             if source.is_available() and source.supports(data_type):
@@ -371,6 +394,9 @@ class DataManager:
         self.sources.clear()
         self._stock_codes_cache = None
         self._initialize_sources()
+        # 重新初始化常用股票代码列表
+        self._stock_codes_cache = self._get_common_stock_codes()
+        self._update_sources_common_codes()
         logger.info("配置已重新加载")
 
 
