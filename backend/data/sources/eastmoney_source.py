@@ -5,6 +5,7 @@
 
 import requests
 import pandas as pd
+import time
 from typing import List, Dict, Optional
 from loguru import logger
 from datetime import datetime
@@ -29,7 +30,9 @@ class EastMoneyLimitUpSource(BaseDataSource):
     """
 
     # 默认请求间隔（秒）- 防止被封禁
-    DEFAULT_REQUEST_INTERVAL = 0.5
+    DEFAULT_REQUEST_INTERVAL = 5
+    # 最大重试次数
+    MAX_RETRIES = 2
 
     def __init__(self, priority: int = 1, request_interval: Optional[float] = None):
         super().__init__(
@@ -92,11 +95,50 @@ class EastMoneyLimitUpSource(BaseDataSource):
                 'erp': '1',
             }
 
-            response = self.session.get(self.base_url, params=params, timeout=10)
-            response.encoding = 'utf-8'
+            # 带重试的请求
+            response = None
+            for retry in range(self.MAX_RETRIES + 1):
+                try:
+                    response = self.session.get(self.base_url, params=params, timeout=15)
+                    response.encoding = 'utf-8'
 
-            if response.status_code != 200:
-                logger.error(f"东方财富API请求失败: {response.status_code}")
+                    if response.status_code == 200:
+                        break  # 成功，跳出重试循环
+                    else:
+                        if retry < self.MAX_RETRIES:
+                            logger.warning(f"东方财富API HTTP {response.status_code}，重试 {retry + 1}/{self.MAX_RETRIES}")
+                            time.sleep(2 ** retry)
+                        else:
+                            logger.error(f"东方财富API请求失败: {response.status_code}")
+                            self.metrics.record_failure()
+                            return []
+
+                except requests.exceptions.Timeout:
+                    if retry < self.MAX_RETRIES:
+                        logger.warning(f"东方财富API请求超时，重试 {retry + 1}/{self.MAX_RETRIES}")
+                        time.sleep(2 ** retry)
+                    else:
+                        logger.error("东方财富API请求超时")
+                        self.metrics.record_failure()
+                        return []
+                except requests.exceptions.ConnectionError:
+                    if retry < self.MAX_RETRIES:
+                        logger.warning(f"东方财富API连接错误，重试 {retry + 1}/{self.MAX_RETRIES}")
+                        time.sleep(2 ** retry)
+                    else:
+                        logger.error("东方财富API连接错误")
+                        self.metrics.record_failure()
+                        return []
+                except Exception as e:
+                    if retry < self.MAX_RETRIES:
+                        logger.warning(f"东方财富API请求异常: {e}，重试 {retry + 1}/{self.MAX_RETRIES}")
+                        time.sleep(2 ** retry)
+                    else:
+                        logger.error(f"东方财富API请求异常: {e}")
+                        self.metrics.record_failure()
+                        return []
+
+            if response is None or response.status_code != 200:
                 self.metrics.record_failure()
                 return []
 

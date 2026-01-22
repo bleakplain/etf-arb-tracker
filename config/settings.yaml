@@ -3,7 +3,7 @@
 # 策略参数配置
 strategy:
   # 扫描间隔（秒）- 控制后端监控扫描频率，防止请求过于频繁被封禁
-  scan_interval: 60
+  scan_interval: 120
 
   # ETF中最小持仓权重（5%）
   min_weight: 0.05
@@ -37,7 +37,7 @@ data_sources:
     priority: 1
     description: "腾讯财经API，完全免费，支持批量查询（每次最多100只）"
     # 请求间隔（秒）- 防止请求过快被封禁
-    request_interval: 0.3
+    request_interval: 5
     # 批量大小
     batch_size: 100
 
@@ -46,7 +46,7 @@ data_sources:
     priority: 1
     description: "东方财富API，用于获取涨停股列表"
     # 请求间隔（秒）
-    request_interval: 0.5
+    request_interval: 5
 
   # 付费低频数据源（财务数据、历史数据）
   tushare:
@@ -62,12 +62,12 @@ data_sources:
 
 # 刷新频率配置（防封禁）
 refresh:
-  # 后端行情数据缓存刷新间隔（秒）
-  backend_cache_interval: 15
+  # 后端行情数据缓存刷新间隔（秒）- 降低刷新频率避免API限流
+  backend_cache_interval: 30
   # 后端行情数据缓存有效期（秒）
-  backend_cache_ttl: 30
+  backend_cache_ttl: 60
   # 前端页面刷新间隔（秒）
-  frontend_refresh_interval: 5
+  frontend_refresh_interval: 10
 
 # 常用股票代码列表（用于数据源查询）
 # 如果数据源需要指定代码列表，将使用此列表

@@ -39,7 +39,9 @@ class TencentDataSource(BaseDataSource):
     """
 
     # 默认请求间隔（秒）- 防止被封禁
-    DEFAULT_REQUEST_INTERVAL = 0.3
+    DEFAULT_REQUEST_INTERVAL = 5
+    # 最大重试次数
+    MAX_RETRIES = 2
 
     def __init__(self, priority: int = 1, request_interval: Optional[float] = None):
         super().__init__(
@@ -180,20 +182,46 @@ class TencentDataSource(BaseDataSource):
                 tc_codes = [convert_code_format(code, 'tencent') for code in batch]
                 url = f"{self.base_url}={','.join(tc_codes)}"
 
-                try:
-                    response = self.session.get(url, timeout=10)
-                    response.encoding = 'gbk'
+                # 带重试的请求
+                for retry in range(self.MAX_RETRIES + 1):
+                    try:
+                        response = self.session.get(url, timeout=15)
+                        response.encoding = 'gbk'
 
-                    if response.status_code == 200:
-                        for code in batch:
-                            quote = self._parse_response(code, response.text)
-                            if quote:
-                                all_results[code] = quote
+                        if response.status_code == 200:
+                            for code in batch:
+                                quote = self._parse_response(code, response.text)
+                                if quote:
+                                    all_results[code] = quote
+                            break  # 成功，跳出重试循环
+                        else:
+                            if retry < self.MAX_RETRIES:
+                                logger.warning(f"批量请求HTTP {response.status_code}，重试 {retry + 1}/{self.MAX_RETRIES}")
+                                time.sleep(2 ** retry)  # 指数退避
+                            else:
+                                logger.error(f"批量请求失败，HTTP状态码: {response.status_code}")
 
-                    time.sleep(self._request_interval)
+                    except requests.exceptions.Timeout:
+                        if retry < self.MAX_RETRIES:
+                            logger.warning(f"批量请求超时，重试 {retry + 1}/{self.MAX_RETRIES}")
+                            time.sleep(2 ** retry)
+                        else:
+                            logger.error(f"批量请求超时，批次 {i//batch_size + 1}")
+                    except requests.exceptions.ConnectionError:
+                        if retry < self.MAX_RETRIES:
+                            logger.warning(f"批量请求连接错误，重试 {retry + 1}/{self.MAX_RETRIES}")
+                            time.sleep(2 ** retry)
+                        else:
+                            logger.error(f"批量请求连接错误，批次 {i//batch_size + 1}")
+                    except Exception as e:
+                        if retry < self.MAX_RETRIES:
+                            logger.warning(f"批量请求异常: {e}，重试 {retry + 1}/{self.MAX_RETRIES}")
+                            time.sleep(2 ** retry)
+                        else:
+                            logger.error(f"批量请求失败: {e}")
 
-                except Exception as e:
-                    logger.warning(f"批量请求失败: {e}")
+                # 批次间请求间隔
+                time.sleep(self._request_interval)
 
             if not all_results:
                 self.metrics.record_failure()
