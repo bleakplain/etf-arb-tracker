@@ -15,6 +15,7 @@ from backend.data.source_base import (
 )
 
 from backend.data.sources.tencent_source import TencentDataSource
+from backend.data.sources.eastmoney_source import EastMoneyLimitUpSource
 from backend.data.sources.tushare_source import TushareDataSource
 
 __all__ = [
@@ -30,5 +31,6 @@ __all__ = [
 
     # 数据源实现
     'TencentDataSource',
+    'EastMoneyLimitUpSource',
     'TushareDataSource',
 ]

@@ -1,7 +1,6 @@
 """
 涨停股数据获取模块
-使用数据管理器获取当日所有涨停股票
-优化：复用StockQuoteFetcher的缓存数据
+使用东方财富数据源获取当日所有涨停股票
 """
 
 import pandas as pd
@@ -13,60 +12,51 @@ from backend.data.utils import safe_float, safe_int, is_limit_up
 
 
 class LimitUpStocksFetcher:
-    """涨停股票数据获取器 - 复用股票行情缓存"""
+    """涨停股票数据获取器 - 使用东方财富数据源"""
 
     def __init__(self):
-        self.data_source = 'DataManager'
-        self._data_manager = None
+        self.data_source = 'EastMoney'
+        self._eastmoney_source = None
 
-    def _get_data_manager(self):
-        """获取数据管理器"""
-        if self._data_manager is None:
-            from backend.data.data_manager import get_data_manager
-            self._data_manager = get_data_manager()
-        return self._data_manager
+    def _get_eastmoney_source(self):
+        """获取东方财富数据源"""
+        if self._eastmoney_source is None:
+            from backend.data.sources.eastmoney_source import EastMoneyLimitUpSource
+            self._eastmoney_source = EastMoneyLimitUpSource()
+        return self._eastmoney_source
 
     def get_today_limit_ups(self, stock_df: pd.DataFrame = None) -> List[Dict]:
         """
         获取今日所有涨停股票
 
         Args:
-            stock_df: 可选，已有的股票行情DataFrame
+            stock_df: 可选，已有的股票行情DataFrame（用于兼容）
 
         Returns:
             涨停股票列表
         """
         try:
-            if stock_df is None or stock_df.empty:
-                logger.info("正在获取涨停股票数据...")
-                data_manager = self._get_data_manager()
-                stock_df = data_manager.fetch_stock_spot()
+            logger.info("正在从东方财富获取涨停股票数据...")
+            source = self._get_eastmoney_source()
 
-                if stock_df.empty:
-                    logger.error("获取A股行情数据失败")
-                    return []
-            else:
-                logger.debug(f"复用缓存数据，包含 {len(stock_df)} 只股票")
+            # 获取全市场股票数据（按涨幅排序）
+            all_stocks = source.fetch_limit_up_stocks()
 
-            # 使用pandas向量化操作筛选涨停股
-            mask = stock_df.apply(
-                lambda row: is_limit_up(
-                    str(row.get('代码', '')),
-                    safe_float(row.get('涨跌幅'))
-                ),
-                axis=1
-            )
+            if not all_stocks:
+                logger.info("未获取到股票数据")
+                return []
 
-            limit_up_df = stock_df[mask]
-
-            # 转换为字典列表
+            # 筛选涨停股（使用更精确的判断）
             limit_up_stocks = []
-            for _, row in limit_up_df.iterrows():
-                parsed = self._parse_limit_up_row(row)
-                if parsed:
-                    limit_up_stocks.append(parsed)
+            for stock in all_stocks:
+                code = stock['code']
+                change_pct = stock['change_pct']
 
-            logger.info(f"从 {len(stock_df)} 只股票中筛选出 {len(limit_up_stocks)} 只涨停股")
+                # 使用涨停判断函数
+                if is_limit_up(code, change_pct):
+                    limit_up_stocks.append(stock)
+
+            logger.info(f"从 {len(all_stocks)} 只股票中筛选出 {len(limit_up_stocks)} 只涨停股")
             return limit_up_stocks
 
         except Exception as e:
