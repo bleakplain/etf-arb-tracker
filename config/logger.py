@@ -110,7 +110,7 @@ class LoggerManager:
                 format=self._console_format,
                 level=self.settings.level,
                 colorize=True,
-                enqueue=True,
+                # 移除 enqueue=True，确保异常时立即写入
                 catch=True,
             )
 
@@ -121,7 +121,7 @@ class LoggerManager:
             level="DEBUG",
             rotation=self.settings.rotation,
             retention=self.settings.retention,
-            enqueue=True,
+            # 移除 enqueue=True，确保异常时立即写入
             serialize=True,
             encoding="utf-8",
             catch=True,
@@ -135,7 +135,7 @@ class LoggerManager:
             level="ERROR",
             rotation=self.settings.rotation,
             retention=self.settings.retention,
-            enqueue=True,
+            # 移除 enqueue=True，确保异常时立即写入
             serialize=True,
             encoding="utf-8",
             catch=True,

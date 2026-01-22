@@ -20,6 +20,15 @@ import time
 # 添加项目路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# 确保日志系统已初始化
+try:
+    from config import get
+    get()  # 这会触发日志初始化
+except Exception:
+    # 如果配置加载失败，使用基本日志配置
+    from config.logger import setup, LoggerSettings
+    setup(LoggerSettings())
+
 from backend.strategy.limit_monitor import LimitUpMonitor, create_monitor_with_defaults
 from backend.domain.value_objects import TradingSignal
 from backend.notification.sender import create_sender_from_config

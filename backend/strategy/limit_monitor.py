@@ -18,6 +18,13 @@ from typing import List, Optional
 from loguru import logger
 from dataclasses import dataclass
 
+# 确保日志系统已初始化
+try:
+    from config import get
+    get()  # 这会触发日志初始化
+except Exception:
+    pass  # 如果已初始化或配置加载失败，忽略
+
 from backend.domain.interfaces import (
     IQuoteFetcher,
     IETFHolderProvider,
