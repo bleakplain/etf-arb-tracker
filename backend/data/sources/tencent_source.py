@@ -103,12 +103,22 @@ class TencentDataSource(BaseDataSource):
             price = safe_float(fields[3]) if len(fields) > 3 else 0.0
             prev_close = safe_float(fields[4]) if len(fields) > 4 else 0.0
             open_price = safe_float(fields[5]) if len(fields) > 5 else 0.0
-            high = safe_float(fields[32]) if len(fields) > 32 else 0.0
-            low = safe_float(fields[33]) if len(fields) > 33 else 0.0
-            volume = safe_int(fields[35]) if len(fields) > 35 else 0
-            amount = safe_float(fields[34]) if len(fields) > 34 else 0.0
-            change = safe_float(fields[30]) if len(fields) > 30 else 0.0
-            change_pct = safe_float(fields[31]) if len(fields) > 31 else 0.0
+            high = safe_float(fields[33]) if len(fields) > 33 else 0.0
+            low = safe_float(fields[34]) if len(fields) > 34 else 0.0
+            # 字段35 格式: "价格/成交量/成交额"
+            volume_str = fields[35] if len(fields) > 35 else ''
+            if '/' in volume_str:
+                parts = volume_str.split('/')
+                volume = safe_int(parts[1]) if len(parts) > 1 else 0
+                amount = safe_float(parts[2]) if len(parts) > 2 else 0.0
+            else:
+                volume = 0
+                amount = 0.0
+            # 字段31: 涨跌额, 字段32: 涨跌幅（百分数形式，需要除以100）
+            change = safe_float(fields[31]) if len(fields) > 31 else 0.0
+            change_pct = safe_float(fields[32]) if len(fields) > 32 else 0.0
+            # 腾讯API返回的涨跌幅是百分数形式（如2.44表示2.44%），需要转换为小数形式（0.0244）
+            change_pct = change_pct / 100 if change_pct != 0 else 0.0
 
             # 计算涨跌幅
             if prev_close > 0 and change_pct == 0:

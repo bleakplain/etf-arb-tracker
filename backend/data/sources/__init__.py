@@ -15,7 +15,6 @@ from backend.data.source_base import (
 )
 
 from backend.data.sources.tencent_source import TencentDataSource
-from backend.data.sources.sina_source import SinaDataSource
 from backend.data.sources.tushare_source import TushareDataSource
 
 __all__ = [
@@ -31,6 +30,5 @@ __all__ = [
 
     # 数据源实现
     'TencentDataSource',
-    'SinaDataSource',
     'TushareDataSource',
 ]

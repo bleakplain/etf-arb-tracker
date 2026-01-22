@@ -18,7 +18,7 @@ from backend.data.source_base import (
     QueryContext,
     QueryResult
 )
-from backend.data.sources import TencentDataSource, SinaDataSource, TushareDataSource
+from backend.data.sources import TencentDataSource, TushareDataSource
 
 
 class DataManager:
@@ -47,6 +47,10 @@ class DataManager:
         if self._initialized:
             return
 
+        # 如果没有传入配置或配置为空，从配置文件加载
+        if not config:
+            config = self._load_config_from_file()
+
         self.config = config or {}
         self.sources: List[BaseDataSource] = []
         self._stock_codes_cache: Optional[List[str]] = None
@@ -59,6 +63,19 @@ class DataManager:
         self._initialized = True
 
         logger.info("数据管理器初始化完成")
+
+    def _load_config_from_file(self) -> Dict:
+        """从配置文件加载配置"""
+        import yaml
+        import os
+        config_file = 'config/settings.yaml'
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    return yaml.safe_load(f) or {}
+            except Exception as e:
+                logger.warning(f"加载配置文件失败: {e}")
+        return {}
 
     def _update_sources_common_codes(self):
         """更新数据源的常用股票代码列表"""
@@ -74,7 +91,6 @@ class DataManager:
 
         # 免费高频数据源
         tencent_enabled = sources_config.get('tencent', {}).get('enabled', True)
-        sina_enabled = sources_config.get('sina', {}).get('enabled', True)
 
         # 付费数据源
         tushare_config = sources_config.get('tushare', {})
@@ -86,11 +102,6 @@ class DataManager:
             priority = sources_config.get('tencent', {}).get('priority', 1)
             self.sources.append(TencentDataSource(priority=priority))
             logger.info("已添加腾讯数据源")
-
-        if sina_enabled:
-            priority = sources_config.get('sina', {}).get('priority', 2)
-            self.sources.append(SinaDataSource(priority=priority))
-            logger.info("已添加新浪数据源")
 
         if tushare_enabled and tushare_token:
             priority = sources_config.get('tushare', {}).get('priority', 10)
