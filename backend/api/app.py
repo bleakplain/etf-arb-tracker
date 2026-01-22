@@ -593,6 +593,168 @@ async def get_etf_categories():
     return categories
 
 
+# Pydantic模型用于自选股管理
+class AddStockRequest(BaseModel):
+    """添加自选股请求"""
+    code: str
+    name: str
+    market: str = "sz"
+    notes: str = ""
+
+
+@app.post("/api/watchlist/add")
+async def add_to_watchlist(request: AddStockRequest):
+    """
+    添加股票到自选列表
+
+    Args:
+        request: 添加股票请求
+
+    Returns:
+        操作结果
+    """
+    import yaml
+    from pathlib import Path
+
+    try:
+        stocks_file = Path("config/stocks.yaml")
+
+        # 读取现有配置
+        if stocks_file.exists():
+            with open(stocks_file, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f) or {}
+        else:
+            config = {}
+
+        # 获取现有列表
+        my_stocks = config.get('my_stocks', [])
+
+        # 检查是否已存在
+        for stock in my_stocks:
+            if stock['code'] == request.code:
+                return {
+                    "status": "already_exists",
+                    "message": f"股票 {request.code} 已在自选列表中"
+                }
+
+        # 添加新股票
+        new_stock = {
+            "code": request.code,
+            "name": request.name,
+            "market": request.market
+        }
+        if request.notes:
+            new_stock["notes"] = request.notes
+
+        my_stocks.append(new_stock)
+        config['my_stocks'] = my_stocks
+
+        # 写回文件
+        with open(stocks_file, 'w', encoding='utf-8') as f:
+            yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+        # 清除监控器缓存，强制重新加载
+        global _monitor_instance
+        _monitor_instance = None
+
+        logger.info(f"已添加股票 {request.code} {request.name} 到自选列表")
+
+        return {
+            "status": "success",
+            "message": f"已添加 {request.name} 到自选列表"
+        }
+
+    except Exception as e:
+        logger.error(f"添加自选股失败: {e}")
+        raise HTTPException(status_code=500, detail=f"添加失败: {e}")
+
+
+@app.delete("/api/watchlist/{code}")
+async def remove_from_watchlist(code: str):
+    """
+    从自选列表删除股票
+
+    Args:
+        code: 股票代码
+
+    Returns:
+        操作结果
+    """
+    import yaml
+    from pathlib import Path
+
+    try:
+        stocks_file = Path("config/stocks.yaml")
+
+        if not stocks_file.exists():
+            raise HTTPException(status_code=404, detail="配置文件不存在")
+
+        # 读取现有配置
+        with open(stocks_file, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f) or {}
+
+        my_stocks = config.get('my_stocks', [])
+
+        # 查找并删除
+        original_count = len(my_stocks)
+        my_stocks = [s for s in my_stocks if s['code'] != code]
+
+        if len(my_stocks) == original_count:
+            raise HTTPException(status_code=404, detail=f"股票 {code} 不在自选列表中")
+
+        config['my_stocks'] = my_stocks
+
+        # 写回文件
+        with open(stocks_file, 'w', encoding='utf-8') as f:
+            yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+        # 清除监控器缓存，强制重新加载
+        global _monitor_instance
+        _monitor_instance = None
+
+        logger.info(f"已从自选列表删除股票 {code}")
+
+        return {
+            "status": "success",
+            "message": f"已删除股票 {code}"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除自选股失败: {e}")
+        raise HTTPException(status_code=500, detail=f"删除失败: {e}")
+
+
+@app.get("/api/watchlist")
+async def get_watchlist():
+    """
+    获取自选股列表
+
+    Returns:
+        自选股列表
+    """
+    import yaml
+    from pathlib import Path
+
+    try:
+        stocks_file = Path("config/stocks.yaml")
+
+        if not stocks_file.exists():
+            return {"my_stocks": []}
+
+        with open(stocks_file, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f) or {}
+
+        return {
+            "my_stocks": config.get('my_stocks', [])
+        }
+
+    except Exception as e:
+        logger.error(f"获取自选列表失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取失败: {e}")
+
+
 # _get_recommended_etfs 函数已移除，API现在使用 find_related_etfs_with_real_weight
 # 该方法只返回持仓占比 >= 5% 的 ETF，确保策略有效性
 

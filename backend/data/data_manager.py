@@ -245,13 +245,84 @@ class DataManager:
             if '代码' in result.columns:
                 self._stock_codes_cache = result['代码'].tolist()[:2000]
 
-        return self._try_all_sources(
+        def should_try_source(source: BaseDataSource, args) -> bool:
+            """
+            判断是否应该尝试该数据源
+            如果用户指定了codes，跳过不支持指定codes查询的数据源（如涨停股数据源）
+            """
+            user_codes = args[0] if args else None
+            if user_codes:
+                # 如果用户指定了股票代码，跳过东方财富涨停股数据源
+                # 因为该数据源只返回涨停股，不支持指定代码查询
+                if source.name == 'eastmoney_limit_up':
+                    logger.debug(f"跳过 {source.name} (不支持指定代码查询)")
+                    return False
+            return True
+
+        # 修改 _try_all_sources 的调用，传入source过滤函数
+        return self._try_all_sources_with_filter(
             DataType.STOCK_REALTIME,
             'fetch_stock_spot',
             codes,
             codes_preprocessor=preprocess_codes,
-            result_processor=process_result
+            result_processor=process_result,
+            source_filter=should_try_source
         )
+
+    def _try_all_sources_with_filter(
+        self,
+        data_type: DataType,
+        method_name: str,
+        *args,
+        codes_preprocessor=None,
+        result_processor=None,
+        source_filter=None,
+        **kwargs
+    ) -> pd.DataFrame:
+        """
+        尝试从所有可用数据源获取数据（支持source过滤器）
+
+        Args:
+            data_type: 数据类型
+            method_name: 调用的方法名
+            source_filter: 数据源过滤函数
+            *args: 方法参数
+            **kwargs: 方法关键字参数
+
+        Returns:
+            DataFrame
+        """
+        available = self._get_available_sources(data_type)
+
+        # 应用source过滤器
+        if source_filter:
+            available = [s for s in available if source_filter(s, args)]
+
+        if not available:
+            logger.error(f"没有可用的{data_type.value}数据源")
+            return pd.DataFrame()
+
+        last_error = None
+
+        for source in available:
+            logger.debug(f"尝试使用 {source.name} 获取数据...")
+
+            # 预处理代码
+            processed_args = list(args)
+            if codes_preprocessor:
+                processed_args = codes_preprocessor(source, args)
+
+            result = self._try_source(source, method_name, *processed_args, **kwargs)
+
+            if result is not None and not result.empty:
+                if result_processor:
+                    result_processor(source, result)
+                return result
+
+            last_error = f"{source.name} 失败"
+
+        logger.warning(f"所有数据源均失败: {last_error}")
+        return pd.DataFrame()
 
     def fetch_etf_spot(self, codes: Optional[List[str]] = None) -> pd.DataFrame:
         """

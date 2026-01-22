@@ -663,21 +663,35 @@
                         ? '<span class="limit-up-badge">涨停</span>'
                         : '';
 
-                    const row = `
-                        <tr>
-                            <td><code>${stock.code}</code></td>
-                            <td>${stock.name}</td>
-                            <td class="${changeClass}">¥${stock.price.toFixed(2)}</td>
-                            <td class="${changeClass}">${changePrefix}${(stock.change_pct * 100).toFixed(2)}%</td>
-                            <td>${limitBadge}</td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-primary" onclick="showStockDetail('${stock.code}', '${stock.name}')">
-                                    <i class="bi bi-graph-up"></i> 详情
-                                </button>
-                            </td>
-                        </tr>
+                    // 使用DOM方法创建行，避免特殊字符问题
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><code>${stock.code}</code></td>
+                        <td>${stock.name}</td>
+                        <td class="${changeClass}">¥${stock.price.toFixed(2)}</td>
+                        <td class="${changeClass}">${changePrefix}${(stock.change_pct * 100).toFixed(2)}%</td>
+                        <td>${limitBadge}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary btn-detail">
+                                <i class="bi bi-graph-up"></i> 详情
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger btn-remove">
+                                <i class="bi bi-dash-circle"></i> 删除
+                            </button>
+                        </td>
                     `;
-                    tbody.innerHTML += row;
+
+                    // 绑定详情按钮事件
+                    row.querySelector('.btn-detail').addEventListener('click', () => {
+                        showStockDetail(stock.code, stock.name);
+                    });
+
+                    // 绑定删除按钮事件
+                    row.querySelector('.btn-remove').addEventListener('click', () => {
+                        removeFromWatchList(stock.code, stock.name);
+                    });
+
+                    tbody.appendChild(row);
                 });
 
                 document.getElementById('stocksRefreshTime').textContent = '更新于 ' + new Date().toLocaleTimeString();
@@ -710,22 +724,50 @@
                         ? (stock.amount / 100000000).toFixed(2) + '亿'
                         : (stock.amount / 10000).toFixed(0) + '万';
 
-                    const row = `
-                        <tr class="limitup-row" onclick="showStockDetail('${stock.code}', '${stock.name}')">
-                            <td><code>${stock.code}</code></td>
-                            <td>${stock.name}</td>
-                            <td class="price-up">¥${stock.price.toFixed(2)}</td>
-                            <td class="price-up">+${(stock.change_pct * 100).toFixed(2)}%</td>
-                            <td>${amountStr}</td>
-                            <td>${stock.turnover.toFixed(2)}%</td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); showStockDetail('${stock.code}', '${stock.name}')">
-                                    <i class="bi bi-graph-up"></i> 详情
-                                </button>
-                            </td>
-                        </tr>
+                    // 转义股票名称中的特殊字符
+                    const escapedName = stock.name.replace(/'/g, "\\'");
+
+                    const row = document.createElement('tr');
+                    row.className = 'limitup-row';
+                    row.innerHTML = `
+                        <td><code>${stock.code}</code></td>
+                        <td>${stock.name}</td>
+                        <td class="price-up">¥${stock.price.toFixed(2)}</td>
+                        <td class="price-up">+${(stock.change_pct * 100).toFixed(2)}%</td>
+                        <td>${amountStr}</td>
+                        <td>${stock.turnover.toFixed(2)}%</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary btn-detail">
+                                <i class="bi bi-graph-up"></i> 详情
+                            </button>
+                            <button class="btn btn-sm btn-outline-success btn-add-watch">
+                                <i class="bi bi-plus-circle"></i> 自选
+                            </button>
+                        </td>
                     `;
-                    tbody.innerHTML += row;
+
+                    // 使用数据属性存储股票信息
+                    row.dataset.code = stock.code;
+                    row.dataset.name = stock.name;
+
+                    // 绑定点击事件
+                    row.addEventListener('click', () => {
+                        showStockDetail(stock.code, stock.name);
+                    });
+
+                    // 详情按钮
+                    row.querySelector('.btn-detail').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        showStockDetail(stock.code, stock.name);
+                    });
+
+                    // 添加自选按钮
+                    row.querySelector('.btn-add-watch').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        addLimitUpToWatchList(stock.code, stock.name);
+                    });
+
+                    tbody.appendChild(row);
                 });
 
             } catch (error) {
@@ -1208,10 +1250,193 @@
             }
         }
 
-        // 添加到自选（占位功能）
-        function addToWatchList() {
-            alert('添加自选功能待实现');
+        // 当前查看的股票信息（用于添加自选）
+        let currentStockInfo = { code: null, name: null, market: 'sz' };
+
+        // 添加到自选列表
+        async function addToWatchList(stockCode, stockName, stockMarket) {
+            // 如果传入了参数，使用传入的值；否则使用当前查看的股票信息
+            const code = stockCode || currentStockInfo.code;
+            const name = stockName || currentStockInfo.name;
+            let market = stockMarket || currentStockInfo.market;
+
+            if (!code) {
+                alert('无法获取股票代码');
+                return;
+            }
+
+            // 如果没有名称，尝试从API获取
+            if (!name) {
+                try {
+                    const response = await fetch(`${API_BASE}/api/stocks/${code}/kline?days=1`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        // API返回数据后可能包含股票名称
+                    }
+                } catch (e) {
+                    // 忽略错误，继续使用代码作为名称
+                }
+            }
+
+            // 根据代码判断市场
+            if (!market) {
+                if (code.startsWith('6') || code.startsWith('5')) {
+                    market = 'sh';
+                } else {
+                    market = 'sz';
+                }
+            }
+
+            const displayName = name || code;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/watchlist/add`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        name: displayName,
+                        market: market,
+                        notes: ''
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success' || result.status === 'already_exists') {
+                    // 显示成功提示
+                    showToastMessage(result.message, 'success');
+
+                    // 刷新自选股列表
+                    loadStocks();
+                    loadStatus();
+
+                    // 如果弹窗打开，关闭弹窗
+                    const modalEl = document.getElementById('stockDetailModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) {
+                        modal.hide();
+                    }
+                } else {
+                    showToastMessage(result.message, 'warning');
+                }
+
+            } catch (error) {
+                console.error('添加自选失败:', error);
+                showToastMessage('添加自选失败: ' + error.message, 'danger');
+            }
         }
+
+        // 从涨停股列表添加到自选
+        async function addLimitUpToWatchList(code, name) {
+            // 判断市场
+            let market = 'sz';
+            if (code.startsWith('6') || code.startsWith('5')) {
+                market = 'sh';
+            }
+
+            await addToWatchList(code, name, market);
+        }
+
+        // 从自选列表删除股票
+        async function removeFromWatchList(code, name) {
+            if (!confirm(`确定要将 ${name} (${code}) 从自选列表中删除吗？`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/watchlist/${code}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showToastMessage(result.message, 'success');
+
+                    // 刷新自选股列表
+                    loadStocks();
+                    loadStatus();
+                } else if (response.status === 404) {
+                    showToastMessage('股票不在自选列表中', 'warning');
+                    // 仍然刷新列表
+                    loadStocks();
+                    loadStatus();
+                } else {
+                    const error = await response.json();
+                    showToastMessage(error.detail || '删除失败', 'danger');
+                }
+
+            } catch (error) {
+                console.error('删除自选失败:', error);
+                showToastMessage('删除自选失败: ' + error.message, 'danger');
+            }
+        }
+
+        // 显示Toast消息
+        function showToastMessage(message, type = 'info') {
+            // 创建toast容器（如果不存在）
+            let toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                document.body.appendChild(toastContainer);
+            }
+
+            // 创建toast元素
+            const toastId = 'toast-' + Date.now();
+            const bgClass = {
+                'success': 'bg-success',
+                'danger': 'bg-danger',
+                'warning': 'bg-warning',
+                'info': 'bg-info'
+            }[type] || 'bg-info';
+
+            const toastHtml = `
+                <div id="${toastId}" class="toast" role="alert">
+                    <div class="toast-header ${bgClass} text-white">
+                        <strong class="me-auto">提示</strong>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+                    </div>
+                    <div class="toast-body bg-dark text-white">
+                        ${message}
+                    </div>
+                </div>
+            `;
+
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+
+            // 显示toast
+            const toastEl = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+            toast.show();
+
+            // 移除已关闭的toast
+            toastEl.addEventListener('hidden.bs.toast', () => {
+                toastEl.remove();
+            });
+        }
+
+        // 更新showStockDetail函数，保存当前股票信息
+        const originalShowStockDetail = showStockDetail;
+        showStockDetail = async function(code, name) {
+            // 保存当前股票信息
+            currentStockInfo = {
+                code: code,
+                name: name,
+                market: code.startsWith('6') || code.startsWith('5') ? 'sh' : 'sz'
+            };
+
+            // 调用原始函数
+            await originalShowStockDetail(code, name);
+
+            // 更新弹窗中的"添加到自选"按钮
+            const addToWatchBtn = document.querySelector('#stockDetailModal .modal-footer .btn-primary');
+            if (addToWatchBtn) {
+                addToWatchBtn.onclick = () => addToWatchList(code, name, currentStockInfo.market);
+            }
+        };
     </script>
 </body>
 </html>
