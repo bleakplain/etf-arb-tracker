@@ -125,22 +125,74 @@
             background-color: #1e293b;
         }
 
+        .table {
+            color: #e2e8f0;
+            font-size: 13px;
+            background-color: #1e293b;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
         .table thead th {
-            background-color: #334155;
+            background: linear-gradient(180deg, #334155 0%, #2d3b4e 100%);
             color: #f1f5f9;
-            border-color: #475569;
+            border: none;
             font-weight: 600;
             position: sticky;
             top: 0;
             z-index: 10;
             text-align: left;
+            padding: 14px 12px;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .table thead th:hover {
+            background: linear-gradient(180deg, #3d4f63 0%, #37455a 100%);
+        }
+
+        .table thead th.sortable {
+            position: relative;
+            padding-right: 28px;
+        }
+
+        .table thead th.sortable::after {
+            content: '\F4AF';
+            font-family: 'bootstrap-icons';
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .table thead th.sort-asc::after {
+            content: '\F433';
+            color: var(--primary-color);
+        }
+
+        .table thead th.sort-desc::after {
+            content: '\F436';
+            color: var(--primary-color);
+        }
+
+        .table thead th:not(.sortable) {
+            cursor: default;
+        }
+
+        .table thead th:not(.sortable):hover {
+            background: linear-gradient(180deg, #334155 0%, #2d3b4e 100%);
         }
 
         .table tbody td {
             border-color: #334155;
-            padding: 10px 8px;
+            padding: 12px 10px;
             background-color: #1e293b;
             color: #e2e8f0;
+            transition: background-color 0.15s;
         }
 
         .table tbody tr:nth-child(even) td {
@@ -149,6 +201,33 @@
 
         .table-hover tbody tr:hover td {
             background-color: #2d3b4e !important;
+        }
+
+        /* 表格行进入动画 */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .table tbody tr {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        /* 表格容器阴影 */
+        .table-responsive {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .table-responsive table {
+            margin-bottom: 0;
         }
 
         .metric-card {
@@ -394,12 +473,12 @@
                                     <table class="table table-hover mb-0">
                                         <thead>
                                             <tr>
-                                                <th>代码</th>
-                                                <th>名称</th>
-                                                <th>现价</th>
-                                                <th>涨跌幅</th>
-                                                <th>状态</th>
-                                                <th>操作</th>
+                                                <th class="sortable" data-sort="code" data-type="string">代码</th>
+                                                <th class="sortable" data-sort="name" data-type="string">名称</th>
+                                                <th class="sortable" data-sort="price" data-type="number">现价</th>
+                                                <th class="sortable" data-sort="change_pct" data-type="number">涨跌幅</th>
+                                                <th class="sortable" data-sort="is_limit_up" data-type="boolean">状态</th>
+                                                <th class="sortable" data-sort="actions" data-type="actions">操作</th>
                                             </tr>
                                         </thead>
                                         <tbody id="stocksTableBody">
@@ -435,13 +514,13 @@
                             <table class="table table-hover mb-0">
                                 <thead>
                                     <tr>
-                                        <th>代码</th>
-                                        <th>名称</th>
-                                        <th>涨停价</th>
-                                        <th>涨幅</th>
-                                        <th>成交额</th>
-                                        <th>换手率</th>
-                                        <th>操作</th>
+                                        <th class="sortable" data-sort="code" data-type="string">代码</th>
+                                        <th class="sortable" data-sort="name" data-type="string">名称</th>
+                                        <th class="sortable" data-sort="price" data-type="number">涨停价</th>
+                                        <th class="sortable" data-sort="change_pct" data-type="number">涨幅</th>
+                                        <th class="sortable" data-sort="amount" data-type="number">成交额</th>
+                                        <th class="sortable" data-sort="turnover" data-type="number">换手率</th>
+                                        <th class="sortable" data-sort="actions" data-type="actions">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="limitupTableBody">
@@ -591,8 +670,18 @@
         let klineChart = null;
         let currentKlinePeriod = 'daily';
 
+        // 排序状态
+        let stocksSortState = { column: null, direction: null };
+        let limitupSortState = { column: null, direction: null };
+        let currentStocksData = [];
+        let currentLimitupData = [];
+
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
+            // 初始化排序事件
+            initTableSorting('stocksTableBody', stocksSortState, 'stocks');
+            initTableSorting('limitupTableBody', limitupSortState, 'limitup');
+
             // 只加载首屏关键数据
             loadStatus();
             loadStocks();
@@ -616,6 +705,184 @@
         function updateCurrentTime() {
             const now = new Date();
             document.getElementById('currentTime').textContent = now.toLocaleString('zh-CN');
+        }
+
+        // ========== 排序功能 ==========
+        function initTableSorting(tbodyId, sortState, tableType) {
+            const table = document.querySelector(`#${tbodyId}`).closest('table');
+            const headers = table.querySelectorAll('th.sortable');
+
+            headers.forEach(th => {
+                th.addEventListener('click', () => {
+                    const column = th.dataset.sort;
+                    const type = th.dataset.type;
+
+                    // 切换排序方向
+                    if (sortState.column === column) {
+                        if (sortState.direction === 'asc') {
+                            sortState.direction = 'desc';
+                        } else if (sortState.direction === 'desc') {
+                            sortState.column = null;
+                            sortState.direction = null;
+                        } else {
+                            sortState.direction = 'asc';
+                        }
+                    } else {
+                        sortState.column = column;
+                        sortState.direction = 'asc';
+                    }
+
+                    // 更新表头样式
+                    headers.forEach(h => {
+                        h.classList.remove('sort-asc', 'sort-desc');
+                    });
+                    if (sortState.direction) {
+                        th.classList.add(sortState.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+                    }
+
+                    // 重新渲染表格
+                    if (tableType === 'stocks') {
+                        renderStocksTable();
+                    } else {
+                        renderLimitupTable();
+                    }
+                });
+            });
+        }
+
+        function sortData(data, column, direction) {
+            if (!column || !direction) return data;
+
+            return [...data].sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+
+                // 处理特殊字段
+                if (column === 'is_limit_up') {
+                    aVal = aVal ? 1 : 0;
+                    bVal = bVal ? 1 : 0;
+                }
+
+                // 数值比较
+                if (typeof aVal === 'number' && typeof bVal === 'number') {
+                    return direction === 'asc' ? aVal - bVal : bVal - aVal;
+                }
+
+                // 字符串比较
+                aVal = String(aVal).toLowerCase();
+                bVal = String(bVal).toLowerCase();
+                if (direction === 'asc') {
+                    return aVal.localeCompare(bVal, 'zh-CN');
+                } else {
+                    return bVal.localeCompare(aVal, 'zh-CN');
+                }
+            });
+        }
+
+        function renderStocksTable() {
+            const tbody = document.getElementById('stocksTableBody');
+            tbody.innerHTML = '';
+
+            let data = currentStocksData;
+            if (stocksSortState.column && stocksSortState.direction) {
+                data = sortData(currentStocksData, stocksSortState.column, stocksSortState.direction);
+            }
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary py-5">暂无自选股，请添加</td></tr>';
+                return;
+            }
+
+            data.forEach(stock => {
+                const changeClass = stock.change_pct >= 0 ? 'price-up' : 'price-down';
+                const changePrefix = stock.change_pct >= 0 ? '+' : '';
+                const limitBadge = stock.is_limit_up
+                    ? '<span class="limit-up-badge">涨停</span>'
+                    : '';
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><code>${stock.code}</code></td>
+                    <td>${stock.name}</td>
+                    <td class="${changeClass}">¥${stock.price.toFixed(2)}</td>
+                    <td class="${changeClass}">${changePrefix}${(stock.change_pct * 100).toFixed(2)}%</td>
+                    <td>${limitBadge}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary btn-detail">
+                            <i class="bi bi-graph-up"></i> 详情
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger btn-remove">
+                            <i class="bi bi-dash-circle"></i> 删除
+                        </button>
+                    </td>
+                `;
+
+                row.querySelector('.btn-detail').addEventListener('click', () => {
+                    showStockDetail(stock.code, stock.name);
+                });
+
+                row.querySelector('.btn-remove').addEventListener('click', () => {
+                    removeFromWatchList(stock.code, stock.name);
+                });
+
+                tbody.appendChild(row);
+            });
+        }
+
+        function renderLimitupTable() {
+            const tbody = document.getElementById('limitupTableBody');
+            tbody.innerHTML = '';
+
+            let data = currentLimitupData;
+            if (limitupSortState.column && limitupSortState.direction) {
+                data = sortData(currentLimitupData, limitupSortState.column, limitupSortState.direction);
+            }
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-5">当前无涨停股</td></tr>';
+                return;
+            }
+
+            data.forEach(stock => {
+                const amountStr = stock.amount > 100000000
+                    ? (stock.amount / 100000000).toFixed(2) + '亿'
+                    : (stock.amount / 10000).toFixed(0) + '万';
+
+                const row = document.createElement('tr');
+                row.className = 'limitup-row';
+                row.innerHTML = `
+                    <td><code>${stock.code}</code></td>
+                    <td>${stock.name}</td>
+                    <td class="price-up">¥${stock.price.toFixed(2)}</td>
+                    <td class="price-up">+${(stock.change_pct * 100).toFixed(2)}%</td>
+                    <td>${amountStr}</td>
+                    <td>${stock.turnover.toFixed(2)}%</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary btn-detail">
+                            <i class="bi bi-graph-up"></i> 详情
+                        </button>
+                        <button class="btn btn-sm btn-outline-success btn-add-watch">
+                            <i class="bi bi-plus-circle"></i> 自选
+                        </button>
+                    </td>
+                `;
+
+                row.addEventListener('click', () => {
+                    showStockDetail(stock.code, stock.name);
+                });
+
+                row.querySelector('.btn-detail').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showStockDetail(stock.code, stock.name);
+                });
+
+                row.querySelector('.btn-add-watch').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    addLimitUpToWatchList(stock.code, stock.name);
+                });
+
+                tbody.appendChild(row);
+            });
         }
 
         // 加载系统状态
@@ -646,54 +913,9 @@
         async function loadStocks() {
             try {
                 const response = await fetch(`${API_BASE}/api/stocks`);
-                const stocks = await response.json();
+                currentStocksData = await response.json();
 
-                const tbody = document.getElementById('stocksTableBody');
-                tbody.innerHTML = '';
-
-                if (stocks.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary py-5">暂无自选股，请添加</td></tr>';
-                    return;
-                }
-
-                stocks.forEach(stock => {
-                    const changeClass = stock.change_pct >= 0 ? 'price-up' : 'price-down';
-                    const changePrefix = stock.change_pct >= 0 ? '+' : '';
-                    const limitBadge = stock.is_limit_up
-                        ? '<span class="limit-up-badge">涨停</span>'
-                        : '';
-
-                    // 使用DOM方法创建行，避免特殊字符问题
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td><code>${stock.code}</code></td>
-                        <td>${stock.name}</td>
-                        <td class="${changeClass}">¥${stock.price.toFixed(2)}</td>
-                        <td class="${changeClass}">${changePrefix}${(stock.change_pct * 100).toFixed(2)}%</td>
-                        <td>${limitBadge}</td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-primary btn-detail">
-                                <i class="bi bi-graph-up"></i> 详情
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger btn-remove">
-                                <i class="bi bi-dash-circle"></i> 删除
-                            </button>
-                        </td>
-                    `;
-
-                    // 绑定详情按钮事件
-                    row.querySelector('.btn-detail').addEventListener('click', () => {
-                        showStockDetail(stock.code, stock.name);
-                    });
-
-                    // 绑定删除按钮事件
-                    row.querySelector('.btn-remove').addEventListener('click', () => {
-                        removeFromWatchList(stock.code, stock.name);
-                    });
-
-                    tbody.appendChild(row);
-                });
-
+                renderStocksTable();
                 document.getElementById('stocksRefreshTime').textContent = '更新于 ' + new Date().toLocaleTimeString();
 
             } catch (error) {
@@ -705,70 +927,13 @@
         async function loadLimitUpStocks() {
             try {
                 const response = await fetch(`${API_BASE}/api/limit-up`);
-                const stocks = await response.json();
+                currentLimitupData = await response.json();
 
-                document.getElementById('limitupCount').textContent = stocks.length;
-                document.getElementById('limitupStocksCount').textContent = stocks.length;
+                document.getElementById('limitupCount').textContent = currentLimitupData.length;
+                document.getElementById('limitupStocksCount').textContent = currentLimitupData.length;
                 document.getElementById('limitupRefreshTime').textContent = '更新于 ' + new Date().toLocaleTimeString();
 
-                const tbody = document.getElementById('limitupTableBody');
-                tbody.innerHTML = '';
-
-                if (stocks.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-5">当前无涨停股</td></tr>';
-                    return;
-                }
-
-                stocks.forEach(stock => {
-                    const amountStr = stock.amount > 100000000
-                        ? (stock.amount / 100000000).toFixed(2) + '亿'
-                        : (stock.amount / 10000).toFixed(0) + '万';
-
-                    // 转义股票名称中的特殊字符
-                    const escapedName = stock.name.replace(/'/g, "\\'");
-
-                    const row = document.createElement('tr');
-                    row.className = 'limitup-row';
-                    row.innerHTML = `
-                        <td><code>${stock.code}</code></td>
-                        <td>${stock.name}</td>
-                        <td class="price-up">¥${stock.price.toFixed(2)}</td>
-                        <td class="price-up">+${(stock.change_pct * 100).toFixed(2)}%</td>
-                        <td>${amountStr}</td>
-                        <td>${stock.turnover.toFixed(2)}%</td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-primary btn-detail">
-                                <i class="bi bi-graph-up"></i> 详情
-                            </button>
-                            <button class="btn btn-sm btn-outline-success btn-add-watch">
-                                <i class="bi bi-plus-circle"></i> 自选
-                            </button>
-                        </td>
-                    `;
-
-                    // 使用数据属性存储股票信息
-                    row.dataset.code = stock.code;
-                    row.dataset.name = stock.name;
-
-                    // 绑定点击事件
-                    row.addEventListener('click', () => {
-                        showStockDetail(stock.code, stock.name);
-                    });
-
-                    // 详情按钮
-                    row.querySelector('.btn-detail').addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        showStockDetail(stock.code, stock.name);
-                    });
-
-                    // 添加自选按钮
-                    row.querySelector('.btn-add-watch').addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        addLimitUpToWatchList(stock.code, stock.name);
-                    });
-
-                    tbody.appendChild(row);
-                });
+                renderLimitupTable();
 
             } catch (error) {
                 console.error('加载涨停股失败:', error);

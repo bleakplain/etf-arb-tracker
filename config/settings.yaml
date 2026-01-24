@@ -5,8 +5,8 @@ strategy:
   # 扫描间隔（秒）- 控制后端监控扫描频率，防止请求过于频繁被封禁
   scan_interval: 120
 
-  # ETF中最小持仓权重（5%）
-  min_weight: 0.05
+  # ETF中最小持仓权重（1%）
+  min_weight: 0.01
 
   # 最小封单量（亿元）
   min_order_amount: 10

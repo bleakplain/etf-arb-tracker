@@ -653,9 +653,15 @@ async def add_to_watchlist(request: AddStockRequest):
         with open(stocks_file, 'w', encoding='utf-8') as f:
             yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
-        # 清除监控器缓存，强制重新加载
+        # 清除监控器缓存和全局配置缓存，强制重新加载
         global _monitor_instance
         _monitor_instance = None
+
+        # 清除配置模块的全局缓存
+        from config import _config
+        if _config is not None:
+            import config
+            config._config = None
 
         logger.info(f"已添加股票 {request.code} {request.name} 到自选列表")
 
@@ -708,9 +714,15 @@ async def remove_from_watchlist(code: str):
         with open(stocks_file, 'w', encoding='utf-8') as f:
             yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
-        # 清除监控器缓存，强制重新加载
+        # 清除监控器缓存和全局配置缓存，强制重新加载
         global _monitor_instance
         _monitor_instance = None
+
+        # 清除配置模块的全局缓存
+        from config import _config
+        if _config is not None:
+            import config
+            config._config = None
 
         logger.info(f"已从自选列表删除股票 {code}")
 
