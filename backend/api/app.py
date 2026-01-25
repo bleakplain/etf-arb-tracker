@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional, Dict
 import uvicorn
 import yaml
@@ -16,6 +16,8 @@ from datetime import datetime
 import os
 import sys
 import time
+from asyncio import Lock, to_thread
+from threading import Lock as ThreadLock
 
 # 添加项目路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -37,6 +39,10 @@ from backend.data.kline import KlineDataFetcher
 from backend.data.etf_holdings import ETFHoldingsFetcher
 from backend.api.state import get_api_state_manager
 from backend.infrastructure.cache import TTLCache
+from backend.backtest import BacktestEngine, BacktestConfig, BacktestResult
+from backend.backtest.clock import TimeGranularity
+from backend.backtest.repository import get_backtest_repository
+import uuid
 
 
 # Pydantic模型
@@ -98,6 +104,99 @@ class LimitUpStockInfo(BaseModel):
     seal_amount: int
 
 
+# 回测相关模型
+class BacktestRequest(BaseModel):
+    """回测请求"""
+    start_date: str          # "20240101"
+    end_date: str            # "20241231"
+    granularity: str = "daily"  # daily, 5m, 15m, 30m
+    min_weight: Optional[float] = None
+    evaluator_type: str = "default"
+    interpolation: str = "linear"
+
+    @validator('start_date', 'end_date')
+    def validate_date_format(cls, v):
+        """验证日期格式"""
+        if not v:
+            raise ValueError('日期不能为空')
+        try:
+            datetime.strptime(v, "%Y%m%d")
+        except ValueError:
+            raise ValueError('日期格式错误，应为YYYYMMDD格式，例如: 20240101')
+
+        # 限制日期范围（防止极端值）
+        min_date = datetime.strptime("20000101", "%Y%m%d")
+        max_date = datetime.strptime("20991231", "%Y%m%d")
+        input_date = datetime.strptime(v, "%Y%m%d")
+
+        if input_date < min_date:
+            raise ValueError('开始日期不能早于20000101')
+        if input_date > max_date:
+            raise ValueError('结束日期不能晚于20991231')
+
+        return v
+
+    @validator('end_date')
+    def validate_date_range(cls, v, values):
+        """验证结束日期必须晚于开始日期"""
+        if 'start_date' in values:
+            start_date = values['start_date']
+            start_dt = datetime.strptime(start_date, "%Y%m%d")
+            end_dt = datetime.strptime(v, "%Y%m%d")
+
+            if end_dt < start_dt:
+                raise ValueError('结束日期不能早于开始日期')
+
+            # 限制回测时间跨度（最大10年）
+            max_span_days = 365 * 10
+            actual_span = (end_dt - start_dt).days
+            if actual_span > max_span_days:
+                raise ValueError(f'回测时间跨度不能超过10年（当前为{actual_span // 365}年）')
+
+        return v
+
+    @validator('granularity')
+    def validate_granularity(cls, v):
+        """验证时间粒度"""
+        valid_granularities = ["daily", "5m", "15m", "30m"]
+        if v not in valid_granularities:
+            raise ValueError(f'时间粒度必须是{valid_granularities}之一')
+        return v
+
+    @validator('min_weight')
+    def validate_min_weight(cls, v):
+        """验证最小权重"""
+        if v is not None:
+            if not (0.001 <= v <= 1.0):
+                raise ValueError('权重必须在0.001到1.0之间')
+        return v
+
+    @validator('evaluator_type')
+    def validate_evaluator_type(cls, v):
+        """验证评估器类型"""
+        valid_types = ["default", "conservative", "aggressive"]
+        if v not in valid_types:
+            raise ValueError(f'评估器类型必须是{valid_types}之一')
+        return v
+
+    @validator('interpolation')
+    def validate_interpolation(cls, v):
+        """验证插值方式"""
+        valid_interpolations = ["linear", "step"]
+        if v not in valid_interpolations:
+            raise ValueError(f'插值方式必须是{valid_interpolations}之一')
+        return v
+
+
+class BacktestResponse(BaseModel):
+    """回测响应"""
+    backtest_id: str
+    status: str              # "queued", "running", "completed", "failed"
+    progress: float          # 0.0 to 1.0
+    message: Optional[str] = None
+    result: Optional[Dict] = None
+
+
 # 全局变量
 app = FastAPI(
     title="A股涨停ETF溢价监控API",
@@ -124,6 +223,12 @@ _monitor_instance: Optional[LimitUpMonitor] = None
 # 涨停股缓存
 _limit_up_cache = TTLCache(ttl=30, name="limit_up_cache")
 
+# 回测任务存储（带线程安全锁）
+_backtest_jobs: Dict[str, Dict] = {}  # backtest_id -> job_info (内存缓存，用于快速访问)
+_backtest_lock = Lock()  # 异步锁，保护API端点的并发访问
+_backtest_thread_lock = ThreadLock()  # 线程锁，保护progress_callback的同步访问
+_backtest_repo = get_backtest_repository()  # 持久化存储仓库
+
 
 def get_monitor() -> LimitUpMonitor:
     """获取或创建监控器实例"""
@@ -142,6 +247,17 @@ def get_state_manager():
 async def startup_event():
     """应用启动时的初始化"""
     logger.info("API服务启动")
+    # 加载历史回测任务到内存
+    global _backtest_jobs
+    try:
+        jobs = _backtest_repo.list_jobs(limit=100)
+        for job in jobs:
+            job_id = job.get("job_id")
+            if job_id:
+                _backtest_jobs[job_id] = job
+        logger.info(f"加载了 {len(_backtest_jobs)} 个历史回测任务")
+    except Exception as e:
+        logger.warning(f"加载历史回测任务失败: {e}")
     # 不再预加载监控器，改为懒加载
     # 后台线程会自动初始化数据
 
@@ -601,6 +717,30 @@ class AddStockRequest(BaseModel):
     market: str = "sz"
     notes: str = ""
 
+    @validator('code')
+    def validate_code(cls, v):
+        """验证股票代码"""
+        if not v:
+            raise ValueError('股票代码不能为空')
+        if not v.isdigit() or len(v) != 6:
+            raise ValueError('股票代码必须是6位数字')
+        return v
+
+    @validator('name')
+    def validate_name(cls, v):
+        """验证股票名称"""
+        if not v or not v.strip():
+            raise ValueError('股票名称不能为空')
+        return v.strip()
+
+    @validator('market')
+    def validate_market(cls, v):
+        """验证市场代码"""
+        valid_markets = ["sh", "sz"]
+        if v not in valid_markets:
+            raise ValueError(f'市场代码必须是{valid_markets}之一')
+        return v
+
 
 @app.post("/api/watchlist/add")
 async def add_to_watchlist(request: AddStockRequest):
@@ -769,6 +909,311 @@ async def get_watchlist():
 
 # _get_recommended_etfs 函数已移除，API现在使用 find_related_etfs_with_real_weight
 # 该方法只返回持仓占比 >= 5% 的 ETF，确保策略有效性
+
+
+# ============ 回测相关API端点 ============
+
+@app.post("/api/backtest/start", response_model=BacktestResponse)
+async def start_backtest(request: BacktestRequest, background_tasks: BackgroundTasks):
+    """
+    启动回测任务
+
+    返回任务ID用于查询进度
+
+    Args:
+        request: 回测请求参数
+        background_tasks: FastAPI后台任务
+
+    Returns:
+        回测任务响应
+    """
+    from config import Config
+
+    job_id = str(uuid.uuid4())
+
+    # 创建回测任务记录（线程安全）
+    async with _backtest_lock:
+        _backtest_jobs[job_id] = {
+            "job_id": job_id,
+            "request": request.dict(),  # 转换为字典以便序列化
+            "status": "queued",
+            "progress": 0.0,
+            "result": None,
+            "error": None
+        }
+
+    # 后台执行回测
+    async def run_backtest_job():
+        try:
+            # 更新状态为运行中
+            async with _backtest_lock:
+                job = _backtest_jobs.get(job_id)
+                if not job:
+                    logger.error(f"回测任务 {job_id} 不存在")
+                    return
+                job["status"] = "running"
+
+            # 加载配置
+            app_config = Config.load()
+
+            # 将字符串转换为 TimeGranularity 枚举
+            granularity_map = {
+                "daily": TimeGranularity.DAILY,
+                "5m": TimeGranularity.MINUTE_5,
+                "15m": TimeGranularity.MINUTE_15,
+                "30m": TimeGranularity.MINUTE_30,
+            }
+            time_granularity = granularity_map.get(request.granularity, TimeGranularity.DAILY)
+
+            # 创建回测配置
+            config = BacktestConfig(
+                start_date=request.start_date,
+                end_date=request.end_date,
+                time_granularity=time_granularity,
+                min_weight=request.min_weight or app_config.strategy.min_weight,
+                evaluator_type=request.evaluator_type,
+                interpolation=request.interpolation
+            )
+
+            # 创建进度回调（线程安全）
+            def progress_callback(p: float):
+                # 直接更新进度（回测运行期间不会有并发修改）
+                try:
+                    with _backtest_thread_lock:
+                        job = _backtest_jobs.get(job_id)
+                        if job:
+                            job["progress"] = p
+                except Exception:
+                    pass  # 忽略进度更新错误
+
+            # 创建回测引擎
+            engine = BacktestEngine(
+                config=config,
+                stocks=app_config.my_stocks,
+                etf_codes=[e.code for e in app_config.watch_etfs],
+                app_config=app_config,
+                progress_callback=progress_callback
+            )
+
+            # 运行回测（在单独的线程中执行，避免阻塞事件循环）
+            result = await to_thread(engine.run)
+
+            # 更新完成状态
+            async with _backtest_lock:
+                job = _backtest_jobs.get(job_id)
+                if job:
+                    job["result"] = result.to_dict()
+                    job["status"] = "completed"
+                    job["progress"] = 1.0
+                    # 保存到持久化存储
+                    _backtest_repo.save_job(job_id, job)
+
+            logger.info(f"回测任务 {job_id} 完成")
+
+        except Exception as e:
+            logger.error(f"回测任务 {job_id} 失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            # 更新失败状态
+            try:
+                async with _backtest_lock:
+                    job = _backtest_jobs.get(job_id)
+                    if job:
+                        job["status"] = "failed"
+                        job["error"] = str(e)
+                        # 保存到持久化存储
+                        _backtest_repo.save_job(job_id, job)
+            except Exception as lock_error:
+                logger.error(f"更新回测任务状态失败: {lock_error}")
+
+    background_tasks.add_task(run_backtest_job)
+
+    return BacktestResponse(
+        backtest_id=job_id,
+        status="queued",
+        progress=0.0,
+        message="回测任务已加入队列"
+    )
+
+
+@app.get("/api/backtest/{backtest_id}", response_model=BacktestResponse)
+async def get_backtest_result(backtest_id: str):
+    """
+    获取回测结果
+
+    Args:
+        backtest_id: 回测任务ID
+
+    Returns:
+        回测任务状态和结果
+    """
+    # 先从内存缓存中获取
+    job = _backtest_jobs.get(backtest_id)
+
+    # 如果内存中没有，尝试从持久化存储加载
+    if not job:
+        job = _backtest_repo.load_job(backtest_id)
+        if job:
+            # 加载到内存缓存
+            _backtest_jobs[backtest_id] = job
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Backtest not found")
+
+    # 复制数据以避免在锁外访问
+    job_copy = {
+        "status": job["status"],
+        "progress": job["progress"],
+        "error": job.get("error"),
+        "result": job.get("result")
+    }
+
+    return BacktestResponse(
+        backtest_id=backtest_id,
+        status=job_copy["status"],
+        progress=job_copy["progress"],
+        message=job_copy.get("error"),
+        result=job_copy.get("result")
+    )
+
+
+@app.get("/api/backtest/{backtest_id}/signals")
+async def get_backtest_signals(backtest_id: str):
+    """
+    获取回测触发的所有信号
+
+    Args:
+        backtest_id: 回测任务ID
+
+    Returns:
+        信号列表和总数
+    """
+    # 先从内存获取，没有则从持久化存储加载
+    job = _backtest_jobs.get(backtest_id)
+    if not job:
+        job = _backtest_repo.load_job(backtest_id)
+        if job:
+            _backtest_jobs[backtest_id] = job
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Backtest not found")
+
+    if job["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Backtest not completed yet")
+
+    result = job.get("result", {})
+    signals = result.get("signals", [])
+
+    return {
+        "signals": signals,
+        "total": len(signals)
+    }
+
+
+@app.get("/api/backtest/{backtest_id}/statistics")
+async def get_backtest_statistics(backtest_id: str):
+    """
+    获取回测统计信息
+
+    Args:
+        backtest_id: 回测任务ID
+
+    Returns:
+        统计信息
+    """
+    # 先从内存获取，没有则从持久化存储加载
+    job = _backtest_jobs.get(backtest_id)
+    if not job:
+        job = _backtest_repo.load_job(backtest_id)
+        if job:
+            _backtest_jobs[backtest_id] = job
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Backtest not found")
+
+    if job["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Backtest not completed yet")
+
+    result = job.get("result", {})
+    statistics = result.get("statistics", {})
+
+    return statistics
+
+
+@app.get("/api/backtest")
+async def list_backtests():
+    """
+    获取所有回测任务列表
+
+    Returns:
+        回测任务列表
+    """
+    # 从持久化存储获取所有任务
+    jobs = _backtest_repo.list_jobs(limit=100)
+
+    # 格式化返回数据
+    result = []
+    for job in jobs:
+        job_id = job.get("job_id")
+        if not job_id:
+            continue
+
+        request_data = job.get("request")
+        # 处理 request 数据（可能是字典或 Pydantic 模型）
+        if isinstance(request_data, dict):
+            start_date = request_data.get("start_date")
+            end_date = request_data.get("end_date")
+            granularity = request_data.get("granularity")
+        elif hasattr(request_data, 'dict'):
+            req_dict = request_data.dict()
+            start_date = req_dict.get("start_date")
+            end_date = req_dict.get("end_date")
+            granularity = req_dict.get("granularity")
+        else:
+            # 如果 request 数据格式不对，使用默认值
+            start_date = None
+            end_date = None
+            granularity = None
+
+        result.append({
+            "job_id": job_id,
+            "status": job.get("status"),
+            "progress": job.get("progress", 0.0),
+            "start_date": start_date,
+            "end_date": end_date,
+            "granularity": granularity,
+            "modified_time": job.get("modified_time")
+        })
+
+    return {"jobs": result}
+
+
+@app.delete("/api/backtest/{backtest_id}")
+async def delete_backtest(backtest_id: str):
+    """
+    删除回测任务
+
+    Args:
+        backtest_id: 回测任务ID
+
+    Returns:
+        删除结果
+    """
+    # 从内存中删除
+    async with _backtest_lock:
+        if backtest_id in _backtest_jobs:
+            del _backtest_jobs[backtest_id]
+
+    # 从持久化存储中删除
+    deleted = _backtest_repo.delete_job(backtest_id)
+
+    if not deleted and backtest_id not in _backtest_jobs:
+        raise HTTPException(status_code=404, detail="Backtest not found")
+
+    return {
+        "status": "success",
+        "message": f"Backtest {backtest_id} deleted"
+    }
 
 
 def start_server(host: str = "0.0.0.0", port: int = 8000):

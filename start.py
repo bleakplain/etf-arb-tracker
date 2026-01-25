@@ -180,14 +180,97 @@ def run_both():
         sys.exit(1)
 
 
+def run_backtest(args):
+    """运行回测"""
+    import yaml
+    import json
+    from backend.backtest import create_backtest_engine, BacktestResult
+
+    # 加载回测配置
+    config_path = "config/backtest.yaml"
+    backtest_config = {}
+    if os.path.exists(config_path):
+        with open(config_path, 'r', encoding='utf-8') as f:
+            backtest_config = yaml.safe_load(f)
+
+    # CLI参数覆盖配置
+    start_date = args.start_date or backtest_config.get('default_start_date', '20240101')
+    end_date = args.end_date or backtest_config.get('default_end_date', '20241231')
+    granularity = args.granularity or backtest_config.get('time_granularity', 'daily')
+    min_weight = args.min_weight
+    evaluator_type = args.evaluator_type or backtest_config.get('evaluator_type', 'default')
+
+    print(f"\n{'='*60}")
+    print("📈 ETF套利策略回测")
+    print(f"{'='*60}")
+    print(f"开始日期: {start_date}")
+    print(f"结束日期: {end_date}")
+    print(f"时间粒度: {granularity}")
+    if min_weight:
+        print(f"最小权重: {min_weight*100:.1f}%")
+    print(f"{'='*60}\n")
+
+    # 创建回测引擎
+    engine = create_backtest_engine(
+        start_date=start_date,
+        end_date=end_date,
+        granularity=granularity,
+        min_weight=min_weight,
+        evaluator_type=evaluator_type,
+        progress_callback=lambda p: print(f"\r进度: {p*100:.1f}%", end='', flush=True)
+    )
+
+    # 运行回测
+    result = engine.run()
+
+    # 显示结果
+    print("\n\n")
+    print(result.statistics.get_summary())
+
+    # 保存结果
+    output_config = backtest_config.get('output', {})
+    if output_config.get('save_signals', True):
+        signals_dir = output_config.get('signals_dir', 'data/historical/signals')
+        os.makedirs(signals_dir, exist_ok=True)
+        output_file = f"{signals_dir}/backtest_{start_date}_{end_date}_{granularity}.json"
+
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(result.to_dict(), f, ensure_ascii=False, indent=2)
+        print(f"\n✓ 结果已保存到: {output_file}")
+
+        # 保存文本报告
+        if 'txt' in output_config.get('formats', []):
+            report_file = output_file.replace('.json', '.txt')
+            with open(report_file, 'w', encoding='utf-8') as f:
+                f.write(result.statistics.get_summary())
+            print(f"✓ 报告已保存到: {report_file}")
+
+
 def main():
     try:
         parser = argparse.ArgumentParser(description='A股涨停ETF溢价监控系统')
-        parser.add_argument('command', nargs='?', default='both',
+        subparsers = parser.add_subparsers(dest='command', help='可用命令')
+
+        # 默认命令（向后兼容）
+        parser.add_argument('command_legacy', nargs='?', default='both',
                            choices=['monitor', 'api', 'both', 'init'],
                            help='命令: monitor=只运行监控, api=只运行API, both=同时运行, init=初始化数据')
 
+        # 回测命令
+        backtest_parser = subparsers.add_parser('backtest', help='运行策略回测')
+        backtest_parser.add_argument('--start-date', help='开始日期 (YYYYMMDD)')
+        backtest_parser.add_argument('--end-date', help='结束日期 (YYYYMMDD)')
+        backtest_parser.add_argument('--granularity', choices=['daily', '5m', '15m', '30m'],
+                                    help='时间粒度')
+        backtest_parser.add_argument('--min-weight', type=float, help='最小持仓权重 (0-1)')
+        backtest_parser.add_argument('--evaluator-type', choices=['default', 'conservative', 'aggressive'],
+                                    help='信号评估器类型')
+
         args = parser.parse_args()
+
+        # 处理旧的命令格式
+        if args.command is None and args.command_legacy:
+            args.command = args.command_legacy
 
         logger.info(f"系统启动，命令: {args.command}")
 
@@ -229,6 +312,10 @@ def main():
                 logger.info("找到已有映射文件")
 
             run_both()
+
+        elif args.command == 'backtest':
+            # 回测不需要检查映射文件
+            run_backtest(args)
 
         logger.info("程序正常退出")
 

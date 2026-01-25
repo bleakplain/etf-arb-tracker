@@ -1,0 +1,60 @@
+# 回测配置文件
+
+# 默认日期范围
+default_start_date: "20240101"
+default_end_date: "20241231"
+
+# 时间粒度: daily, 5m, 15m, 30m
+time_granularity: "daily"
+
+# 是否使用config/stocks.yaml中的自选股
+use_watchlist: true
+
+# ETF持仓快照配置
+holdings_snapshots:
+  # 快照日期列表（YYYYMMDD格式）
+  # 如果不指定，自动生成年初/每季度初
+  dates:
+    - "20240101"  # 年初
+    - "20240401"  # Q2开始
+    - "20240701"  # Q3开始
+    - "20241001"  # Q4开始
+
+  # 插值方式: linear（线性）, step（阶梯）
+  interpolation: "linear"
+
+# 策略参数（可覆盖config/settings.yaml）
+strategy:
+  min_weight: 0.05          # ETF最小持仓权重
+  min_order_amount: 10      # 最小封单量（亿元）
+  min_time_to_close: 1800   # 距收盘最小时间（秒）
+  min_etf_volume: 5000      # ETF最小成交额（万元）
+
+# 信号评估器类型
+evaluator_type: "default"  # default, conservative, aggressive
+
+# 数据源配置
+data_sources:
+  # 优先级顺序
+  priority:
+    - "akshare"
+    - "tushare"
+
+  # Tushare配置（如果使用）
+  tushare:
+    token: "${TUSHARE_TOKEN}"  # 从环境变量读取
+
+# 输出配置
+output:
+  # 保存详细信号
+  save_signals: true
+  signals_dir: "data/historical/signals"
+
+  # 保存统计报告
+  save_report: true
+  report_dir: "data/historical/reports"
+
+  # 报告格式
+  formats:
+    - "json"   # 详细信号数据
+    - "txt"    # 文本报告
