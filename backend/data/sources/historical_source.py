@@ -325,7 +325,7 @@ class HistoricalQuoteFetcher(IQuoteFetcher):
 
     def _find_closest_datetime(
         self,
-        datetimes: Dict[datetime, Dict].keys()
+        datetimes: List[datetime]
     ) -> tuple:
         """找到最接近当前时间的时间点"""
         best_dt = None

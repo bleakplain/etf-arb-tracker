@@ -4,12 +4,13 @@
 
 import json
 import os
+import threading
 from typing import List
-from datetime import datetime
 from loguru import logger
 
 from backend.domain.interfaces import ISignalRepository
 from backend.domain.value_objects import TradingSignal
+from backend.utils.time_utils import today_china
 
 
 class FileSignalRepository(ISignalRepository):
@@ -31,6 +32,7 @@ class FileSignalRepository(ISignalRepository):
         """
         self._filepath = filepath
         self._signals: List[TradingSignal] = []
+        self._lock = threading.Lock()  # 线程安全锁
         self._load()
 
     def _load(self) -> None:
@@ -60,42 +62,49 @@ class FileSignalRepository(ISignalRepository):
             json.dump(data, f, ensure_ascii=False, indent=2)
 
     def save(self, signal: TradingSignal) -> None:
-        """保存单个信号"""
-        self._signals.append(signal)
-        self._save_to_file()
+        """保存单个信号（线程安全）"""
+        with self._lock:
+            self._signals.append(signal)
+            self._save_to_file()
         logger.debug(f"保存信号: {signal.stock_name} -> {signal.etf_name}")
 
     def save_all(self, signals: List[TradingSignal]) -> None:
-        """批量保存信号"""
-        self._signals.extend(signals)
-        self._save_to_file()
+        """批量保存信号（线程安全）"""
+        with self._lock:
+            self._signals.extend(signals)
+            self._save_to_file()
         logger.info(f"批量保存 {len(signals)} 个信号")
 
     def get_all_signals(self) -> List[TradingSignal]:
-        """获取所有信号"""
-        return self._signals.copy()
+        """获取所有信号（线程安全）"""
+        with self._lock:
+            return self._signals.copy()
 
     def get_today_signals(self) -> List[TradingSignal]:
-        """获取今天的所有信号"""
-        today = datetime.now().strftime("%Y-%m-%d")
-        return [s for s in self._signals if s.timestamp.startswith(today)]
+        """获取今天的所有信号（线程安全）"""
+        with self._lock:
+            today = today_china()
+            return [s for s in self._signals if s.timestamp.startswith(today)]
 
     def get_recent_signals(self, limit: int = 20) -> List[TradingSignal]:
-        """获取最近的信号"""
-        # 按时间倒序
-        sorted_signals = sorted(
-            self._signals,
-            key=lambda x: x.timestamp,
-            reverse=True
-        )
-        return sorted_signals[:limit]
+        """获取最近的信号（线程安全）"""
+        with self._lock:
+            # 按时间倒序
+            sorted_signals = sorted(
+                self._signals,
+                key=lambda x: x.timestamp,
+                reverse=True
+            )
+            return sorted_signals[:limit]
 
     def clear(self) -> None:
-        """清空所有信号"""
-        self._signals.clear()
-        self._save_to_file()
+        """清空所有信号（线程安全）"""
+        with self._lock:
+            self._signals.clear()
+            self._save_to_file()
         logger.info("已清空信号历史")
 
     def get_count(self) -> int:
-        """获取信号总数"""
-        return len(self._signals)
+        """获取信号总数（线程安全）"""
+        with self._lock:
+            return len(self._signals)

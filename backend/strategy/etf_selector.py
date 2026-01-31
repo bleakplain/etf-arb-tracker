@@ -7,6 +7,7 @@ from loguru import logger
 
 from backend.domain.interfaces import IETFHolderProvider, IETFHoldingsProvider
 from backend.domain.value_objects import ETFReference, ETFCategory
+from backend.utils.code_utils import normalize_stock_code
 
 
 class ETFSelector:
@@ -19,11 +20,35 @@ class ETFSelector:
     3. 根据策略筛选符合条件的ETF
     """
 
+    # ETF分类映射（从配置加载）
+    _etf_categories: Dict[str, ETFCategory] = {}
+
+    # 配置分类名到ETFCategory枚举的映射
+    _CATEGORY_MAP = {
+        'broad_index': ETFCategory.BROAD_INDEX,
+        'tech': ETFCategory.TECH,
+        'consumer': ETFCategory.CONSUMER,
+        'financial': ETFCategory.FINANCIAL,
+        'other': ETFCategory.OTHER,
+    }
+
+    @classmethod
+    def set_etf_categories(cls, categories_config) -> None:
+        """设置ETF分类配置"""
+        cls._etf_categories = {}
+        for cat_name, etf_codes in (categories_config.__dict__ or {}).items():
+            if not cat_name.startswith('_') and isinstance(etf_codes, list):
+                # 将配置中的分类名映射到ETFCategory枚举
+                category_enum = cls._CATEGORY_MAP.get(cat_name, ETFCategory.OTHER)
+                for code in etf_codes:
+                    cls._etf_categories[code] = category_enum
+
     def __init__(
         self,
         holder_provider: IETFHolderProvider,
         holdings_provider: IETFHoldingsProvider,
-        min_weight: float = 0.05
+        min_weight: float = 0.05,
+        etf_categories_config=None
     ):
         """
         初始化ETF选择器
@@ -32,11 +57,16 @@ class ETFSelector:
             holder_provider: ETF持仓关系提供者
             holdings_provider: ETF持仓详情提供者
             min_weight: 最小持仓权重阈值
+            etf_categories_config: ETF分类配置
         """
         self._holder_provider = holder_provider
         self._holdings_provider = holdings_provider
         self._min_weight = min_weight
         self._mapping: Dict = {}
+
+        # 设置ETF分类（如果提供）
+        if etf_categories_config:
+            self.set_etf_categories(etf_categories_config)
 
     def load_mapping(self, filepath: str = "data/stock_etf_mapping.json") -> None:
         """加载股票-ETF映射关系"""
@@ -86,7 +116,7 @@ class ETFSelector:
         Returns:
             符合条件的ETF列表，按权重降序排序
         """
-        normalized_code = self._normalize_code(stock_code)
+        normalized_code = normalize_stock_code(stock_code)
 
         # 获取映射中的ETF
         mapped_etfs = self._mapping.get(normalized_code, [])
@@ -138,7 +168,7 @@ class ETFSelector:
         Returns:
             相关ETF列表
         """
-        normalized_code = self._normalize_code(stock_code)
+        normalized_code = normalize_stock_code(stock_code)
         return self._mapping.get(normalized_code, [])
 
     def _get_stock_weight(self, stock_code: str, etf_code: str) -> Dict:
@@ -181,19 +211,13 @@ class ETFSelector:
             logger.warning(f"获取 {stock_code} 在 {etf_code} 中的权重失败: {e}")
             return {'weight': 0, 'rank': -1, 'in_top10': False, 'top10_ratio': 0}
 
-    @staticmethod
-    def _normalize_code(stock_code: str) -> str:
-        """标准化股票代码，去掉市场前缀"""
-        prefixes = ['sh', 'sz', 'bj']
-        code = stock_code.lower()
-        for prefix in prefixes:
-            if code.startswith(prefix):
-                return code[2:]
-        return stock_code
+    def _get_etf_category(self, etf_code: str) -> ETFCategory:
+        """根据ETF代码获取分类（从配置加载）"""
+        # 优先使用类变量中的配置
+        if etf_code in self._etf_categories:
+            return self._etf_categories[etf_code]
 
-    @staticmethod
-    def _get_etf_category(etf_code: str) -> ETFCategory:
-        """根据ETF代码获取分类"""
+        # 兼容旧代码：硬编码的默认分类（向后兼容）
         broad_based = ["510300", "510500", "510050", "159915", "588000",
                        "159901", "512100", "588200"]
         tech = ["159995", "512480", "515000", "516160", "515790"]

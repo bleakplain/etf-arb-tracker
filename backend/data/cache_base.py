@@ -10,12 +10,14 @@ from typing import Optional, Dict, Any
 from loguru import logger
 import pandas as pd
 
+from backend.utils.constants import CacheConfig as CacheConsts
+
 
 class CacheConfig:
-    """缓存配置类"""
-    DEFAULT_TTL = 30              # 默认缓存过期时间（秒）
-    DEFAULT_REFRESH_INTERVAL = 15 # 默认刷新间隔（秒）
-    SHUTDOWN_TIMEOUT = 2          # 线程关闭超时（秒）
+    """缓存配置类（向后兼容）"""
+    DEFAULT_TTL = CacheConsts.DEFAULT_TTL
+    DEFAULT_REFRESH_INTERVAL = CacheConsts.DEFAULT_REFRESH_INTERVAL
+    SHUTDOWN_TIMEOUT = CacheConsts.SHUTDOWN_TIMEOUT
 
 
 class BaseCachedFetcher:
@@ -31,19 +33,20 @@ class BaseCachedFetcher:
     - _fetch_data(): 实际获取数据的方法
     """
 
-    # 类变量，由子类继承
-    _cache_lock = threading.Lock()
-    _cache = None
-    _cache_time = None
+    # 类级别配置常量（由子类继承）
     _cache_ttl = CacheConfig.DEFAULT_TTL
     _refresh_interval = CacheConfig.DEFAULT_REFRESH_INTERVAL
-    _refresh_thread = None
-    _running = False
-    _initialized = False
-    _data_manager = None
 
     def __init__(self, config: Optional[Dict] = None):
         self._config = config or {}
+        # 实例变量，避免类变量共享状态导致的并发问题
+        self._cache_lock = threading.Lock()
+        self._cache = None
+        self._cache_time = None
+        self._refresh_thread = None
+        self._running = False
+        self._initialized = False
+        self._data_manager = None
         self._ensure_initialized()
 
     def _ensure_initialized(self):

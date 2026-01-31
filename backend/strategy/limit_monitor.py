@@ -41,6 +41,7 @@ from backend.strategy.etf_selector import ETFSelector
 from backend.strategy.signal_generator import SignalGenerator
 from backend.strategy.signal_repository import FileSignalRepository
 from backend.strategy.signal_evaluators import SignalEvaluatorFactory
+from backend.utils.code_utils import normalize_stock_code
 
 from config import Config
 
@@ -105,7 +106,8 @@ class LimitUpMonitor:
         self._etf_selector = ETFSelector(
             etf_holder_provider,
             etf_holdings_provider,
-            min_weight=self.config.strategy.min_weight
+            min_weight=self.config.strategy.min_weight,
+            etf_categories_config=self.config.etf_categories
         )
 
         self._signal_generator = SignalGenerator(
@@ -170,24 +172,6 @@ class LimitUpMonitor:
         """获取所有相关ETF代码"""
         return self._etf_selector.get_all_etf_codes()
 
-    @staticmethod
-    def normalize_stock_code(stock_code: str) -> str:
-        """
-        标准化股票代码，去掉市场前缀
-
-        Args:
-            stock_code: 股票代码，可能带前缀如 sh688319, sz000001
-
-        Returns:
-            纯数字股票代码，如 688319, 000001
-        """
-        prefixes = ['sh', 'sz', 'bj']
-        code = stock_code.lower()
-        for prefix in prefixes:
-            if code.startswith(prefix):
-                return code[2:]
-        return stock_code
-
     def find_related_etfs(self, stock_code: str) -> List[dict]:
         """
         找到与股票相关的ETF（用于API展示）
@@ -195,7 +179,7 @@ class LimitUpMonitor:
         Returns:
             [{etf_code, etf_name, weight, category}, ...]
         """
-        normalized_code = self.normalize_stock_code(stock_code)
+        normalized_code = normalize_stock_code(stock_code)
         return self._etf_selector.find_related_etfs(normalized_code)
 
     def find_related_etfs_with_real_weight(self, stock_code: str) -> List[dict]:
@@ -207,7 +191,7 @@ class LimitUpMonitor:
         Returns:
             [{etf_code, etf_name, weight, rank, in_top10, top10_ratio}, ...]
         """
-        normalized_code = self.normalize_stock_code(stock_code)
+        normalized_code = normalize_stock_code(stock_code)
         etf_refs = self._etf_selector.find_eligible_etfs(normalized_code)
 
         return [

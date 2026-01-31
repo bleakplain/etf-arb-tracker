@@ -52,7 +52,7 @@ data_sources:
   tushare:
     enabled: false
     priority: 10
-    token: "9baaa340c9eab5557513572741005eb35c07b52687093a1fa99ac956"
+    token: "${TUSHARE_TOKEN:}"  # 从环境变量读取，格式: ${VAR_NAME:default_value}
     description: "Tushare专业版，需要token，支持财务数据、历史数据"
 
   # ETF持仓数据源
@@ -138,6 +138,35 @@ risk_control:
 
   # 持仓天数上限
   max_hold_days: 3
+
+# ETF分类配置（按代码分类，用于ETF选择策略）
+etf_categories:
+  # 宽基指数ETF
+  broad_index:
+    - "510300"  # 沪深300ETF
+    - "510500"  # 中证500ETF
+    - "510050"  # 上证50ETF
+    - "159915"  # 创业板ETF
+    - "588000"  # 科创50ETF
+    - "159901"  # 深100ETF
+    - "512100"  # 中证1000ETF
+    - "588200"  # 科创板ETF
+  # 科技类ETF
+  tech:
+    - "159995"  # 芯片ETF
+    - "512480"  # 计算机ETF
+    - "515000"  # 5G ETF
+    - "516160"  # 新能源车ETF
+    - "515790"  # 光伏ETF
+  # 消费类ETF
+  consumer:
+    - "512590"  # 食品饮料ETF
+    - "159928"  # 消费ETF
+    - "512170"  # 医疗ETF
+  # 金融类ETF
+  financial:
+    - "512880"  # 证券ETF
+    - "512800"  # 银行ETF
 
 # 信号评估配置
 signal_evaluation:
