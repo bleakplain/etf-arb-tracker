@@ -947,6 +947,17 @@
                                         </select>
                                         <small class="text-secondary">历史持仓权重的插值方式</small>
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                            快速测试模式
+                                            <span class="badge bg-info ms-2">可选</span>
+                                        </label>
+                                        <input type="number" class="form-control" id="backtestMaxStocks"
+                                               value="0" min="0" max="1000" step="10" placeholder="0=不限制">
+                                        <small class="text-secondary">
+                                            限制股票数量（0=不限制）。设置较小值（如50）可大幅加快回测速度用于测试
+                                        </small>
+                                    </div>
                                     <div class="d-grid gap-2">
                                         <button type="button" class="btn btn-primary" onclick="startBacktest()">
                                             <i class="bi bi-play-fill"></i> 开始回测
@@ -2145,6 +2156,7 @@
             const minWeight = parseFloat(document.getElementById('backtestMinWeight').value);
             const evaluator = document.getElementById('backtestEvaluator').value;
             const interpolation = document.getElementById('backtestInterpolation').value;
+            const maxStocks = parseInt(document.getElementById('backtestMaxStocks').value) || 0;
 
             if (!startDate || !endDate) {
                 showToastMessage('请选择开始和结束日期', 'warning');
@@ -2165,7 +2177,8 @@
                         granularity: granularity,
                         min_weight: minWeight,
                         evaluator_type: evaluator,
-                        interpolation: interpolation
+                        interpolation: interpolation,
+                        max_stocks: maxStocks
                     })
                 });
 
@@ -2173,7 +2186,8 @@
 
                 if (response.ok) {
                     currentBacktestId = result.backtest_id;
-                    showToastMessage('回测任务已启动', 'success');
+                    const modeText = maxStocks > 0 ? ` (快速测试模式: ${maxStocks}只股票)` : '';
+                    showToastMessage('回测任务已启动' + modeText, 'success');
 
                     // 显示当前回测卡片
                     document.getElementById('currentBacktestCard').style.display = 'block';
@@ -2615,7 +2629,17 @@
 
                     <!-- 详细信号列表 -->
                     <div class="data-detail-card">
-                        <h6><i class="bi bi-list-ul"></i> 信号详情列表 (显示前 20 条)</h6>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0"><i class="bi bi-list-ul"></i> 信号详情列表 (显示前 20 条)</h6>
+                            <div>
+                                <button class="btn btn-sm btn-outline-success me-2" onclick="exportBacktestSignals('${jobId}')">
+                                    <i class="bi bi-download"></i> 导出CSV
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary" onclick="exportBacktestJSON('${jobId}')">
+                                    <i class="bi bi-file-code"></i> 导出JSON
+                                </button>
+                            </div>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-sm backtest-signal-table">
                                 <thead>
@@ -2628,6 +2652,7 @@
                                         <th>置信度</th>
                                         <th>风险</th>
                                         <th>距收盘</th>
+                                        <th>操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2657,6 +2682,63 @@
                             <td><span class="badge bg-${confidenceClass}">${signal.confidence}</span></td>
                             <td><span class="badge bg-${riskClass}">${signal.risk_level}</span></td>
                             <td><span>${timeToClose}</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary py-0" onclick="toggleSignalDetail('${index}')">
+                                    <i class="bi bi-chevron-down" id="icon-${index}"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr id="detail-${index}" style="display: none;">
+                            <td colspan="9" class="p-3">
+                                <div class="card" style="background-color: var(--bg-hover);">
+                                    <div class="card-body">
+                                        <h6 class="card-title mb-3">信号详情 #${index + 1}</h6>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6 class="small text-primary mb-2">📊 涨停信息</h6>
+                                                <ul class="small mb-3">
+                                                    <li>股票名称：<strong>${signal.stock_name}</strong></li>
+                                                    <li>股票代码：<code>${signal.stock_code}</code></li>
+                                                    <li>涨停时间：<strong>${signal.timestamp}</strong></li>
+                                                    ${signal.limit_price ? `<li>涨停价格：<strong>${signal.limit_price}</strong> 元</li>` : ''}
+                                                    ${signal.change_pct ? `<li>涨跌幅：<strong class="text-up">${signal.change_pct}%</strong></li>` : ''}
+                                                </ul>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6 class="small text-primary mb-2">💼 ETF 信息</h6>
+                                                <ul class="small mb-3">
+                                                    <li>ETF名称：<strong>${signal.etf_name}</strong></li>
+                                                    <li>ETF代码：<code>${signal.etf_code}</code></li>
+                                                    <li>持仓权重：<strong class="text-up">${weight}</strong></li>
+                                                    ${signal.etf_category ? `<li>ETF类型：<span class="badge bg-info">${signal.etf_category}</span></li>` : ''}
+                                                    ${signal.is_top10 ? `<li>前十大持仓：<span class="badge bg-success">是</span></li>` : ''}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6 class="small text-primary mb-2">📈 市场数据</h6>
+                                                <ul class="small mb-3">
+                                                    ${signal.stock_volume ? `<li>股票成交量：<strong>${(signal.stock_volume / 10000).toFixed(0)}</strong> 万股</li>` : ''}
+                                                    ${signal.stock_amount ? `<li>股票成交额：<strong>${(signal.stock_amount / 100000000).toFixed(2)}</strong> 亿元</li>` : ''}
+                                                    ${signal.etf_volume ? `<li>ETF成交量：<strong>${(signal.etf_volume / 10000).toFixed(0)}</strong> 万股</li>` : ''}
+                                                    ${signal.etf_amount ? `<li>ETF成交额：<strong>${(signal.etf_amount / 100000000).toFixed(2)}</strong> 亿元</li>` : ''}
+                                                </ul>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6 class="small text-primary mb-2">🎯 评估详情</h6>
+                                                <ul class="small mb-3">
+                                                    <li>置信度：<span class="badge bg-${confidenceClass}">${signal.confidence}</span></li>
+                                                    <li>风险等级：<span class="badge bg-${riskClass}">${signal.risk_level}</span></li>
+                                                    <li>距收盘：<strong>${timeToClose}</strong></li>
+                                                    ${signal.score ? `<li>综合评分：<strong>${signal.score.toFixed(1)}</strong> / 100</li>` : ''}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        ${signal.reason ? `<div class="mt-2"><small class="text-secondary"><i class="bi bi-info-circle"></i> <strong>理由：</strong>${signal.reason}</small></div></div>` : ''}
+                                    </div>
+                                </div>
+                            </td>
                         </tr>
                     `;
                 });
@@ -2763,6 +2845,103 @@
         // 隐藏回测结果
         function hideBacktestResult() {
             document.getElementById('backtestResultCard').style.display = 'none';
+        }
+
+        // 展开/收起信号详情
+        function toggleSignalDetail(index) {
+            const detailRow = document.getElementById(`detail-${index}`);
+            const icon = document.getElementById(`icon-${index}`);
+
+            if (detailRow.style.display === 'none') {
+                detailRow.style.display = 'table-row';
+                icon.classList.remove('bi-chevron-down');
+                icon.classList.add('bi-chevron-up');
+            } else {
+                detailRow.style.display = 'none';
+                icon.classList.remove('bi-chevron-up');
+                icon.classList.add('bi-chevron-down');
+            }
+        }
+
+        // 导出回测信号为CSV
+        async function exportBacktestSignals(jobId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/backtest/${jobId}/signals`);
+                if (!response.ok) {
+                    showToastMessage('获取信号数据失败', 'danger');
+                    return;
+                }
+
+                const data = await response.json();
+                const signals = data.signals || [];
+
+                if (signals.length === 0) {
+                    showToastMessage('没有信号数据可导出', 'warning');
+                    return;
+                }
+
+                // 生成CSV内容
+                const headers = ['序号', '时间', '股票代码', '股票名称', 'ETF代码', 'ETF名称', '持仓权重', '置信度', '风险等级', '距收盘(分钟)', '涨跌幅(%)'];
+                let csv = headers.join(',') + '\n';
+
+                signals.forEach((signal, index) => {
+                    const row = [
+                        index + 1,
+                        signal.timestamp || '',
+                        signal.stock_code || '',
+                        signal.stock_name || '',
+                        signal.etf_code || '',
+                        signal.etf_name || '',
+                        signal.etf_weight ? (signal.etf_weight * 100).toFixed(2) + '%' : '',
+                        signal.confidence || '',
+                        signal.risk_level || '',
+                        signal.time_to_close || '',
+                        signal.change_pct || ''
+                    ];
+                    csv += row.map(v => `"${v}"`).join(',') + '\n';
+                });
+
+                // 创建下载链接
+                const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `backtest_signals_${jobId}_${new Date().toISOString().slice(0,10)}.csv`;
+                link.click();
+                URL.revokeObjectURL(url);
+
+                showToastMessage('CSV导出成功', 'success');
+            } catch (error) {
+                console.error('导出CSV失败:', error);
+                showToastMessage('导出CSV失败: ' + error.message, 'danger');
+            }
+        }
+
+        // 导出回测结果为JSON
+        async function exportBacktestJSON(jobId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/backtest/${jobId}`);
+                if (!response.ok) {
+                    showToastMessage('获取回测结果失败', 'danger');
+                    return;
+                }
+
+                const result = await response.json();
+
+                // 创建下载链接
+                const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `backtest_result_${jobId}_${new Date().toISOString().slice(0,10)}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+
+                showToastMessage('JSON导出成功', 'success');
+            } catch (error) {
+                console.error('导出JSON失败:', error);
+                showToastMessage('导出JSON失败: ' + error.message, 'danger');
+            }
         }
 
         // 删除回测任务

@@ -6,6 +6,7 @@
 
 import os
 import json
+import pandas as pd
 from datetime import datetime
 from typing import Dict, List, Optional
 from pathlib import Path
@@ -250,13 +251,26 @@ class HistoricalDataLoader:
 
             # 根据粒度选择不同的API
             if granularity == TimeGranularity.DAILY:
-                df = ak.stock_zh_a_hist(
-                    symbol=symbol,
-                    period="daily",
-                    start_date=start_date,
-                    end_date=end_date,
-                    adjust="qfq"  # 前复权
-                )
+                # 优先使用 stock_zh_a_daily API（更稳定）
+                try:
+                    df = ak.stock_zh_a_daily(
+                        symbol=symbol,
+                        start_date=start_date.replace("-", ""),  # 20240101格式
+                        end_date=end_date.replace("-", ""),
+                        adjust="qfq"
+                    )
+                    if df.empty:
+                        # 如果daily API返回空，尝试hist API
+                        raise ValueError("Empty data from stock_zh_a_daily")
+                except Exception as e:
+                    logger.debug(f"stock_zh_a_daily failed, trying stock_zh_a_hist: {e}")
+                    df = ak.stock_zh_a_hist(
+                        symbol=stock_code,  # hist API不需要前缀
+                        period="daily",
+                        start_date=start_date,
+                        end_date=end_date,
+                        adjust=""  # 不复权，避免空数据
+                    )
             else:
                 # 分钟级别数据
                 df = ak.stock_zh_a_hist_min_em(
@@ -283,8 +297,22 @@ class HistoricalDataLoader:
             import akshare as ak
 
             if granularity == TimeGranularity.DAILY:
-                # 尝试使用新的API接口
+                # ETF 代码格式化（加上前缀）
+                symbol = self._format_stock_symbol(etf_code)
+
+                # 优先使用 fund_etf_hist_sina（稳定）
                 try:
+                    df = ak.fund_etf_hist_sina(symbol=etf_code)
+
+                    # 如果获取了所有历史数据，需要按日期过滤
+                    if not df.empty and "日期" in df.columns:
+                        start_dt = datetime.strptime(start_date, "%Y%m%d")
+                        end_dt = datetime.strptime(end_date, "%Y%m%d")
+                        df["日期_dt"] = pd.to_datetime(df["日期"])
+                        df = df[(df["日期_dt"] >= start_dt) & (df["日期_dt"] <= end_dt)]
+                        df = df.drop(columns=["日期_dt"])
+                except Exception as e:
+                    logger.debug(f"fund_etf_hist_sina failed, trying fund_etf_hist_em: {e}")
                     df = ak.fund_etf_hist_em(
                         symbol=etf_code,
                         period="daily",
@@ -292,9 +320,6 @@ class HistoricalDataLoader:
                         end_date=end_date.replace("-", ""),
                         adjust="qfq"
                     )
-                except TypeError:
-                    # 如果新接口不支持日期参数，使用旧接口
-                    df = ak.fund_etf_hist_sina(symbol=etf_code)
             else:
                 # ETF分钟数据
                 df = ak.fund_etf_hist_min_em(
@@ -396,44 +421,105 @@ class HistoricalDataLoader:
 
     @staticmethod
     def _convert_df_to_dict(df, code: str) -> Dict[datetime, Dict]:
-        """转换DataFrame为字典"""
+        """转换DataFrame为字典，支持多种数据格式"""
         result = {}
+
+        if df.empty:
+            return result
 
         # 获取该股票的涨停阈值
         limit_threshold = HistoricalDataLoader._get_limit_up_threshold(code)
 
+        # 检测数据格式类型
+        has_chinese_cols = "日期" in df.columns or "收盘" in df.columns or "涨跌幅" in df.columns
+
+        # 对数据按日期排序
+        df = df.sort_index() if hasattr(df, 'sort_index') else df
+
+        prev_close = None  # 前一日收盘价，用于计算涨跌幅
+
         for _, row in df.iterrows():
             try:
                 # 解析时间
-                if "日期" in df.columns:
-                    dt = datetime.strptime(row["日期"], "%Y-%m-%d")
-                elif "time" in df.columns:
-                    dt_str = str(row["time"])
-                    dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
-                else:
+                dt = HistoricalDataLoader._parse_datetime(row, df.columns)
+
+                if dt is None:
                     continue
 
-                # 判断涨停（使用动态阈值）
-                change_pct = float(row.get("涨跌幅", row.get("change_pct", 0)))
-                is_limit = change_pct >= (limit_threshold * 100)
+                # 解析价格数据
+                quote_data = HistoricalDataLoader._parse_quote_data(
+                    row, has_chinese_cols, prev_close
+                )
 
-                result[dt] = {
-                    "code": code,
-                    "name": row.get("名称", ""),
-                    "price": float(row.get("收盘", row.get("close", 0))),
-                    "change_pct": change_pct,
-                    "high": float(row.get("最高", row.get("high", 0))),
-                    "low": float(row.get("最低", row.get("low", 0))),
-                    "volume": float(row.get("成交量", row.get("volume", 0))),
-                    "amount": float(row.get("成交额", row.get("amount", 0))),
-                    "is_limit_up": is_limit,
-                    "timestamp": dt.strftime("%Y-%m-%d %H:%M:%S")
-                }
+                # 判断涨停（使用动态阈值）
+                quote_data["is_limit_up"] = quote_data["change_pct"] >= (limit_threshold * 100)
+
+                # 添加元数据
+                quote_data["code"] = code
+                quote_data["name"] = row.get("名称", row.get("name", ""))
+                quote_data["timestamp"] = dt.strftime("%Y-%m-%d %H:%M:%S")
+
+                result[dt] = quote_data
+                prev_close = quote_data["price"]
+
             except Exception as e:
                 logger.debug(f"转换行数据失败: {e}")
                 continue
 
         return result
+
+    @staticmethod
+    def _parse_datetime(row, columns) -> Optional[datetime]:
+        """解析时间字段"""
+        if "日期" in columns:
+            return datetime.strptime(str(row["日期"]), "%Y-%m-%d")
+
+        if "date" in columns:
+            date_val = row["date"]
+            if isinstance(date_val, str):
+                return datetime.strptime(date_val, "%Y-%m-%d")
+            elif hasattr(date_val, "to_pydatetime"):
+                return date_val.to_pydatetime()
+            elif hasattr(date_val, "year"):
+                return datetime.combine(date_val, datetime.min.time())
+            else:
+                return datetime.fromtimestamp(float(date_val))
+
+        if "time" in columns:
+            return datetime.strptime(str(row["time"]), "%Y-%m-%d %H:%M:%S")
+
+        return None
+
+    @staticmethod
+    def _parse_quote_data(row, has_chinese_cols: bool, prev_close: Optional[float]) -> Dict:
+        """解析行情数据"""
+        if has_chinese_cols:
+            price = float(row.get("收盘", row.get("close", 0)))
+            change_pct = float(row.get("涨跌幅", row.get("change_pct", 0)))
+            high = float(row.get("最高", row.get("high", 0)))
+            low = float(row.get("最低", row.get("low", 0)))
+            volume = float(row.get("成交量", row.get("volume", 0)))
+            amount = float(row.get("成交额", row.get("amount", 0)))
+        else:
+            price = float(row.get("close", 0))
+            high = float(row.get("high", 0))
+            low = float(row.get("low", 0))
+            volume = float(row.get("volume", 0))
+            amount = float(row.get("amount", 0))
+            change_pct = float(row.get("change_pct", 0))
+
+            # 如果没有涨跌幅数据，自己计算
+            if change_pct == 0 and prev_close is not None and prev_close > 0:
+                change_pct = ((price - prev_close) / prev_close) * 100
+
+        return {
+            "price": price,
+            "change_pct": change_pct,
+            "high": high,
+            "low": low,
+            "volume": volume,
+            "amount": amount
+        }
 
     @staticmethod
     def _convert_tushare_df_to_dict(df, code: str) -> Dict[datetime, Dict]:

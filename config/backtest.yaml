@@ -10,6 +10,15 @@ time_granularity: "daily"
 # 是否使用config/stocks.yaml中的自选股
 use_watchlist: true
 
+# 回测性能选项（用于快速测试）
+performance:
+  # 最大股票数量限制（0表示不限制）
+  # 设置较小的值（如50）可以大幅加快回测速度用于测试
+  max_stocks: 0
+
+  # 最大ETF数量限制（0表示不限制）
+  max_etfs: 0
+
 # ETF持仓快照配置
 holdings_snapshots:
   # 快照日期列表（YYYYMMDD格式）

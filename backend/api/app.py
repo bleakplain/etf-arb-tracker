@@ -113,6 +113,8 @@ class BacktestRequest(BaseModel):
     min_weight: Optional[float] = None
     evaluator_type: str = "default"
     interpolation: str = "linear"
+    max_stocks: Optional[int] = 0  # 0表示不限制，用于快速测试
+    max_etfs: Optional[int] = 0    # 0表示不限制
 
     @validator('start_date', 'end_date')
     def validate_date_format(cls, v):
@@ -742,6 +744,40 @@ class AddStockRequest(BaseModel):
         return v
 
 
+def _load_watchlist_config() -> Dict:
+    """加载自选股配置"""
+    import yaml
+    from pathlib import Path
+
+    stocks_file = Path("config/stocks.yaml")
+    if stocks_file.exists():
+        with open(stocks_file, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f) or {}
+    return {}
+
+
+def _save_watchlist_config(config: Dict) -> None:
+    """保存自选股配置"""
+    import yaml
+    from pathlib import Path
+
+    stocks_file = Path("config/stocks.yaml")
+    with open(stocks_file, 'w', encoding='utf-8') as f:
+        yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+
+def _clear_monitor_cache() -> None:
+    """清除监控器和配置缓存"""
+    global _monitor_instance
+    _monitor_instance = None
+
+    # 清除配置模块的全局缓存
+    from config import _config
+    if _config is not None:
+        import config
+        config._config = None
+
+
 @app.post("/api/watchlist/add")
 async def add_to_watchlist(request: AddStockRequest):
     """
@@ -753,20 +789,8 @@ async def add_to_watchlist(request: AddStockRequest):
     Returns:
         操作结果
     """
-    import yaml
-    from pathlib import Path
-
     try:
-        stocks_file = Path("config/stocks.yaml")
-
-        # 读取现有配置
-        if stocks_file.exists():
-            with open(stocks_file, 'r', encoding='utf-8') as f:
-                config = yaml.safe_load(f) or {}
-        else:
-            config = {}
-
-        # 获取现有列表
+        config = _load_watchlist_config()
         my_stocks = config.get('my_stocks', [])
 
         # 检查是否已存在
@@ -789,19 +813,11 @@ async def add_to_watchlist(request: AddStockRequest):
         my_stocks.append(new_stock)
         config['my_stocks'] = my_stocks
 
-        # 写回文件
-        with open(stocks_file, 'w', encoding='utf-8') as f:
-            yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        # 保存配置
+        _save_watchlist_config(config)
 
-        # 清除监控器缓存和全局配置缓存，强制重新加载
-        global _monitor_instance
-        _monitor_instance = None
-
-        # 清除配置模块的全局缓存
-        from config import _config
-        if _config is not None:
-            import config
-            config._config = None
+        # 清除缓存
+        _clear_monitor_cache()
 
         logger.info(f"已添加股票 {request.code} {request.name} 到自选列表")
 
@@ -826,18 +842,11 @@ async def remove_from_watchlist(code: str):
     Returns:
         操作结果
     """
-    import yaml
-    from pathlib import Path
-
     try:
-        stocks_file = Path("config/stocks.yaml")
+        config = _load_watchlist_config()
 
-        if not stocks_file.exists():
+        if not config:
             raise HTTPException(status_code=404, detail="配置文件不存在")
-
-        # 读取现有配置
-        with open(stocks_file, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f) or {}
 
         my_stocks = config.get('my_stocks', [])
 
@@ -850,19 +859,11 @@ async def remove_from_watchlist(code: str):
 
         config['my_stocks'] = my_stocks
 
-        # 写回文件
-        with open(stocks_file, 'w', encoding='utf-8') as f:
-            yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        # 保存配置
+        _save_watchlist_config(config)
 
-        # 清除监控器缓存和全局配置缓存，强制重新加载
-        global _monitor_instance
-        _monitor_instance = None
-
-        # 清除配置模块的全局缓存
-        from config import _config
-        if _config is not None:
-            import config
-            config._config = None
+        # 清除缓存
+        _clear_monitor_cache()
 
         logger.info(f"已从自选列表删除股票 {code}")
 
@@ -886,22 +887,11 @@ async def get_watchlist():
     Returns:
         自选股列表
     """
-    import yaml
-    from pathlib import Path
-
     try:
-        stocks_file = Path("config/stocks.yaml")
-
-        if not stocks_file.exists():
-            return {"my_stocks": []}
-
-        with open(stocks_file, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f) or {}
-
+        config = _load_watchlist_config()
         return {
             "my_stocks": config.get('my_stocks', [])
         }
-
     except Exception as e:
         logger.error(f"获取自选列表失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取失败: {e}")
@@ -975,6 +965,18 @@ async def start_backtest(request: BacktestRequest, background_tasks: BackgroundT
                 interpolation=request.interpolation
             )
 
+            # 应用股票数量限制（用于快速测试）
+            stocks = app_config.my_stocks
+            etf_codes = [e.code for e in app_config.watch_etfs]
+
+            if request.max_stocks and request.max_stocks > 0:
+                stocks = stocks[:request.max_stocks]
+                logger.info(f"限制股票数量为 {request.max_stocks} 用于快速测试")
+
+            if request.max_etfs and request.max_etfs > 0:
+                etf_codes = etf_codes[:request.max_etfs]
+                logger.info(f"限制ETF数量为 {request.max_etfs} 用于快速测试")
+
             # 创建进度回调（线程安全）
             def progress_callback(p: float):
                 # 直接更新进度（回测运行期间不会有并发修改）
@@ -989,8 +991,8 @@ async def start_backtest(request: BacktestRequest, background_tasks: BackgroundT
             # 创建回测引擎
             engine = BacktestEngine(
                 config=config,
-                stocks=app_config.my_stocks,
-                etf_codes=[e.code for e in app_config.watch_etfs],
+                stocks=stocks,
+                etf_codes=etf_codes,
                 app_config=app_config,
                 progress_callback=progress_callback
             )

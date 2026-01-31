@@ -62,13 +62,21 @@ class HistoricalQuoteFetcher(IQuoteFetcher):
         # 是否已加载数据
         self._loaded = False
 
-    def load_data(self) -> None:
-        """预加载所有历史数据"""
+    def load_data(self, progress_callback=None) -> None:
+        """
+        预加载所有历史数据
+
+        Args:
+            progress_callback: 进度回调函数，签名为 (loaded_count, total_count)
+        """
         if self._loaded:
             return
 
         logger.info("开始加载历史行情数据...")
         logger.info(f"股票: {len(self._stock_codes)}只, ETF: {len(self._etf_codes)}只")
+
+        total_count = len(self._stock_codes) + len(self._etf_codes)
+        loaded_count = 0
 
         # 加载股票数据
         for code in self._stock_codes:
@@ -81,6 +89,10 @@ class HistoricalQuoteFetcher(IQuoteFetcher):
             except Exception as e:
                 logger.warning(f"加载股票 {code} 数据失败: {e}")
 
+            loaded_count += 1
+            if progress_callback:
+                progress_callback(loaded_count, total_count)
+
         # 加载ETF数据
         for code in self._etf_codes:
             try:
@@ -91,6 +103,10 @@ class HistoricalQuoteFetcher(IQuoteFetcher):
                 logger.debug(f"加载ETF {code} 数据: {len(data)}条记录")
             except Exception as e:
                 logger.warning(f"加载ETF {code} 数据失败: {e}")
+
+            loaded_count += 1
+            if progress_callback:
+                progress_callback(loaded_count, total_count)
 
         total_records = sum(len(d) for d in self._stock_data.values()) + \
                         sum(len(d) for d in self._etf_data.values())
@@ -275,16 +291,12 @@ class HistoricalQuoteFetcher(IQuoteFetcher):
 
         # 精确匹配日期
         if self._current_time in history:
-            quote = history[self._current_time].copy()
-            quote["code"] = code
-            return quote
+            return self._copy_quote_with_code(history[self._current_time], code)
 
         # 尝试找到同一天的数据（时间可能不同）
         for dt, quote in history.items():
             if dt.date() == current_date:
-                result = quote.copy()
-                result["code"] = code
-                return result
+                return self._copy_quote_with_code(quote, code)
 
         return None
 
@@ -296,22 +308,36 @@ class HistoricalQuoteFetcher(IQuoteFetcher):
     ) -> Optional[Dict]:
         """查找分钟级别行情（找最接近的）"""
         # 找到时间差最小的数据
+        best_dt, min_delta = self._find_closest_datetime(history.keys())
+
+        # 如果时间差超过1小时，认为没有有效数据
+        if best_dt and min_delta <= 3600:
+            return self._copy_quote_with_code(history[best_dt], code)
+
+        return None
+
+    @staticmethod
+    def _copy_quote_with_code(quote: Dict, code: str) -> Dict:
+        """复制行情数据并添加代码"""
+        result = quote.copy()
+        result["code"] = code
+        return result
+
+    def _find_closest_datetime(
+        self,
+        datetimes: Dict[datetime, Dict].keys()
+    ) -> tuple:
+        """找到最接近当前时间的时间点"""
         best_dt = None
         min_delta = float('inf')
 
-        for dt in history.keys():
+        for dt in datetimes:
             delta = abs((dt - self._current_time).total_seconds())
             if delta < min_delta:
                 min_delta = delta
                 best_dt = dt
 
-        # 如果时间差超过1小时，认为没有有效数据
-        if best_dt and min_delta <= 3600:
-            quote = history[best_dt].copy()
-            quote["code"] = code
-            return quote
-
-        return None
+        return best_dt, min_delta
 
     @staticmethod
     def _normalize_code(code: str) -> str:

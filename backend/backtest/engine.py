@@ -176,7 +176,12 @@ class BacktestEngine:
         try:
             # 1. 初始化历史行情获取器
             stock_codes = [s.code for s in self.stocks]
+            total_symbols = len(stock_codes) + len(self.etf_codes)
             logger.info(f"需要加载 {len(stock_codes)} 只股票和 {len(self.etf_codes)} 个ETF的历史数据")
+
+            # 报告初始化进度
+            if self.progress_callback:
+                self.progress_callback(0.1)  # 初始化阶段 10%
 
             self.quote_fetcher = HistoricalQuoteFetcher(
                 stock_codes=stock_codes,
@@ -187,8 +192,20 @@ class BacktestEngine:
             )
 
             try:
-                self.quote_fetcher.load_data()
+                # 创建进度回调用于数据加载
+                def load_progress(loaded: int, total: int):
+                    if self.progress_callback:
+                        # 数据加载占总进度的 30% (10%-40%)
+                        load_progress = 0.1 + (loaded / total) * 0.3
+                        self.progress_callback(min(load_progress, 0.4))
+                    if loaded % 50 == 0 or loaded == total:
+                        logger.info(f"数据加载进度: {loaded}/{total} ({loaded*100//total if total > 0 else 0}%)")
+
+                self.quote_fetcher.load_data(progress_callback=load_progress)
                 logger.info("历史行情数据加载完成")
+
+                if self.progress_callback:
+                    self.progress_callback(0.4)  # 数据加载完成 40%
             except Exception as e:
                 logger.error(
                     f"历史数据加载失败: {e}\n"
@@ -205,10 +222,13 @@ class BacktestEngine:
                 logger.info("持仓快照加载完成")
             except Exception as e:
                 logger.warning(
-                    f"持仓快照加载失败（将使用空持仓）: {e}\n"
+                    f"持仓快照加载失败（将使用模拟持仓数据）: {e}\n"
                     f"堆栈信息:\n{traceback.format_exc()}"
                 )
-                # 不中断回测，继续使用空持仓
+                # 不中断回测，继续使用模拟持仓
+
+            if self.progress_callback:
+                self.progress_callback(0.5)  # 持仓加载完成 50%
 
             # 3. 初始化策略组件
             try:
@@ -237,6 +257,9 @@ class BacktestEngine:
                     f"堆栈信息:\n{traceback.format_exc()}"
                 )
                 raise RuntimeError(f"策略组件初始化失败: {e}") from e
+
+            if self.progress_callback:
+                self.progress_callback(0.6)  # 策略组件初始化完成 60%
 
             logger.info("=" * 60)
 
@@ -268,6 +291,10 @@ class BacktestEngine:
             total_steps = self._estimate_total_steps()
             current_step = 0
 
+            # 回测执行阶段占总进度的 40% (60%-100%)
+            start_progress = 0.6
+            progress_range = 0.4
+
             while self.clock.has_next():
                 try:
                     # 推进时间
@@ -286,14 +313,16 @@ class BacktestEngine:
                     # 更新进度
                     current_step += 1
                     if self.progress_callback and total_steps > 0:
-                        progress = current_step / total_steps
-                        self.progress_callback(min(progress, 1.0))
+                        progress = start_progress + (current_step / total_steps) * progress_range
+                        self.progress_callback(min(progress, 0.99))  # 保留1%给结果生成
 
                     # 日级别输出进度
                     if self.config.time_granularity == TimeGranularity.DAILY:
+                        signal_count = self.signal_recorder.get_signal_count()
+                        progress_pct = int(current_step * 100 / total_steps) if total_steps > 0 else 0
                         logger.info(
-                            f"进度: {self.clock.current_date_str} "
-                            f"({self.signal_recorder.get_signal_count()} 个信号)"
+                            f"进度: {self.clock.current_date_str} ({progress_pct}%) - "
+                            f"累计 {signal_count} 个信号"
                         )
 
                 except Exception as e:
@@ -306,8 +335,11 @@ class BacktestEngine:
 
             # 生成结果
             logger.info("=" * 60)
-            logger.info("回测完成")
+            logger.info("回测完成，生成结果...")
             logger.info("=" * 60)
+
+            if self.progress_callback:
+                self.progress_callback(1.0)
 
             return self._generate_result()
 
@@ -417,60 +449,88 @@ class BacktestEngine:
             },
             "trading_calendar": {
                 "total_days": len(self.clock.trading_calendar),
-                "trading_days": list(self.clock.trading_calendar)[:10],  # 前10个交易日
+                "trading_days": list(self.clock.trading_calendar)[:10],
                 "description": f"共{len(self.clock.trading_calendar)}个交易日"
             },
             "scan_details": {
-                "total_scans": 0,
-                "stocks_with_limit_up": 0,
+                "total_scans": len(self.clock.trading_calendar) * len(self.stocks),
+                "stocks_with_limit_up": len(
+                    set(s.stock_code for s in self.signal_recorder.get_signals())
+                ),
                 "signals_generated": len(self.signal_recorder.get_signals())
             }
         }
 
-        # 收集股票数据详情
         if self.quote_fetcher:
-            for stock in self.stocks:
-                stock_data = self.quote_fetcher.stock_data.get(stock.code)
-                if stock_data is not None and not stock_data.empty:
-                    details["data_source"]["stocks_data"][stock.code] = {
-                        "name": stock.name,
-                        "data_points": len(stock_data),
-                        "date_range": {
-                            "start": stock_data.index[0].strftime("%Y-%m-%d"),
-                            "end": stock_data.index[-1].strftime("%Y-%m-%d")
-                        }
-                    }
+            # 收集股票数据详情（限制前10个）
+            self._collect_quote_details(
+                self.quote_fetcher._stock_data,
+                self.stocks[:10],
+                details["data_source"]["stocks_data"]
+            )
 
-            # 收集ETF数据详情
-            for etf_code in self.etf_codes[:20]:  # 限制前20个ETF避免数据过大
-                etf_data = self.quote_fetcher.etf_data.get(etf_code)
-                if etf_data is not None and not etf_data.empty:
-                    details["data_source"]["etfs_data"][etf_code] = {
-                        "data_points": len(etf_data),
-                        "date_range": {
-                            "start": etf_data.index[0].strftime("%Y-%m-%d"),
-                            "end": etf_data.index[-1].strftime("%Y-%m-%d")
-                        }
-                    }
+            # 收集ETF数据详情（限制前10个）
+            self._collect_etf_details(
+                self.quote_fetcher._etf_data,
+                self.etf_codes[:10],
+                details["data_source"]["etfs_data"]
+            )
 
-        # 收集持仓快照详情
+        # 收集持仓快照详情（限制前10个股票）
         if self.holdings_manager:
-            for stock in self.stocks[:10]:  # 限制前10个股票
+            for stock in self.stocks[:10]:
                 snapshots = self.holdings_manager.snapshots.get(stock.code, {})
                 if snapshots:
                     details["data_source"]["holdings_snapshots"][stock.code] = {
                         "name": stock.name,
                         "snapshot_count": len(snapshots),
-                        "snapshot_dates": sorted(list(snapshots.keys()))[:5]  # 前5个快照日期
+                        "snapshot_dates": sorted(list(snapshots.keys()))[:5]
                     }
 
-        # 扫描详情统计
-        details["scan_details"]["total_scans"] = len(self.clock.trading_calendar) * len(self.stocks)
-        details["scan_details"]["stocks_with_limit_up"] = len(
-            set(s.stock_code for s in self.signal_recorder.get_signals())
-        )
-
         return details
+
+    def _collect_quote_details(
+        self,
+        data_source: Dict,
+        stocks: List[Stock],
+        output: Dict
+    ) -> None:
+        """收集股票行情数据详情"""
+        for stock in stocks:
+            stock_data = data_source.get(stock.code)
+            if not stock_data:
+                continue
+
+            dates = list(stock_data.keys())
+            output[stock.code] = {
+                "name": stock.name,
+                "data_points": len(stock_data),
+                "date_range": {
+                    "start": dates[0].strftime("%Y-%m-%d") if dates else "N/A",
+                    "end": dates[-1].strftime("%Y-%m-%d") if dates else "N/A"
+                }
+            }
+
+    def _collect_etf_details(
+        self,
+        data_source: Dict,
+        etf_codes: List[str],
+        output: Dict
+    ) -> None:
+        """收集ETF行情数据详情"""
+        for etf_code in etf_codes:
+            etf_data = data_source.get(etf_code)
+            if not etf_data:
+                continue
+
+            dates = list(etf_data.keys())
+            output[etf_code] = {
+                "data_points": len(etf_data),
+                "date_range": {
+                    "start": dates[0].strftime("%Y-%m-%d") if dates else "N/A",
+                    "end": dates[-1].strftime("%Y-%m-%d") if dates else "N/A"
+                }
+            }
 
     def get_progress(self) -> float:
         """获取当前进度"""
