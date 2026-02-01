@@ -684,6 +684,7 @@
             padding: 6px 12px;
         }
     </style>
+    <link rel="stylesheet" href="css/backtest-wizard.css">
 </head>
 <body>
     <!-- 导航栏 -->
@@ -896,189 +897,190 @@
                 </div>
             </div>
 
-            <!-- 回测标签页 -->
+            <!-- 回测标签页 - 向导式 -->
             <div class="tab-pane fade" id="backtest">
-                <div class="row">
-                    <!-- 回测配置面板 -->
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <i class="bi bi-gear"></i> 回测配置
+                <div class="container-fluid">
+                    <!-- 向导进度指示器 -->
+                    <div class="wizard-progress mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="wizard-step active" data-step="1">
+                                <div class="step-number">1</div>
+                                <div class="step-label">选择时间</div>
                             </div>
-                            <div class="card-body">
-                                <form id="backtestForm">
-                                    <div class="mb-3">
-                                        <label class="form-label">开始日期</label>
-                                        <input type="date" class="form-control" id="backtestStartDate" required>
-                                        <small class="text-secondary">格式: YYYY-MM-DD</small>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">结束日期</label>
-                                        <input type="date" class="form-control" id="backtestEndDate" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">时间粒度</label>
-                                        <select class="form-select" id="backtestGranularity">
-                                            <option value="daily" selected>日级别</option>
-                                            <option value="5m">5分钟</option>
-                                            <option value="15m">15分钟</option>
-                                            <option value="30m">30分钟</option>
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">最小持仓权重</label>
-                                        <input type="number" class="form-control" id="backtestMinWeight"
-                                               value="0.05" min="0.01" max="1" step="0.01">
-                                        <small class="text-secondary">ETF中股票持仓占比最小值</small>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">评估器类型</label>
-                                        <select class="form-select" id="backtestEvaluator">
-                                            <option value="default" selected>默认</option>
-                                            <option value="conservative">保守</option>
-                                            <option value="aggressive">激进</option>
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">插值方式</label>
-                                        <select class="form-select" id="backtestInterpolation">
-                                            <option value="linear" selected>线性插值</option>
-                                            <option value="step">阶梯插值</option>
-                                        </select>
-                                        <small class="text-secondary">历史持仓权重的插值方式</small>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">
-                                            快速测试模式
-                                            <span class="badge bg-info ms-2">可选</span>
-                                        </label>
-                                        <input type="number" class="form-control" id="backtestMaxStocks"
-                                               value="0" min="0" max="1000" step="10" placeholder="0=不限制">
-                                        <small class="text-secondary">
-                                            限制股票数量（0=不限制）。设置较小值（如50）可大幅加快回测速度用于测试
-                                        </small>
-                                    </div>
-                                    <div class="d-grid gap-2">
-                                        <button type="button" class="btn btn-primary" onclick="startBacktest()">
-                                            <i class="bi bi-play-fill"></i> 开始回测
-                                        </button>
-                                        <button type="button" class="btn btn-outline-secondary" onclick="loadBacktestJobs()">
-                                            <i class="bi bi-arrow-clockwise"></i> 刷新列表
-                                        </button>
-                                    </div>
-                                </form>
+                            <div class="wizard-connector"></div>
+                            <div class="wizard-step" data-step="2">
+                                <div class="step-number">2</div>
+                                <div class="step-label">配置策略</div>
                             </div>
-                        </div>
-
-                        <!-- 回测说明 -->
-                        <div class="card">
-                            <div class="card-header">
-                                <i class="bi bi-info-circle"></i> 使用说明
+                            <div class="wizard-connector"></div>
+                            <div class="wizard-step" data-step="3">
+                                <div class="step-number">3</div>
+                                <div class="step-label">预览数据</div>
                             </div>
-                            <div class="card-body">
-                                <h6>什么是回测？</h6>
-                                <p class="text-secondary small">
-                                    回测使用历史数据验证ETF套利策略的有效性。模拟器会：
-                                </p>
-                                <ul class="text-secondary small">
-                                    <li>加载历史K线数据</li>
-                                    <li>检查每日涨停股票</li>
-                                    <li>筛选符合条件的ETF</li>
-                                    <li>记录所有触发的信号</li>
-                                </ul>
-                                <h6 class="mt-3">CLI使用方式：</h6>
-                                <code class="d-block p-2 bg-dark text-secondary small">
-                                    python start.py backtest --start-date 20240101 --end-date 20241231
-                                </code>
+                            <div class="wizard-connector"></div>
+                            <div class="wizard-step" data-step="4">
+                                <div class="step-number">4</div>
+                                <div class="step-label">查看结果</div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- 回测结果区域 -->
-                    <div class="col-md-8">
-                        <!-- 当前回测状态 -->
-                        <div class="card" id="currentBacktestCard" style="display: none;">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <span>
-                                    <i class="bi bi-activity"></i> 当前回测
-                                    <span class="badge bg-primary ms-2" id="currentBacktestStatus">运行中</span>
-                                </span>
-                                <button class="btn btn-sm btn-outline-primary" onclick="checkCurrentBacktest()">
-                                    <i class="bi bi-arrow-clockwise"></i> 刷新状态
-                                </button>
-                            </div>
-                            <div class="card-body">
-                                <div class="progress mb-3" style="height: 25px;">
-                                    <div id="backtestProgressBar" class="progress-bar progress-bar-striped progress-bar-animated"
-                                         role="progressbar" style="width: 0%">0%</div>
+                    <!-- 向导内容区域 -->
+                    <div class="wizard-content">
+                        <!-- Step 1: 日期选择 -->
+                        <div class="wizard-step-panel active" id="wizard-step-1">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0"><i class="bi bi-calendar3"></i> 选择回测时间范围</h5>
                                 </div>
-                                <div class="row text-center">
-                                    <div class="col-3">
-                                        <div class="metric-value" id="backtestSignalCount">-</div>
-                                        <div class="metric-label">信号数</div>
+                                <div class="card-body">
+                                    <div class="row mb-4">
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">快捷选择</label>
+                                            <div class="d-flex gap-2 flex-wrap">
+                                                <button class="btn btn-outline-primary date-preset" data-months="1">近1个月</button>
+                                                <button class="btn btn-outline-primary date-preset" data-months="3">近3个月</button>
+                                                <button class="btn btn-outline-primary date-preset" data-months="6">近6个月</button>
+                                                <button class="btn btn-outline-primary date-preset" data-months="12">近1年</button>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="col-3">
-                                        <div class="metric-value" id="backtestHighConf">-</div>
-                                        <div class="metric-label">高置信</div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label for="wizard-start-date" class="form-label">开始日期</label>
+                                            <input type="date" class="form-control" id="wizard-start-date" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="wizard-end-date" class="form-label">结束日期</label>
+                                            <input type="date" class="form-control" id="wizard-end-date" required>
+                                        </div>
                                     </div>
-                                    <div class="col-3">
-                                        <div class="metric-value" id="backtestMediumConf">-</div>
-                                        <div class="metric-label">中置信</div>
+                                    <div class="mt-3">
+                                        <small class="text-secondary" id="trading-days-hint">
+                                            <i class="bi bi-info-circle"></i> 预计需要处理约 - 个交易日
+                                        </small>
                                     </div>
-                                    <div class="col-3">
-                                        <div class="metric-value" id="backtestLowConf">-</div>
-                                        <div class="metric-label">低置信</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: 策略配置 -->
+                        <div class="wizard-step-panel" id="wizard-step-2">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0"><i class="bi bi-sliders"></i> 配置策略参数</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row mb-4">
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">选择策略模板</label>
+                                            <div class="row g-3" id="strategy-templates">
+                                                <!-- Templates will be loaded dynamically -->
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="accordion" id="advanced-options">
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options-body">
+                                                    <i class="bi bi-gear me-2"></i> 高级选项
+                                                </button>
+                                            </h2>
+                                            <div id="advanced-options-body" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
+                                                <div class="accordion-body">
+                                                    <div class="row g-3">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">最小持仓权重 (%)</label>
+                                                            <input type="number" class="form-control" id="wizard-min-weight" step="0.01" min="0" max="100">
+                                                            <small class="text-secondary">ETF持有该股票的比例必须≥此值才会产生信号</small>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">信号评估器</label>
+                                                            <select class="form-select" id="wizard-evaluator">
+                                                                <option value="default">平衡型</option>
+                                                                <option value="conservative">保守型</option>
+                                                                <option value="aggressive">激进型</option>
+                                                            </select>
+                                                            <small class="text-secondary">控制信号的置信度评分标准</small>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">最小ETF成交额 (万元)</label>
+                                                            <input type="number" class="form-control" id="wizard-min-volume" step="100" min="0">
+                                                            <small class="text-secondary">确保ETF有足够流动性可以交易</small>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">持仓插值方式</label>
+                                                            <select class="form-select" id="wizard-interpolation">
+                                                                <option value="linear">线性插值</option>
+                                                                <option value="step">阶梯插值</option>
+                                                            </select>
+                                                            <small class="text-secondary">季度快照之间的数据插值方式</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- 回测历史列表 -->
-                        <div class="card">
-                            <div class="card-header">
-                                <i class="bi bi-clock-history"></i> 回测历史
-                            </div>
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-hover mb-0 backtest-history-table">
-                                        <thead>
-                                            <tr>
-                                                <th>任务ID</th>
-                                                <th>日期范围</th>
-                                                <th>粒度</th>
-                                                <th>信号数</th>
-                                                <th>状态</th>
-                                                <th>操作</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="backtestJobsBody">
-                                            <tr>
-                                                <td colspan="6" class="text-center text-secondary py-5">
-                                                    <i class="bi bi-inbox" style="font-size: 32px;"></i>
-                                                    <p class="mt-2 mb-0">暂无回测记录</p>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                        <!-- Step 3: 数据预览 -->
+                        <div class="wizard-step-panel" id="wizard-step-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0"><i class="bi bi-search"></i> 数据预览</h5>
+                                </div>
+                                <div class="card-body" id="data-preview-content">
+                                    <div class="text-center py-5">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">加载中...</span>
+                                        </div>
+                                        <p class="mt-3">正在加载数据...</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- 回测结果详情 -->
-                        <div class="card" id="backtestResultCard" style="display: none;">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <span><i class="bi bi-file-text"></i> 回测结果详情</span>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="hideBacktestResult()">
-                                    <i class="bi bi-x"></i> 关闭
-                                </button>
-                            </div>
-                            <div class="card-body" id="backtestResultContent">
-                                <!-- 动态填充 -->
+                        <!-- Step 4: 查看结果 -->
+                        <div class="wizard-step-panel" id="wizard-step-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> 回测结果</h5>
+                                </div>
+                                <div class="card-body" id="backtest-results-content">
+                                    <div class="text-center py-5">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">回测中...</span>
+                                        </div>
+                                        <p class="mt-3">正在运行回测...</p>
+                                        <div class="progress" style="max-width: 400px; margin: 20px auto;">
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                                 id="wizard-backtest-progress" style="width: 0%"></div>
+                                        </div>
+                                        <p class="text-secondary" id="wizard-backtest-status">准备中...</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- 向导导航按钮 -->
+                    <div class="wizard-navigation mt-4 d-flex justify-content-between">
+                        <button class="btn btn-secondary" id="wizard-prev-btn" disabled>
+                            <i class="bi bi-arrow-left"></i> 上一步
+                        </button>
+                        <button class="btn btn-primary" id="wizard-next-btn">
+                            下一步 <i class="bi bi-arrow-right"></i>
+                        </button>
+                        <button class="btn btn-success d-none" id="wizard-start-btn">
+                            <i class="bi bi-play-fill"></i> 开始回测
+                        </button>
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
 

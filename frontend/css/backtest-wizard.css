@@ -1,0 +1,247 @@
+/* 回测向导样式 */
+
+.wizard-progress {
+    padding: 20px 0;
+}
+
+.wizard-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 2;
+}
+
+.wizard-step .step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #dee2e6;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 16px;
+    transition: all 0.3s;
+}
+
+.wizard-step.active .step-number {
+    background: #0d6efd;
+    color: white;
+}
+
+.wizard-step.completed .step-number {
+    background: #198754;
+    color: white;
+}
+
+.wizard-step .step-label {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #6c757d;
+}
+
+.wizard-step.active .step-label {
+    color: #0d6efd;
+    font-weight: 500;
+}
+
+.wizard-connector {
+    flex: 1;
+    height: 2px;
+    background: #dee2e6;
+    margin: 20px 10px 0;
+}
+
+.wizard-step.completed ~ .wizard-connector {
+    background: #198754;
+}
+
+.wizard-step-panel {
+    display: none;
+}
+
+.wizard-step-panel.active {
+    display: block;
+}
+
+/* 策略模板卡片 */
+.strategy-template-card {
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    height: 100%;
+}
+
+.strategy-template-card:hover {
+    border-color: #adb5bd;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.strategy-template-card.selected {
+    border-color: #0d6efd;
+    background: #f8f9fa;
+}
+
+.strategy-template-card .template-name {
+    font-weight: bold;
+    color: #212529;
+}
+
+.strategy-template-card .template-desc {
+    font-size: 13px;
+    color: #6c757d;
+    margin-top: 8px;
+}
+
+.strategy-template-card .template-params {
+    font-size: 12px;
+    color: #495057;
+    margin-top: 10px;
+}
+
+/* 数据覆盖度条 */
+.coverage-bar {
+    height: 24px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.coverage-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #198754, #20c997);
+    transition: width 0.5s ease;
+}
+
+.coverage-bar-fill.warning {
+    background: linear-gradient(90deg, #ffc107, #fd7e14);
+}
+
+.coverage-bar-fill.danger {
+    background: linear-gradient(90deg, #dc3545, #c82333);
+}
+
+/* 数据状态标签 */
+.data-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.data-status-badge.complete {
+    background: #d4edda;
+    color: #155724;
+}
+
+.data-status-badge.partial {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.data-status-badge.missing {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* 置信度可视化 */
+.confidence-bar-container {
+    margin-bottom: 12px;
+}
+
+.confidence-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.confidence-bar {
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.confidence-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0d6efd, #0dcaf0);
+    transition: width 0.3s ease;
+}
+
+.confidence-bar-fill.high {
+    background: linear-gradient(90deg, #198754, #20c997);
+}
+
+.confidence-bar-fill.medium {
+    background: linear-gradient(90deg, #ffc107, #fd7e14);
+}
+
+.confidence-bar-fill.low {
+    background: linear-gradient(90deg, #dc3545, #c82333);
+}
+
+/* 信号分组视图 */
+.signal-group {
+    margin-bottom: 20px;
+}
+
+.signal-group-header {
+    background: #f8f9fa;
+    padding: 12px 16px;
+    border-radius: 8px 8px 0 0;
+    font-weight: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.signal-group-body {
+    border: 1px solid #dee2e6;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 0;
+}
+
+.signal-row {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f3f5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.signal-row:last-child {
+    border-bottom: none;
+}
+
+.signal-row:hover {
+    background: #f8f9fa;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    .wizard-step .step-label {
+        font-size: 10px;
+    }
+
+    .wizard-step .step-number {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+
+    .signal-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
