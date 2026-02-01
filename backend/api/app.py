@@ -42,6 +42,7 @@ from backend.infrastructure.cache import TTLCache
 from backend.backtest import BacktestEngine, BacktestConfig, BacktestResult
 from backend.backtest.clock import TimeGranularity
 from backend.backtest.repository import get_backtest_repository
+from backend.backtest.strategy_templates import get_all_templates
 import uuid
 
 
@@ -922,6 +923,22 @@ async def get_watchlist():
 
 
 # ============ 回测相关API端点 ============
+
+@app.get("/api/backtest/templates")
+async def get_strategy_templates_api():
+    """
+    获取策略模板列表
+
+    返回预定义的回测策略模板（保守型、平衡型、激进型）
+
+    Returns:
+        模板列表
+    """
+    templates = get_all_templates()
+    return {
+        "templates": [t.to_dict() for t in templates]
+    }
+
 
 @app.post("/api/backtest/start", response_model=BacktestResponse)
 async def start_backtest(request: BacktestRequest, background_tasks: BackgroundTasks):
