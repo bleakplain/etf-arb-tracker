@@ -16,15 +16,13 @@ from backend.data.parsers import parse_quote_row, batch_parse_quotes
 class StockQuoteFetcher(BaseCachedFetcher):
     """A股行情数据获取器 - 使用新数据管理器架构"""
 
-    # 类变量
-    _cache_lock = None
-    _spot_cache = None
-    _cache_time = None
+    # 类级别配置常量
     _cache_ttl = 30  # 默认缓存有效期30秒，可通过配置覆盖
     _refresh_interval = 15  # 默认刷新间隔15秒，可通过配置覆盖
-    _refresh_thread = None
-    _running = False
-    _initialized = False
+
+    # 实例变量（在__init__中初始化）
+    _spot_cache = None
+    _cache_time = None
     _data_manager = None
     _watch_stocks = None  # 自选股列表
 
@@ -219,14 +217,6 @@ class StockQuoteFetcher(BaseCachedFetcher):
 
         delta = close_time - now
         return int(delta.total_seconds())
-
-    @property
-    def _cache_lock(self):
-        """获取缓存锁"""
-        import threading
-        if not hasattr(self, '__cache_lock'):
-            self.__cache_lock = threading.Lock()
-        return self.__cache_lock
 
     def get_cache_status(self) -> Dict:
         """获取缓存状态"""
