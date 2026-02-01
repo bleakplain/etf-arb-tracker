@@ -16,16 +16,9 @@ from backend.data.parsers import parse_quote_row, batch_parse_quotes
 class ETFQuoteFetcher(BaseCachedFetcher):
     """ETF行情获取器 - 使用新数据管理器架构"""
 
-    # 类变量
-    _cache_lock = None
-    _etf_cache = None
-    _cache_time = None
+    # 类变量 - 默认缓存配置
     _cache_ttl = 30  # 默认缓存有效期30秒，可通过配置覆盖
     _refresh_interval = 15  # 默认刷新间隔15秒，可通过配置覆盖
-    _refresh_thread = None
-    _running = False
-    _initialized = False
-    _data_manager = None
 
     def __init__(self, config: dict = None):
         self.data_source = 'DataManager'
@@ -63,16 +56,18 @@ class ETFQuoteFetcher(BaseCachedFetcher):
 
             logger.info(f"成功获取 {len(df)} 只ETF的实时行情数据 (耗时: {elapsed:.2f}秒)")
 
-            self._etf_cache = df
+            # 使用父类的缓存变量
+            self._cache = df
             self._cache_time = time.time()
 
             return df
 
         except Exception as e:
             logger.error(f"获取ETF行情失败: {e}")
-            if self._etf_cache is not None:
+            # 如果父类有缓存，使用缓存的ETF行情数据
+            if self._cache is not None:
                 logger.warning("使用缓存的ETF行情数据")
-                return self._etf_cache
+                return self._cache
             return pd.DataFrame()
 
     def _get_etf_spot_data(self, force_refresh: bool = False) -> pd.DataFrame:
@@ -199,14 +194,6 @@ class ETFQuoteFetcher(BaseCachedFetcher):
         current_amount = quote.get('amount', 0)
         return current_amount >= min_amount / 4
 
-    @property
-    def _cache_lock(self):
-        """获取缓存锁"""
-        import threading
-        if not hasattr(self, '__cache_lock'):
-            self.__cache_lock = threading.Lock()
-        return self.__cache_lock
-
     def get_cache_status(self) -> Dict:
         """获取缓存状态"""
         return super().get_cache_status()
@@ -214,8 +201,6 @@ class ETFQuoteFetcher(BaseCachedFetcher):
     def clear_cache(self):
         """清除缓存"""
         super().clear_cache()
-        self._etf_cache = None
-        self._cache_time = None
 
 
 # 测试代码
