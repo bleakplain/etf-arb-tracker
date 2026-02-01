@@ -30,6 +30,10 @@ class BacktestWizard {
             }
         };
 
+        // Date picker instances
+        this.startDatePicker = null;
+        this.endDatePicker = null;
+
         this.init();
     }
 
@@ -37,9 +41,46 @@ class BacktestWizard {
      * 初始化向导
      */
     init() {
+        this.initDatePickers();
         this.bindEvents();
         this.loadStrategyTemplates();
-        this.initDefaultDates();
+        this.setDatePreset(3); // 默认近3个月
+    }
+
+    /**
+     * 初始化日期选择器
+     */
+    initDatePickers() {
+        const startDateInput = document.getElementById('wizard-start-date');
+        const endDateInput = document.getElementById('wizard-end-date');
+
+        if (startDateInput) {
+            this.startDatePicker = flatpickr(startDateInput, {
+                locale: 'zh',
+                dateFormat: 'Y-m-d',
+                maxDate: 'today',
+                onChange: (selectedDates, dateStr) => {
+                    this.data.dateRange.startDate = dateStr;
+                    this.updateTradingDaysHint();
+                    // 更新结束日期选择器的最小日期
+                    if (this.endDatePicker && selectedDates.length > 0) {
+                        this.endDatePicker.set('minDate', selectedDates[0]);
+                    }
+                }
+            });
+        }
+
+        if (endDateInput) {
+            this.endDatePicker = flatpickr(endDateInput, {
+                locale: 'zh',
+                dateFormat: 'Y-m-d',
+                maxDate: 'today',
+                onChange: (selectedDates, dateStr) => {
+                    this.data.dateRange.endDate = dateStr;
+                    this.updateTradingDaysHint();
+                }
+            });
+        }
     }
 
     /**
@@ -54,16 +95,14 @@ class BacktestWizard {
             });
         });
 
-        // 日期输入变化
-        const startDateInput = document.getElementById('wizard-start-date');
-        const endDateInput = document.getElementById('wizard-end-date');
-        startDateInput?.addEventListener('change', () => this.updateTradingDaysHint());
-        endDateInput?.addEventListener('change', () => this.updateTradingDaysHint());
-
         // 上一步/下一步按钮
-        document.getElementById('wizard-prev-btn')?.addEventListener('click', () => this.prevStep());
-        document.getElementById('wizard-next-btn')?.addEventListener('click', () => this.nextStep());
-        document.getElementById('wizard-start-btn')?.addEventListener('click', () => this.startBacktest());
+        const prevBtn = document.getElementById('wizard-prev-btn');
+        const nextBtn = document.getElementById('wizard-next-btn');
+        const startBtn = document.getElementById('wizard-start-btn');
+
+        if (prevBtn) prevBtn.addEventListener('click', () => this.prevStep());
+        if (nextBtn) nextBtn.addEventListener('click', () => this.nextStep());
+        if (startBtn) startBtn.addEventListener('click', () => this.startBacktest());
     }
 
     /**
@@ -107,13 +146,6 @@ class BacktestWizard {
     }
 
     /**
-     * 初始化默认日期（近3个月）
-     */
-    initDefaultDates() {
-        this.setDatePreset(3);
-    }
-
-    /**
      * 设置快捷日期
      */
     setDatePreset(months) {
@@ -121,17 +153,15 @@ class BacktestWizard {
         const start = new Date();
         start.setMonth(start.getMonth() - months);
 
-        const startDateStr = start.toISOString().split('T')[0];
-        const endDateStr = end.toISOString().split('T')[0];
+        if (this.startDatePicker) {
+            this.startDatePicker.setDate(start);
+            this.data.dateRange.startDate = this.startDatePicker.formatDate(start);
+        }
 
-        const startDateInput = document.getElementById('wizard-start-date');
-        const endDateInput = document.getElementById('wizard-end-date');
-
-        if (startDateInput) startDateInput.value = startDateStr;
-        if (endDateInput) endDateInput.value = endDateStr;
-
-        this.data.dateRange.startDate = startDateStr;
-        this.data.dateRange.endDate = endDateStr;
+        if (this.endDatePicker) {
+            this.endDatePicker.setDate(end);
+            this.data.dateRange.endDate = this.endDatePicker.formatDate(end);
+        }
 
         this.updateTradingDaysHint();
     }
@@ -140,11 +170,16 @@ class BacktestWizard {
      * 更新交易日提示
      */
     updateTradingDaysHint() {
-        const startDate = document.getElementById('wizard-start-date')?.value;
-        const endDate = document.getElementById('wizard-end-date')?.value;
         const hint = document.getElementById('trading-days-hint');
+        if (!hint) return;
 
-        if (!startDate || !endDate || !hint) return;
+        const startDate = this.data.dateRange.startDate;
+        const endDate = this.data.dateRange.endDate;
+
+        if (!startDate || !endDate) {
+            hint.innerHTML = `<i class="bi bi-info-circle"></i> 请选择日期范围`;
+            return;
+        }
 
         // 简单估算：每月约21个交易日
         const start = new Date(startDate);
@@ -187,29 +222,20 @@ class BacktestWizard {
      * 验证当前步骤
      */
     validateCurrentStep() {
-        switch (this.currentStep) {
-            case 1:
-                const startDate = document.getElementById('wizard-start-date')?.value;
-                const endDate = document.getElementById('wizard-end-date')?.value;
-                if (!startDate || !endDate) {
-                    this.showToast('请选择日期范围', 'warning');
-                    return false;
-                }
-                if (new Date(startDate) > new Date(endDate)) {
-                    this.showToast('开始日期不能晚于结束日期', 'warning');
-                    return false;
-                }
-                return true;
-
-            case 2:
-                return true; // 策略有默认值，总是有效
-
-            case 3:
-                return true; // 数据预览总是可以继续
-
-            default:
-                return true;
+        if (this.currentStep === 1) {
+            const startDate = this.data.dateRange.startDate;
+            const endDate = this.data.dateRange.endDate;
+            if (!startDate || !endDate) {
+                this.showToast('请选择日期范围', 'warning');
+                return false;
+            }
+            if (new Date(startDate) > new Date(endDate)) {
+                this.showToast('开始日期不能晚于结束日期', 'warning');
+                return false;
+            }
+            return true;
         }
+        return true;
     }
 
     /**
@@ -300,18 +326,16 @@ class BacktestWizard {
      * 保存当前步骤数据
      */
     saveCurrentStepData() {
-        switch (this.currentStep) {
-            case 1:
-                this.data.dateRange.startDate = document.getElementById('wizard-start-date')?.value;
-                this.data.dateRange.endDate = document.getElementById('wizard-end-date')?.value;
-                break;
+        if (this.currentStep === 2) {
+            const minWeightInput = document.getElementById('wizard-min-weight');
+            const minVolumeInput = document.getElementById('wizard-min-volume');
+            const evaluatorSelect = document.getElementById('wizard-evaluator');
+            const interpolationSelect = document.getElementById('wizard-interpolation');
 
-            case 2:
-                this.data.strategy.minWeight = parseFloat(document.getElementById('wizard-min-weight')?.value) / 100;
-                this.data.strategy.minEtfVolume = parseInt(document.getElementById('wizard-min-volume')?.value);
-                this.data.strategy.evaluatorType = document.getElementById('wizard-evaluator')?.value;
-                this.data.strategy.interpolation = document.getElementById('wizard-interpolation')?.value;
-                break;
+            if (minWeightInput) this.data.strategy.minWeight = parseFloat(minWeightInput.value) / 100;
+            if (minVolumeInput) this.data.strategy.minEtfVolume = parseInt(minVolumeInput.value);
+            if (evaluatorSelect) this.data.strategy.evaluatorType = evaluatorSelect.value;
+            if (interpolationSelect) this.data.strategy.interpolation = interpolationSelect.value;
         }
     }
 
@@ -339,8 +363,9 @@ class BacktestWizard {
                         <i class="bi bi-info-circle"></i>
                         数据预览功能将在后续实现中完成
                     </div>
-                    <p>日期范围: ${this.data.dateRange.startDate} 至 ${this.data.dateRange.endDate}</p>
-                    <p>策略模板: ${this.data.strategy.template}</p>
+                    <p><strong>日期范围:</strong> ${this.data.dateRange.startDate} 至 ${this.data.dateRange.endDate}</p>
+                    <p><strong>策略模板:</strong> ${this.data.strategy.template}</p>
+                    <p><strong>最小权重:</strong> ${(this.data.strategy.minWeight * 100).toFixed(0)}%</p>
                 `;
             }, 1000);
 
@@ -358,6 +383,9 @@ class BacktestWizard {
      * 开始回测
      */
     async startBacktest() {
+        // 确保数据是最新的
+        this.saveCurrentStepData();
+
         const container = document.getElementById('backtest-results-content');
         if (!container) return;
 
@@ -406,6 +434,9 @@ class BacktestWizard {
                     <i class="bi bi-exclamation-triangle"></i>
                     启动回测失败: ${error.message}
                 </div>
+                <button class="btn btn-primary" onclick="window.BacktestWizard?.instance?.goToStep(2)">
+                    <i class="bi bi-arrow-left"></i> 返回修改配置
+                </button>
             `;
         }
     }
@@ -422,7 +453,7 @@ class BacktestWizard {
                 const progressBar = document.getElementById('wizard-backtest-progress');
                 const statusText = document.getElementById('wizard-backtest-status');
 
-                if (progressBar) {
+                if (progressBar && result.progress !== undefined) {
                     progressBar.style.width = `${result.progress * 100}%`;
                 }
 
@@ -445,6 +476,9 @@ class BacktestWizard {
                         <i class="bi bi-exclamation-triangle"></i>
                         回测失败: ${error.message}
                     </div>
+                    <button class="btn btn-primary" onclick="window.BacktestWizard?.instance?.goToStep(2)">
+                        <i class="bi bi-arrow-left"></i> 返回修改配置
+                    </button>
                 `;
             }
         }, 2000);
@@ -529,6 +563,7 @@ class BacktestWizard {
      */
     reset() {
         this.currentStep = 1;
+        this.data.result.backtestId = null;
         this.goToStep(1);
     }
 
@@ -561,9 +596,12 @@ window.BacktestWizard = {
     instance: null,
 
     init() {
-        if (document.getElementById('backtest')) {
-            this.instance = new BacktestWizard();
-        }
+        // 延迟初始化，确保DOM完全加载
+        setTimeout(() => {
+            if (document.getElementById('backtest')) {
+                this.instance = new BacktestWizard();
+            }
+        }, 100);
     }
 };
 
