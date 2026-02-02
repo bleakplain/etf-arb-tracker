@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>回测向导 | Backtest Wizard - ETF套利终端</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://npmcdn.com/flatpickr/dist/l10n/zh.css">
+    <style>
+        :root {
+            /* Terminal Palette */
+            --terminal-bg: #0a0e17;
+            --terminal-panel: #111827;
+            --terminal-panel-light: #1a2332;
+            --terminal-border: #1e293b;
+            --terminal-border-accent: #334155;
+
+            /* Electric Accents */
+            --electric-blue: #00d4ff;
+            --electric-cyan: #22d3ee;
+            --electric-purple: #a855f7;
+
+            /* Status Colors */
+            --status-active: #10b981;
+            --status-inactive: #64748b;
+            --status-warning: #f59e0b;
+            --status-error: #ef4444;
+
+            /* Market Colors */
+            --market-up: #22c55e;
+            --market-down: #ef4444;
+
+            /* Typography */
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-display: 'Space Grotesk', sans-serif;
+
+            /* Spacing */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 32px;
+
+            /* Effects */
+            --glow-blue: 0 0 20px rgba(0, 212, 255, 0.3);
+            --glow-green: 0 0 20px rgba(34, 197, 94, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--terminal-bg);
+            color: #e2e8f0;
+            font-family: var(--font-display);
+            font-size: 14px;
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        /* === WIZARD BOOT ANIMATION === */
+        @keyframes wizard-boot {
+            0% {
+                opacity: 0;
+                filter: blur(8px);
+                transform: translateY(20px);
+            }
+            100% {
+                opacity: 1;
+                filter: blur(0);
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes wizard-step-arrive {
+            0% {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .wizard-content {
+            animation: wizard-boot 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .wizard-progress {
+            animation: wizard-step-arrive 0.5s ease-out 0.2s backwards;
+        }
+
+        .wizard-panel.active {
+            animation: panel-in 0.4s ease-out;
+        }
+
+        /* === STRATEGY TEMPLATE SELECTION === */
+        .strategy-template.selected::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(135deg, var(--electric-blue), var(--electric-purple));
+            border-radius: 10px;
+            z-index: -1;
+            animation: template-glow 2s ease-in-out infinite;
+        }
+
+        @keyframes template-glow {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .strategy-template.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 24px;
+            height: 24px;
+            background: var(--electric-blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--terminal-bg);
+            font-weight: bold;
+            box-shadow: var(--glow-blue);
+            animation: check-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes check-pop {
+            0% { transform: scale(0); }
+            100% { transform: scale(1); }
+        }
+
+        /* === RESULTS CELEBRATION === */
+        @keyframes result-celebration {
+            0% {
+                opacity: 0;
+                transform: scale(0.8) rotate(-5deg);
+            }
+            50% {
+                transform: scale(1.05) rotate(2deg);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) rotate(0);
+            }
+        }
+
+        .results-summary .result-card {
+            animation: result-celebration 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            opacity: 0;
+        }
+
+        .results-summary .result-card:nth-child(1) { animation-delay: 0s; }
+        .results-summary .result-card:nth-child(2) { animation-delay: 0.1s; }
+        .results-summary .result-card:nth-child(3) { animation-delay: 0.2s; }
+        .results-summary .result-card:nth-child(4) { animation-delay: 0.3s; }
+
+        /* === IMPROVED FOCUS STATES === */
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible {
+            outline: 2px solid var(--electric-blue);
+            outline-offset: 2px;
+        }
+
+        .wizard-btn:focus-visible,
+        .date-preset:focus-visible,
+        .strategy-template:focus-visible {
+            box-shadow: 0 0 0 4px rgba(0, 212, 255, 0.2);
+        }
+
+        /* === HEADER === */
+        .wizard-header {
+            background: linear-gradient(180deg, var(--terminal-panel) 0%, var(--terminal-bg) 100%);
+            border-bottom: 1px solid var(--terminal-border-accent);
+            padding: var(--space-md) var(--space-lg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .wizard-logo {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            cursor: pointer;
+        }
+
+        .wizard-logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--electric-blue), var(--electric-purple));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 18px;
+            color: white;
+            box-shadow: var(--glow-blue);
+        }
+
+        .wizard-logo-text {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 20px;
+            color: white;
+        }
+
+        .wizard-logo-subtitle {
+            font-size: 11px;
+            color: var(--status-inactive);
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* === WIZARD PROGRESS === */
+        .wizard-progress {
+            background: var(--terminal-panel);
+            border-bottom: 1px solid var(--terminal-border-accent);
+            padding: var(--space-lg) var(--space-xl);
+        }
+
+        .wizard-steps {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+        }
+
+        .wizard-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+            min-width: 80px;
+        }
+
+        .wizard-step-number {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--terminal-panel-light);
+            border: 2px solid var(--terminal-border);
+            color: var(--status-inactive);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .wizard-step.active .wizard-step-number {
+            background: var(--electric-blue);
+            border-color: var(--electric-blue);
+            color: var(--terminal-bg);
+            box-shadow: var(--glow-blue);
+        }
+
+        .wizard-step.completed .wizard-step-number {
+            background: var(--status-active);
+            border-color: var(--status-active);
+            color: white;
+        }
+
+        .wizard-step-label {
+            margin-top: var(--space-sm);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--status-inactive);
+            transition: color 0.3s;
+        }
+
+        .wizard-step.active .wizard-step-label {
+            color: var(--electric-blue);
+        }
+
+        .wizard-step.completed .wizard-step-label {
+            color: var(--status-active);
+        }
+
+        .wizard-connector {
+            flex: 1;
+            height: 2px;
+            background: var(--terminal-border);
+            margin: 0 var(--space-xs);
+            position: relative;
+            top: -16px;
+        }
+
+        .wizard-step.completed ~ .wizard-connector {
+            background: var(--status-active);
+        }
+
+        /* === WIZARD CONTENT === */
+        .wizard-content {
+            max-width: 900px;
+            margin: var(--space-xl) auto;
+            padding: 0 var(--space-lg);
+        }
+
+        .wizard-panel {
+            display: none;
+        }
+
+        .wizard-panel.active {
+            display: block;
+            animation: panel-in 0.3s ease-out;
+        }
+
+        @keyframes panel-in {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .wizard-panel-title {
+            font-family: var(--font-display);
+            font-size: 24px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: var(--space-sm);
+        }
+
+        .wizard-panel-subtitle {
+            font-size: 14px;
+            color: var(--status-inactive);
+            margin-bottom: var(--space-xl);
+        }
+
+        /* === DATE PRESETS === */
+        .date-presets {
+            display: flex;
+            gap: var(--space-sm);
+            margin-bottom: var(--space-lg);
+            flex-wrap: wrap;
+        }
+
+        .date-preset {
+            padding: var(--space-sm) var(--space-lg);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 500;
+            background: var(--terminal-panel-light);
+            border: 1px solid var(--terminal-border);
+            border-radius: 4px;
+            color: #e2e8f0;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .date-preset:hover {
+            border-color: var(--electric-blue);
+            color: var(--electric-blue);
+        }
+
+        .date-preset.active {
+            background: var(--electric-blue);
+            border-color: var(--electric-blue);
+            color: var(--terminal-bg);
+        }
+
+        /* === FORM GROUPS === */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-lg);
+            margin-bottom: var(--space-lg);
+        }
+
+        .form-group {
+            margin-bottom: var(--space-lg);
+        }
+
+        .form-label {
+            display: block;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--status-inactive);
+            margin-bottom: var(--space-sm);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: var(--space-md);
+            font-family: var(--font-mono);
+            font-size: 14px;
+            background: var(--terminal-panel-light);
+            border: 1px solid var(--terminal-border);
+            border-radius: 4px;
+            color: white;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--electric-blue);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+        }
+
+        .form-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .form-hint {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--status-inactive);
+            margin-top: var(--space-sm);
+        }
+
+        /* === STRATEGY TEMPLATES === */
+        .strategy-templates {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--space-md);
+            margin-bottom: var(--space-lg);
+        }
+
+        .strategy-template {
+            position: relative;
+            background: var(--terminal-panel-light);
+            border: 2px solid var(--terminal-border);
+            border-radius: 8px;
+            padding: var(--space-lg);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .strategy-template:hover {
+            border-color: var(--terminal-border-accent);
+        }
+
+        .strategy-template.selected {
+            border-color: var(--electric-blue);
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .strategy-template-name {
+            font-family: var(--font-display);
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            margin-bottom: var(--space-sm);
+        }
+
+        .strategy-template-desc {
+            font-size: 13px;
+            color: var(--status-inactive);
+            margin-bottom: var(--space-md);
+        }
+
+        .strategy-template-params {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--status-inactive);
+        }
+
+        /* === ADVANCED OPTIONS === */
+        .advanced-options {
+            background: var(--terminal-panel-light);
+            border: 1px solid var(--terminal-border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .advanced-options-header {
+            padding: var(--space-md) var(--space-lg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .advanced-options-header:hover {
+            background: var(--terminal-border);
+        }
+
+        .advanced-options-title {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--status-inactive);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .advanced-options-body {
+            padding: 0 var(--space-lg);
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .advanced-options.open .advanced-options-body {
+            padding: var(--space-lg);
+            padding-top: 0;
+            max-height: 500px;
+        }
+
+        /* === WIZARD ACTIONS === */
+        .wizard-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: var(--space-xl);
+            padding-top: var(--space-lg);
+            border-top: 1px solid var(--terminal-border);
+        }
+
+        .wizard-btn {
+            padding: var(--space-md) var(--space-xl);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid var(--terminal-border-accent);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .wizard-btn-prev {
+            background: transparent;
+            color: #e2e8f0;
+        }
+
+        .wizard-btn-prev:hover {
+            border-color: var(--status-inactive);
+        }
+
+        .wizard-btn-next {
+            background: var(--electric-blue);
+            border-color: var(--electric-blue);
+            color: var(--terminal-bg);
+        }
+
+        .wizard-btn-next:hover {
+            box-shadow: var(--glow-blue);
+        }
+
+        .wizard-btn-start {
+            background: linear-gradient(135deg, var(--status-active), #34d399);
+            border-color: transparent;
+            color: var(--terminal-bg);
+        }
+
+        .wizard-btn-start:hover {
+            box-shadow: var(--glow-green);
+        }
+
+        .wizard-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* === PROGRESS DISPLAY === */
+        .progress-display {
+            background: var(--terminal-panel);
+            border: 1px solid var(--terminal-border);
+            border-radius: 8px;
+            padding: var(--space-xl);
+            text-align: center;
+        }
+
+        .progress-spinner {
+            width: 64px;
+            height: 64px;
+            border: 4px solid var(--terminal-border);
+            border-top-color: var(--electric-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto var(--space-lg);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .progress-bar-container {
+            height: 4px;
+            background: var(--terminal-panel-light);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: var(--space-lg) 0;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--electric-blue), var(--electric-cyan));
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--status-inactive);
+        }
+
+        /* === RESULTS DISPLAY === */
+        .results-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: var(--space-md);
+            margin-bottom: var(--space-lg);
+        }
+
+        .result-card {
+            background: var(--terminal-panel-light);
+            border: 1px solid var(--terminal-border);
+            border-radius: 8px;
+            padding: var(--space-lg);
+            text-align: center;
+        }
+
+        .result-value {
+            font-family: var(--font-mono);
+            font-size: 32px;
+            font-weight: 700;
+            color: white;
+            line-height: 1;
+        }
+
+        .result-value.up {
+            color: var(--market-up);
+            text-shadow: var(--glow-green);
+        }
+
+        .result-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--status-inactive);
+            margin-top: var(--space-sm);
+        }
+
+        /* === EMPTY STATE === */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-xl);
+            color: var(--status-inactive);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            opacity: 0.3;
+            margin-bottom: var(--space-md);
+        }
+
+        .empty-state-text {
+            font-family: var(--font-mono);
+            font-size: 13px;
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 768px) {
+            .wizard-steps {
+                gap: var(--space-xs);
+            }
+
+            .wizard-step-number {
+                width: 36px;
+                height: 36px;
+                font-size: 14px;
+            }
+
+            .wizard-step-label {
+                font-size: 10px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .wizard-actions {
+                flex-direction: column-reverse;
+                gap: var(--space-md);
+            }
+
+            .wizard-btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* === FLATPICKR OVERRIDES === */
+        .flatpickr-calendar {
+            background: var(--terminal-panel) !important;
+            border: 1px solid var(--terminal-border) !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        .flatpickr-day {
+            color: #e2e8f0 !important;
+        }
+
+        .flatpickr-day:hover {
+            background: var(--terminal-panel-light) !important;
+        }
+
+        .flatpickr-day.selected,
+        .flatpickr-day.startRange,
+        .flatpickr-day.endRange,
+        .flatpickr-day.inRange {
+            background: var(--electric-blue) !important;
+            border-color: var(--electric-blue) !important;
+        }
+
+        .flatpickr-months .flatpickr-month,
+        .flatpickr-current-month .flatpickr-monthDropdown-months,
+        .flatpickr-current-month .cur-year {
+            color: white !important;
+        }
+
+        .flatpickr-weekday {
+            color: var(--status-inactive) !important;
+        }
+
+        .numInputWrapper span {
+            border-color: var(--terminal-border) !important;
+        }
+
+        .numInputWrapper span.arrowUp:after,
+        .numInputWrapper span.arrowDown:after {
+            border-color: var(--status-inactive) !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="wizard-header">
+        <div class="wizard-logo" onclick="window.location.href='/frontend/index.html'">
+            <div class="wizard-logo-icon">ETF</div>
+            <div>
+                <div class="wizard-logo-text">回测向导</div>
+                <div class="wizard-logo-subtitle">Backtest Wizard</div>
+            </div>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 12px; color: var(--status-inactive);">
+            <i class="bi bi-info-circle"></i> 4步向导式回测流程
+        </div>
+    </header>
+
+    <!-- Wizard Progress -->
+    <div class="wizard-progress">
+        <div class="wizard-steps">
+            <div class="wizard-step active" data-step="1">
+                <div class="wizard-step-number">1</div>
+                <div class="wizard-step-label">日期范围</div>
+            </div>
+            <div class="wizard-connector"></div>
+            <div class="wizard-step" data-step="2">
+                <div class="wizard-step-number">2</div>
+                <div class="wizard-step-label">策略配置</div>
+            </div>
+            <div class="wizard-connector"></div>
+            <div class="wizard-step" data-step="3">
+                <div class="wizard-step-number">3</div>
+                <div class="wizard-step-label">数据预览</div>
+            </div>
+            <div class="wizard-connector"></div>
+            <div class="wizard-step" data-step="4">
+                <div class="wizard-step-number">4</div>
+                <div class="wizard-step-label">回测结果</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wizard Content -->
+    <div class="wizard-content">
+        <!-- Step 1: Date Range -->
+        <div class="wizard-panel active" id="step-1">
+            <h1 class="wizard-panel-title">选择回测日期范围</h1>
+            <p class="wizard-panel-subtitle">选择要回测的历史数据时间段，建议至少选择3个月数据</p>
+
+            <div class="date-presets">
+                <button class="date-preset" data-months="1">近1个月</button>
+                <button class="date-preset" data-months="3">近3个月</button>
+                <button class="date-preset" data-months="6">近6个月</button>
+                <button class="date-preset" data-months="12">近1年</button>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">开始日期</label>
+                    <input type="text" class="form-input" id="startDate" placeholder="选择开始日期" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">结束日期</label>
+                    <input type="text" class="form-input" id="endDate" placeholder="选择结束日期" readonly>
+                </div>
+            </div>
+
+            <div class="form-hint" id="tradingDaysHint">
+                <i class="bi bi-info-circle"></i> 请选择日期范围
+            </div>
+
+            <div class="wizard-actions">
+                <div></div>
+                <button class="wizard-btn wizard-btn-next" id="step1Next">
+                    下一步 <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 2: Strategy Configuration -->
+        <div class="wizard-panel" id="step-2">
+            <h1 class="wizard-panel-title">配置回测策略</h1>
+            <p class="wizard-panel-subtitle">选择策略模板或自定义参数</p>
+
+            <div class="strategy-templates">
+                <div class="strategy-template selected" data-template="conservative">
+                    <div class="strategy-template-name">
+                        <i class="bi bi-shield-check"></i> 保守型
+                    </div>
+                    <div class="strategy-template-desc">高权重、高成交额要求，信号量少但质量高</div>
+                    <div class="strategy-template-params">
+                        最小权重: 8% | 最小成交额: 8000万
+                    </div>
+                </div>
+                <div class="strategy-template" data-template="balanced">
+                    <div class="strategy-template-name">
+                        <i class="bi bi-balance-scale"></i> 平衡型
+                    </div>
+                    <div class="strategy-template-desc">平衡信号数量与质量，适合大多数场景</div>
+                    <div class="strategy-template-params">
+                        最小权重: 5% | 最小成交额: 5000万
+                    </div>
+                </div>
+                <div class="strategy-template" data-template="aggressive">
+                    <div class="strategy-template-name">
+                        <i class="bi bi-lightning"></i> 激进型
+                    </div>
+                    <div class="strategy-template-desc">低门槛、高信号量，适合回测验证</div>
+                    <div class="strategy-template-params">
+                        最小权重: 3% | 最小成交额: 3000万
+                    </div>
+                </div>
+            </div>
+
+            <div class="advanced-options" id="advancedOptions">
+                <div class="advanced-options-header" onclick="toggleAdvancedOptions()">
+                    <span class="advanced-options-title">
+                        <i class="bi bi-sliders"></i> 高级选项
+                    </span>
+                    <i class="bi bi-chevron-down" id="advancedOptionsIcon"></i>
+                </div>
+                <div class="advanced-options-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">最小权重 (%)</label>
+                            <input type="number" class="form-input" id="minWeight" value="5" min="1" max="50" step="1">
+                            <div class="form-hint">ETF中股票持仓占比最小值</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">最小成交额 (万)</label>
+                            <input type="number" class="form-input" id="minVolume" value="5000" min="1000" max="50000" step="1000">
+                            <div class="form-hint">ETF日成交额最小值</div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">评估器类型</label>
+                            <select class="form-input" id="evaluatorType">
+                                <option value="default">默认</option>
+                                <option value="conservative">保守</option>
+                                <option value="aggressive">激进</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">插值方式</label>
+                            <select class="form-input" id="interpolation">
+                                <option value="linear">线性插值</option>
+                                <option value="step">阶梯插值</option>
+                            </select>
+                            <div class="form-hint">历史持仓权重的插值方式</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="wizard-actions">
+                <button class="wizard-btn wizard-btn-prev" id="step2Prev">
+                    <i class="bi bi-arrow-left"></i> 上一步
+                </button>
+                <button class="wizard-btn wizard-btn-next" id="step2Next">
+                    下一步 <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 3: Data Preview -->
+        <div class="wizard-panel" id="step-3">
+            <h1 class="wizard-panel-title">数据预览</h1>
+            <p class="wizard-panel-subtitle">确认回测配置和数据覆盖情况</p>
+
+            <div id="previewContent">
+                <div class="progress-display">
+                    <div class="progress-spinner"></div>
+                    <div class="progress-text">正在分析数据覆盖度...</div>
+                </div>
+            </div>
+
+            <div class="wizard-actions">
+                <button class="wizard-btn wizard-btn-prev" id="step3Prev">
+                    <i class="bi bi-arrow-left"></i> 上一步
+                </button>
+                <button class="wizard-btn wizard-btn-start" id="startBacktest">
+                    <i class="bi bi-play-fill"></i> 开始回测
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 4: Results -->
+        <div class="wizard-panel" id="step-4">
+            <h1 class="wizard-panel-title">回测完成</h1>
+            <p class="wizard-panel-subtitle">查看回测结果和统计分析</p>
+
+            <div id="resultsContent">
+                <!-- Results will be loaded here -->
+            </div>
+
+            <div class="wizard-actions" id="resultsActions">
+                <button class="wizard-btn wizard-btn-prev" onclick="resetWizard()">
+                    <i class="bi bi-arrow-clockwise"></i> 重新开始
+                </button>
+                <button class="wizard-btn wizard-btn-next" id="exportSignals">
+                    <i class="bi bi-download"></i> 导出信号
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/zh.js"></script>
+    <script src="/frontend/js/backtest-wizard.js"></script>
+</body>
+</html>
