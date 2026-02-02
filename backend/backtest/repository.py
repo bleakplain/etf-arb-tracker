@@ -5,11 +5,19 @@
 """
 
 import json
-import os
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 from loguru import logger
+
+
+class DateTimeEncoder(json.JSONEncoder):
+    """自定义JSON编码器，处理datetime对象"""
+
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 
 class BacktestRepository:
@@ -48,7 +56,7 @@ class BacktestRepository:
         try:
             file_path = self._get_job_file_path(job_id)
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(job_data, f, ensure_ascii=False, indent=2)
+                json.dump(job_data, f, ensure_ascii=False, indent=2, cls=DateTimeEncoder)
             logger.debug(f"回测任务 {job_id} 已保存到 {file_path}")
             return True
         except Exception as e:

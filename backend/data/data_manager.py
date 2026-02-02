@@ -3,20 +3,16 @@
 支持免费高频和付费低频相结合的策略
 """
 
-import time
 import threading
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional
 from loguru import logger
 from datetime import datetime
 import pandas as pd
 
 from backend.data.source_base import (
     BaseDataSource,
-    SourceType,
     DataType,
-    DataSourceStatus,
-    QueryContext,
-    QueryResult
+    DataSourceStatus
 )
 from backend.data.sources import TencentDataSource, TushareDataSource, EastMoneyLimitUpSource
 
@@ -506,34 +502,3 @@ def get_data_manager(config: Optional[Dict] = None) -> DataManager:
 
 
 # 测试代码
-if __name__ == "__main__":
-    # 测试配置
-    test_config = {
-        'data_sources': {
-            'tencent': {'enabled': True, 'priority': 1},
-            'tushare': {'enabled': False, 'priority': 10},
-        }
-    }
-
-    manager = get_data_manager(test_config)
-
-    print("=" * 60)
-    print("测试数据管理器")
-    print("=" * 60)
-
-    # 测试获取股票行情
-    print("\n=== 测试获取股票行情 ===")
-    codes = ["600519", "000001", "300750", "510300"]
-    df = manager.fetch_stock_spot(codes)
-
-    if not df.empty:
-        print(f"成功获取 {len(df)} 只股票:")
-        print(df[['代码', '名称', '最新价', '涨跌幅']].to_string())
-    else:
-        print("获取失败")
-
-    # 显示指标
-    print("\n=== 数据源指标 ===")
-    metrics = manager.get_metrics()
-    for name, metric in metrics.items():
-        print(f"{name}: {metric}")

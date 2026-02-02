@@ -14,7 +14,6 @@ from backend.data.utils import (
     is_limit_up,
     is_limit_down,
 )
-from backend.data.column_mappings import STANDARD_TO_INTERNAL
 
 
 def parse_quote_row(

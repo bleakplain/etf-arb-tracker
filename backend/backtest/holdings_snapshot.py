@@ -6,7 +6,7 @@ ETF持仓快照管理器
 
 import json
 import random
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass

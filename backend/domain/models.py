@@ -8,7 +8,7 @@
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Dict
+from typing import Dict
 from datetime import datetime
 
 

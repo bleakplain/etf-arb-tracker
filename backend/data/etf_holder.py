@@ -218,11 +218,3 @@ class ETFHolderFetcher:
 
 
 # 测试代码
-if __name__ == "__main__":
-    fetcher = ETFHolderFetcher()
-
-    # 测试获取单个ETF持仓
-    holdings = fetcher.get_etf_holdings("510300")
-    if not holdings.empty:
-        print("\n沪深300ETF前十大持仓:")
-        print(holdings.head(10).to_string(index=False))

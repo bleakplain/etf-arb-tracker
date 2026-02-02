@@ -6,8 +6,8 @@ TTL缓存组件 - 可复用的带过期时间的缓存
 
 import threading
 from typing import TypeVar, Optional, Generic, Callable, Dict, Any
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field
+from datetime import datetime
+from dataclasses import dataclass
 from loguru import logger
 
 T = TypeVar('T')

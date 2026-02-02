@@ -8,9 +8,8 @@
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
-from datetime import datetime
 
-from .value_objects import TradingSignal, StockInfo
+from .value_objects import TradingSignal
 
 
 class IQuoteFetcher(ABC):
@@ -27,7 +26,6 @@ class IQuoteFetcher(ABC):
         Returns:
             行情字典，未找到返回None
         """
-        pass
 
     @abstractmethod
     def get_batch_quotes(self, stock_codes: List[str]) -> Dict[str, Dict]:
@@ -40,12 +38,10 @@ class IQuoteFetcher(ABC):
         Returns:
             {股票代码: 行情数据}
         """
-        pass
 
     @abstractmethod
     def is_trading_time(self) -> bool:
         """判断是否在交易时间内"""
-        pass
 
     @abstractmethod
     def get_time_to_close(self) -> int:
@@ -55,7 +51,6 @@ class IQuoteFetcher(ABC):
         Returns:
             距离15:00收盘的秒数，不在交易时间返回-1
         """
-        pass
 
 
 class IETFHolderProvider(ABC):
@@ -64,12 +59,10 @@ class IETFHolderProvider(ABC):
     @abstractmethod
     def load_mapping(self, filepath: str) -> Optional[Dict]:
         """加载股票-ETF映射关系"""
-        pass
 
     @abstractmethod
     def save_mapping(self, mapping: Dict, filepath: str = None) -> None:
         """保存股票-ETF映射关系"""
-        pass
 
     @abstractmethod
     def build_stock_etf_mapping(
@@ -78,7 +71,6 @@ class IETFHolderProvider(ABC):
         etf_codes: List[str]
     ) -> Dict:
         """构建股票-ETF映射关系"""
-        pass
 
 
 class IETFHoldingsProvider(ABC):
@@ -97,7 +89,6 @@ class IETFHoldingsProvider(ABC):
                 'total_weight': float
             }
         """
-        pass
 
 
 class IETFQuoteProvider(ABC):
@@ -106,17 +97,14 @@ class IETFQuoteProvider(ABC):
     @abstractmethod
     def get_etf_quote(self, etf_code: str) -> Optional[Dict]:
         """获取单只ETF行情"""
-        pass
 
     @abstractmethod
     def get_etf_batch_quotes(self, etf_codes: List[str]) -> Dict[str, Dict]:
         """批量获取ETF行情"""
-        pass
 
     @abstractmethod
     def check_liquidity(self, etf_code: str, min_amount: float) -> bool:
         """检查ETF流动性"""
-        pass
 
 
 class ISignalEvaluator(ABC):
@@ -134,7 +122,6 @@ class ISignalEvaluator(ABC):
         Returns:
             (confidence, risk_level) - (置信度, 风险等级)
         """
-        pass
 
 
 class ISignalRepository(ABC):
@@ -143,22 +130,18 @@ class ISignalRepository(ABC):
     @abstractmethod
     def save(self, signal: TradingSignal) -> None:
         """保存单个信号"""
-        pass
 
     @abstractmethod
     def save_all(self, signals: List[TradingSignal]) -> None:
         """批量保存信号"""
-        pass
 
     @abstractmethod
     def get_today_signals(self) -> List[TradingSignal]:
         """获取今天的所有信号"""
-        pass
 
     @abstractmethod
     def get_recent_signals(self, limit: int = 20) -> List[TradingSignal]:
         """获取最近的信号"""
-        pass
 
 
 class ISignalSender(ABC):
@@ -172,4 +155,3 @@ class ISignalSender(ABC):
         Returns:
             是否发送成功
         """
-        pass

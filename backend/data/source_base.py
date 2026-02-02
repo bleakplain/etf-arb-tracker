@@ -6,10 +6,8 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Set
-from datetime import datetime, timedelta
-from loguru import logger
-import time
+from typing import Optional, Any, Set
+from datetime import datetime
 import threading
 
 
@@ -170,12 +168,10 @@ class BaseDataSource(ABC):
     @abstractmethod
     def _get_capability(self) -> SourceCapability:
         """定义数据源能力"""
-        pass
 
     @abstractmethod
     def _check_config(self) -> bool:
         """检查配置是否完整"""
-        pass
 
     def is_configured(self) -> bool:
         """检查数据源是否已配置"""

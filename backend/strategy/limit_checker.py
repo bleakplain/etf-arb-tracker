@@ -2,7 +2,7 @@
 涨停检查器 - 专职检查股票涨停状态
 """
 
-from typing import Optional, Dict, Set
+from typing import Optional, Set
 from datetime import datetime
 from loguru import logger
 

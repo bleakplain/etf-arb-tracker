@@ -6,7 +6,6 @@ Web API服务
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, validator
 from typing import List, Optional, Dict
 import uvicorn
@@ -32,14 +31,13 @@ except Exception:
     setup(LoggerSettings())
 
 from backend.strategy.limit_monitor import LimitUpMonitor, create_monitor_with_defaults
-from backend.domain.value_objects import TradingSignal
 from backend.notification.sender import create_sender_from_config
 from backend.data.limit_up_stocks import LimitUpStocksFetcher
 from backend.data.kline import KlineDataFetcher
 from backend.data.etf_holdings import ETFHoldingsFetcher
 from backend.api.state import get_api_state_manager
 from backend.infrastructure.cache import TTLCache
-from backend.backtest import BacktestEngine, BacktestConfig, BacktestResult
+from backend.backtest import BacktestEngine, BacktestConfig
 from backend.backtest.clock import TimeGranularity
 from backend.backtest.repository import get_backtest_repository
 import uuid
@@ -617,7 +615,8 @@ async def get_limit_up_stocks():
             mon = get_monitor()
             stock_df = mon.stock_fetcher._get_spot_data()
             stocks = fetcher.get_today_limit_ups(stock_df)
-        except:
+        except Exception as e:
+            logger.warning(f"Failed to get cached spot data, using fresh fetch: {e}")
             stocks = fetcher.get_today_limit_ups()
 
         return [
@@ -1221,16 +1220,21 @@ async def delete_backtest(backtest_id: str):
     Returns:
         删除结果
     """
-    # 从内存中删除
-    async with _backtest_lock:
-        if backtest_id in _backtest_jobs:
-            del _backtest_jobs[backtest_id]
+    # 先检查是否存在
+    exists_in_memory = backtest_id in _backtest_jobs
+    exists_in_repo = _backtest_repo.load_job(backtest_id) is not None
 
-    # 从持久化存储中删除
-    deleted = _backtest_repo.delete_job(backtest_id)
-
-    if not deleted and backtest_id not in _backtest_jobs:
+    if not exists_in_memory and not exists_in_repo:
         raise HTTPException(status_code=404, detail="Backtest not found")
+
+    # 从内存中删除
+    if exists_in_memory:
+        async with _backtest_lock:
+            if backtest_id in _backtest_jobs:
+                del _backtest_jobs[backtest_id]
+
+    # 从持久化存储中删除（无论是否存在都尝试删除）
+    _backtest_repo.delete_job(backtest_id)
 
     return {
         "status": "success",

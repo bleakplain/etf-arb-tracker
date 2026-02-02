@@ -4,7 +4,7 @@
 记录回测期间触发的所有信号，不模拟实际交易。
 """
 
-from typing import List, Dict, Optional
+from typing import List, Dict
 from datetime import datetime
 from collections import Counter
 from loguru import logger

@@ -5,7 +5,6 @@
 
 import pandas as pd
 from typing import List, Dict
-from datetime import datetime
 from loguru import logger
 
 from backend.data.utils import safe_float, safe_int, is_limit_up
@@ -126,21 +125,3 @@ class LimitUpStocksFetcher:
 
 
 # 测试代码
-if __name__ == "__main__":
-    fetcher = LimitUpStocksFetcher()
-
-    print("=" * 60)
-    print("获取今日涨停股")
-    print("=" * 60)
-
-    limit_ups = fetcher.get_today_limit_ups()
-
-    print(f"\n今日涨停股数量: {len(limit_ups)}")
-
-    if limit_ups:
-        print("\n前20只涨停股:")
-        for i, stock in enumerate(limit_ups[:20], 1):
-            print(f"{i}. {stock['name']} ({stock['code']}) - "
-                  f"¥{stock['price']:.2f} (+{stock['change_pct']:.2f}%)")
-    else:
-        print("\n当前无涨停股或非交易时间")

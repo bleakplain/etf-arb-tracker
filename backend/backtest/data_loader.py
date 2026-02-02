@@ -85,7 +85,6 @@ class HistoricalDataLoader:
     def _check_akshare() -> bool:
         """检查AKShare是否可用"""
         try:
-            import akshare as ak
             return True
         except ImportError:
             return False
@@ -94,7 +93,6 @@ class HistoricalDataLoader:
     def _check_tushare() -> bool:
         """检查Tushare是否可用"""
         try:
-            import tushare as ts
             token = os.environ.get("TUSHARE_TOKEN")
             return bool(token)
         except ImportError:

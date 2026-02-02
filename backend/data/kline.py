@@ -4,7 +4,6 @@ K线图数据获取模块
 """
 
 import akshare as ak
-import pandas as pd
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from loguru import logger
@@ -234,29 +233,3 @@ class KlineDataFetcher:
 
 
 # 测试代码
-if __name__ == "__main__":
-    fetcher = KlineDataFetcher()
-
-    # 测试获取K线数据
-    print("测试获取K线数据:")
-
-    test_codes = ['600519', '300750', '688308']
-
-    for code in test_codes:
-        print(f"\n测试 {code}:")
-        kline_data = fetcher.get_kline_for_chart(code, days=30)
-
-        if kline_data:
-            print(f"  ✓ 成功获取 {len(kline_data['dates'])} 条数据")
-            print(f"  最新日期: {kline_data['dates'][-1]}")
-            print(f"  最新价格: {kline_data['values'][-1]}")
-        else:
-            print(f"  ✗ 获取失败")
-
-    # 测试ETF K线
-    print("\n测试ETF K线:")
-    etf_data = fetcher.get_etf_kline('510300', days=30)
-    if etf_data:
-        print(f"  ✓ 成功获取 {len(etf_data['dates'])} 条数据")
-    else:
-        print(f"  ✗ 获取失败")

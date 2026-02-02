@@ -6,7 +6,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple
 from datetime import datetime
-from loguru import logger
 
 from config.strategy import SignalEvaluationConfig
 from backend.domain.interfaces import ISignalEvaluator
@@ -30,7 +29,6 @@ class SignalEvaluator(ISignalEvaluator, ABC):
         Returns:
             (confidence, risk_level) - (置信度, 风险等级)
         """
-        pass
 
 
 class DefaultSignalEvaluator(SignalEvaluator):

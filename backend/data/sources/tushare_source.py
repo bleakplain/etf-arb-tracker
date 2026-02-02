@@ -5,7 +5,7 @@ Tushare数据源 - 付费低频
 
 import pandas as pd
 import time
-from typing import Dict, List, Optional
+from typing import List, Optional
 from loguru import logger
 from datetime import datetime
 
@@ -290,35 +290,3 @@ class TushareDataSource(BaseDataSource):
 
 
 # 测试代码
-if __name__ == "__main__":
-    import os
-
-    # 从环境变量获取token
-    token = os.getenv("TUSHARE_TOKEN", "")
-
-    if not token:
-        print("请设置TUSHARE_TOKEN环境变量")
-        exit(1)
-
-    fetcher = TushareDataSource(token=token)
-
-    print("=" * 60)
-    print("测试Tushare数据源")
-    print("=" * 60)
-
-    # 测试获取股票列表
-    print("\n=== 测试获取股票列表 ===")
-    df = fetcher.fetch_stock_list()
-
-    if not df.empty:
-        print(f"成功获取 {len(df)} 只股票")
-        print(df.head(10).to_string())
-
-    # 测试获取指定股票行情
-    print("\n=== 测试获取指定股票行情 ===")
-    codes = ["600519.SH", "000001.SZ", "510300.SH"]
-    df = fetcher.fetch_by_codes(codes)
-
-    if not df.empty:
-        print(f"成功获取 {len(df)} 只股票:")
-        print(df[['代码', '最新价', '涨跌幅']].to_string())

@@ -6,9 +6,8 @@ ETF持仓数据获取模块
 
 import requests
 import json
-from typing import List, Dict, Optional
+from typing import Dict, Optional
 from loguru import logger
-import os
 import re
 from datetime import datetime
 
@@ -569,21 +568,3 @@ class ETFHoldingsFetcher:
 
 
 # 测试代码
-if __name__ == "__main__":
-    fetcher = ETFHoldingsFetcher()
-
-    print("=" * 60)
-    print("测试ETF持仓数据获取")
-    print("=" * 60)
-
-    test_etfs = ['510300', '159995', '512590']
-
-    for etf_code in test_etfs:
-        print(f"\n测试 {etf_code}:")
-        holdings = fetcher.get_etf_top_holdings(etf_code)
-
-        print(f"  ETF名称: {holdings['etf_name']}")
-        print(f"  前十大持仓占比: {holdings['total_weight']:.2%}")
-        print("  TOP5持仓:")
-        for i, h in enumerate(holdings['top_holdings'][:5], 1):
-            print(f"    {i}. {h['stock_name']} ({h['stock_code']}) - {h['weight']:.2%}")

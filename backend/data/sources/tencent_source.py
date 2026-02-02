@@ -19,8 +19,6 @@ from backend.data.source_base import (
 from backend.data.utils import (
     safe_float,
     safe_int,
-    is_limit_up,
-    is_limit_down,
     convert_code_format
 )
 from backend.data.column_mappings import TENCENT_COLUMN_MAPPING
@@ -273,20 +271,3 @@ class TencentDataSource(BaseDataSource):
 
 
 # 测试代码
-if __name__ == "__main__":
-    fetcher = TencentDataSource()
-
-    print("=" * 60)
-    print("测试腾讯数据源")
-    print("=" * 60)
-
-    # 测试获取指定股票
-    print("\n=== 测试获取指定股票 ===")
-    codes = ["600519", "000001", "300750", "510300"]
-    df = fetcher.fetch_by_codes(codes)
-
-    if not df.empty:
-        print(f"成功获取 {len(df)} 只股票:")
-        print(df[['代码', '名称', '最新价', '涨跌幅']].to_string())
-    else:
-        print("获取失败")

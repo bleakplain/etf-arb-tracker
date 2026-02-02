@@ -8,7 +8,6 @@ import pandas as pd
 import time
 from typing import List, Dict, Optional
 from loguru import logger
-from datetime import datetime
 
 from backend.data.source_base import (
     BaseDataSource,
@@ -232,19 +231,3 @@ class EastMoneyLimitUpSource(BaseDataSource):
 
 
 # 测试代码
-if __name__ == "__main__":
-    fetcher = EastMoneyLimitUpSource()
-
-    print("=" * 60)
-    print("测试东方财富涨停股数据源")
-    print("=" * 60)
-
-    stocks = fetcher.fetch_limit_up_stocks()
-
-    print(f"\n获取到 {len(stocks)} 只股票")
-
-    if stocks:
-        print("\n前20只:")
-        for i, stock in enumerate(stocks[:20], 1):
-            print(f"{i}. {stock['name']} ({stock['code']}) - "
-                  f"¥{stock['price']:.2f} ({stock['change_pct']*100:+.2f}%)")

@@ -58,10 +58,13 @@ def is_limit_up(code: str, change_pct: float) -> bool:
     if change_pct < 0.095:
         return False
 
-    if code.startswith('688') or code.startswith('300'):
+    # 科创板 (688xxx) 和 创业板 (300xxx, 301xxx) 涨停限制为 20%
+    if code.startswith('688') or code.startswith('300') or code.startswith('301'):
         return change_pct >= 0.195
+    # 北交所 (8xxxx, 4xxxx) 涨停限制为 30%
     elif code.startswith('8') or code.startswith('4'):
         return change_pct >= 0.295
+    # 主板 涨停限制为 10%
     else:
         return change_pct >= 0.095
 
@@ -80,10 +83,13 @@ def is_limit_down(code: str, change_pct: float) -> bool:
     if change_pct > -0.095:
         return False
 
-    if code.startswith('688') or code.startswith('300'):
+    # 科创板 (688xxx) 和 创业板 (300xxx, 301xxx) 跌停限制为 -20%
+    if code.startswith('688') or code.startswith('300') or code.startswith('301'):
         return change_pct <= -0.195
+    # 北交所 (8xxxx, 4xxxx) 跌停限制为 -30%
     elif code.startswith('8') or code.startswith('4'):
         return change_pct <= -0.295
+    # 主板 跌停限制为 -10%
     else:
         return change_pct <= -0.095
 

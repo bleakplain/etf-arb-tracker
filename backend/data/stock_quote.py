@@ -16,15 +16,9 @@ from backend.data.parsers import parse_quote_row, batch_parse_quotes
 class StockQuoteFetcher(BaseCachedFetcher):
     """A股行情数据获取器 - 使用新数据管理器架构"""
 
-    # 类级别配置常量
+    # 类级别配置常量（不要在这里声明实例变量）
     _cache_ttl = 30  # 默认缓存有效期30秒，可通过配置覆盖
     _refresh_interval = 15  # 默认刷新间隔15秒，可通过配置覆盖
-
-    # 实例变量（在__init__中初始化）
-    _spot_cache = None
-    _cache_time = None
-    _data_manager = None
-    _watch_stocks = None  # 自选股列表
 
     def __init__(self, config: Optional[Dict] = None, watch_stocks: Optional[List[str]] = None):
         self.data_source = 'DataManager'
@@ -65,26 +59,26 @@ class StockQuoteFetcher(BaseCachedFetcher):
 
             if df.empty:
                 # 检查是否有可用缓存
-                if self._spot_cache is not None:
+                if self._cache is not None:
                     cache_age = time.time() - self._cache_time
                     if cache_age < 300:
                         logger.warning(f"数据源暂时不可用，使用缓存数据 (缓存年龄: {cache_age:.1f}秒)")
-                        return self._spot_cache
+                        return self._cache
                 raise ValueError("获取数据为空且无可用缓存")
 
             logger.info(f"成功获取 {len(df)} 只A股的实时行情数据 (耗时: {elapsed:.2f}秒)")
 
-            self._spot_cache = df
+            self._cache = df
             self._cache_time = time.time()
 
             return df
 
         except Exception as e:
             logger.error(f"获取A股行情失败: {e}")
-            if self._spot_cache is not None:
+            if self._cache is not None:
                 cache_age = time.time() - self._cache_time
                 logger.warning(f"使用缓存的行情数据 (缓存年龄: {cache_age:.1f}秒)")
-                return self._spot_cache
+                return self._cache
             return pd.DataFrame()
 
     def _get_spot_data(self, force_refresh: bool = False) -> pd.DataFrame:
@@ -225,38 +219,6 @@ class StockQuoteFetcher(BaseCachedFetcher):
     def clear_cache(self):
         """清除缓存"""
         super().clear_cache()
-        self._spot_cache = None
-        self._cache_time = None
 
 
 # 测试代码
-if __name__ == "__main__":
-    fetcher = StockQuoteFetcher()
-
-    # 显示缓存状态
-    status = fetcher.get_cache_status()
-    print(f"缓存状态: {status}")
-
-    # 测试获取单只股票（应该很快，因为读缓存）
-    print("\n=== 测试获取股票行情（从缓存读取） ===")
-    import time
-
-    start = time.time()
-    quote = fetcher.get_stock_quote("600519")
-    elapsed = time.time() - start
-
-    if quote:
-        print(f"股票: {quote['name']} ({quote['code']})")
-        print(f"价格: {quote['price']}")
-        print(f"涨跌幅: {quote['change_pct']:.2f}%")
-        print(f"响应时间: {elapsed*1000:.1f}毫秒")
-
-    # 测试批量获取
-    print("\n=== 测试批量获取 ===")
-    codes = ["600519", "300750", "002594"]
-    start = time.time()
-    quotes = fetcher.get_batch_quotes(codes)
-    elapsed = time.time() - start
-    print(f"批量获取 {len(quotes)} 只股票，响应时间: {elapsed*1000:.1f}毫秒")
-    for code, quote in quotes.items():
-        print(f"{quote['name']}: {quote['price']:.2f} ({quote['change_pct']:+.2f}%)")

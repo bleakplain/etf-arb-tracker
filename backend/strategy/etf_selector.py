@@ -2,7 +2,7 @@
 ETF选择器 - 专职选择合适的ETF
 """
 
-from typing import List, Dict, Optional
+from typing import List, Dict
 from loguru import logger
 
 from backend.domain.interfaces import IETFHolderProvider, IETFHoldingsProvider

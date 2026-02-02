@@ -30,11 +30,9 @@ from backend.domain.interfaces import (
     IETFHolderProvider,
     IETFHoldingsProvider,
     IETFQuoteProvider,
-    ISignalEvaluator,
     ISignalSender
 )
-from backend.domain.value_objects import TradingSignal, StockInfo
-from backend.domain.models import LimitUpInfo
+from backend.domain.value_objects import TradingSignal
 
 from backend.strategy.limit_checker import LimitChecker
 from backend.strategy.etf_selector import ETFSelector
@@ -446,5 +444,3 @@ def main():
         print("演示模式，不启动持续监控")
 
 
-if __name__ == "__main__":
-    main()

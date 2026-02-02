@@ -11,12 +11,11 @@ import time
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import List, Optional
+from typing import List
 import requests
 from loguru import logger
 
 from backend.domain.value_objects import TradingSignal
-from config import Config
 
 
 class NotificationSender:

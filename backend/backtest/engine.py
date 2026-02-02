@@ -8,14 +8,13 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional, Dict, Any, Callable
 from datetime import datetime
 from loguru import logger
 
 from config import Config, Stock
-from backend.domain.value_objects import TradingSignal, ETFReference
-from backend.domain.models import LimitUpInfo
+from backend.domain.value_objects import ETFReference
 from backend.strategy.limit_checker import LimitChecker
 from backend.strategy.signal_generator import SignalGenerator
 from backend.strategy.signal_evaluators import SignalEvaluatorFactory
@@ -24,7 +23,7 @@ from backend.data.sources.historical_source import HistoricalQuoteFetcher
 from .clock import TimeGranularity, SimulationClock
 from .signal_recorder import SignalRecorder
 from .holdings_snapshot import HoldingsSnapshotManager
-from .metrics import BacktestResult, SignalStatistics
+from .metrics import BacktestResult
 
 
 @dataclass
