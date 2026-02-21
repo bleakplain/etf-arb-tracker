@@ -12,7 +12,7 @@
 from typing import Dict, List, Optional, Any
 from loguru import logger
 
-from backend.core.registry import PluginRegistry
+from backend.shared.infrastructure.registry import PluginRegistry
 from backend.arbitrage.domain.interfaces import (
     IEventDetectorStrategy,
     IFundSelectionStrategy,

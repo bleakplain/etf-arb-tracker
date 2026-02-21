@@ -10,8 +10,8 @@ from typing import Dict, Tuple, Type
 from datetime import datetime
 
 from config.strategy import SignalEvaluationConfig
-from backend.domain.interfaces import ISignalEvaluator
-from backend.core.registry import evaluator_registry
+from backend.signal.domain.interfaces import ISignalEvaluator
+from backend.shared.infrastructure.registry import evaluator_registry
 
 
 class SignalEvaluator(ISignalEvaluator, ABC):

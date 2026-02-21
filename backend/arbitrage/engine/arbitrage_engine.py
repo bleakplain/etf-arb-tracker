@@ -17,17 +17,12 @@ from backend.arbitrage.domain.interfaces import (
     IFundSelectionStrategy,
     ISignalFilterStrategy,
     EventInfo,
-    ETFReference,
-    TradingSignal,
+    CandidateETF,
     StrategyChainConfig
 )
-from backend.domain.interfaces import (
-    IQuoteFetcher,
-    IETFHolderProvider,
-    IETFHoldingsProvider,
-    IETFQuoteProvider,
-    ISignalEvaluator
-)
+from backend.arbitrage.domain.models import TradingSignal
+from backend.market.domain.interfaces import IQuoteFetcher, IHoldingProvider
+from backend.signal.domain.interfaces import ISignalEvaluator
 from backend.domain.value_objects import TradingSignal as VOT
 
 from backend.engine.strategy_executor import StrategyExecutor
@@ -76,9 +71,9 @@ class ArbitrageEngine:
     def __init__(
         self,
         quote_fetcher: IQuoteFetcher,
-        etf_holder_provider: IETFHolderProvider,
+        etf_holder_provider: IHoldingProvider,
         etf_holdings_provider: IETFHoldingsProvider,
-        etf_quote_provider: IETFQuoteProvider,
+        etf_quote_provider: IQuoteFetcher,
         watch_securities: List[str],
         strategy_config: StrategyChainConfig = None,
         signal_evaluator: ISignalEvaluator = None,
@@ -184,7 +179,7 @@ class ArbitrageEngine:
                 fund_set.add(fund['etf_code'])
         return list(fund_set)
 
-    def get_eligible_funds(self, security_code: str) -> List[ETFReference]:
+    def get_eligible_funds(self, security_code: str) -> List[CandidateETF]:
         """
         获取符合条件的基金列表
 
@@ -195,7 +190,7 @@ class ArbitrageEngine:
             符合条件的ETF引用列表
         """
         from backend.utils.code_utils import normalize_stock_code
-        from backend.domain.value_objects import ETFReference
+        from backend.market.domain import CandidateETF
 
         normalized_code = normalize_stock_code(security_code)
         mapped_funds = self._security_fund_mapping.get(normalized_code, [])
@@ -230,7 +225,7 @@ class ArbitrageEngine:
             # 根据配置筛选
             min_weight = self._strategy_config.fund_config.get('min_weight', 0.05)
             if weight >= min_weight:
-                results.append(ETFReference(
+                results.append(CandidateETF(
                     etf_code=fund_code,
                     etf_name=fund_names.get(fund_code, f'ETF{fund_code}'),
                     weight=weight,
