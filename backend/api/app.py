@@ -44,8 +44,8 @@ import uuid
 
 
 # Pydantic模型
-class StockInfo(BaseModel):
-    """股票信息"""
+class StockQuoteResponse(BaseModel):
+    """股票行情响应模型"""
     code: str
     name: str
     price: float
@@ -53,8 +53,8 @@ class StockInfo(BaseModel):
     is_limit_up: bool
 
 
-class ETFInfo(BaseModel):
-    """ETF信息"""
+class ETFQuoteResponse(BaseModel):
+    """ETF行情响应模型"""
     code: str
     name: str
     price: float
@@ -89,8 +89,8 @@ class MonitorStatus(BaseModel):
     last_scan_time: Optional[str] = None
 
 
-class LimitUpStockInfo(BaseModel):
-    """涨停股票信息"""
+class LimitUpStockResponse(BaseModel):
+    """涨停股票响应模型"""
     code: str
     name: str
     price: float
@@ -332,7 +332,7 @@ async def get_status():
     )
 
 
-@app.get("/api/stocks", response_model=List[StockInfo])
+@app.get("/api/stocks", response_model=List[StockQuoteResponse])
 async def get_stocks():
     """
     获取所有自选股的实时行情
@@ -349,7 +349,7 @@ async def get_stocks():
     for code in stock_codes:
         quote = quotes.get(code)
         if quote:
-            result.append(StockInfo(
+            result.append(StockQuoteResponse(
                 code=quote['code'],
                 name=quote['name'],
                 price=quote['price'],
@@ -597,7 +597,7 @@ async def get_stock_etf_mapping():
     return mon.stock_etf_mapping
 
 
-@app.get("/api/limit-up", response_model=List[LimitUpStockInfo])
+@app.get("/api/limit-up", response_model=List[LimitUpStockResponse])
 async def get_limit_up_stocks():
     """
     获取今日所有涨停股票（带缓存，复用股票行情缓存）
@@ -620,7 +620,7 @@ async def get_limit_up_stocks():
             stocks = fetcher.get_today_limit_ups()
 
         return [
-            LimitUpStockInfo(
+            LimitUpStockResponse(
                 code=s['code'],
                 name=s['name'],
                 price=s['price'],
@@ -692,6 +692,32 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat()
     }
+
+
+@app.get("/api/plugins")
+async def list_plugins():
+    """
+    列出所有已注册的插件
+
+    Returns:
+        插件列表和元数据
+    """
+    from backend.core.plugin_manager import list_all_plugins
+
+    return list_all_plugins()
+
+
+@app.get("/api/plugins/stats")
+async def get_plugin_stats():
+    """
+    获取插件统计信息
+
+    Returns:
+        插件统计
+    """
+    from backend.core.plugin_manager import get_plugin_stats
+
+    return get_plugin_stats()
 
 
 @app.get("/api/etfs/{code}/holdings")

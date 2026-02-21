@@ -36,8 +36,8 @@ class ETFCategory(Enum):
 
 
 @dataclass(frozen=True)
-class StockInfo:
-    """股票信息值对象"""
+class StockQuote:
+    """股票行情值对象"""
     code: str
     name: str
     price: float

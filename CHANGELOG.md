@@ -8,10 +8,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **插件注册表系统 (Plugin Registry)**
+  - `backend/core/registry.py` - 通用插件注册表类，支持装饰器注册
+  - `backend/core/plugin_manager.py` - 插件管理工具和查询接口
+  - `backend/core/__init__.py` - 核心基础设施模块
+  - 支持信号评估器、通知渠道的插件式扩展
+  - 无需修改工厂代码即可添加新的插件类型
+  - 提供插件元数据管理（名称、版本、优先级、描述）
+- **API端点**
+  - `GET /api/plugins` - 列出所有已注册插件
+  - `GET /api/plugins/stats` - 获取插件统计信息
+- **文档**
+  - `docs/plugin-system.md` - 插件系统完整使用指南
+
+### Changed
+- **通知系统重构**
+  - 移除钉钉、邮件、企业微信通知实现
+  - 默认使用 `LogSender` 输出信号到日志
+  - 提供 `NullSender` 用于禁用通知
+  - 用户可通过插件注册表自定义通知方式
+- **策略层**
+  - `SignalEvaluatorFactory` 现在使用插件注册表动态获取评估器
+  - 支持通过装饰器 `@evaluator_registry.register()` 自定义评估器
+- **命名重构**
+  - `LimitUpInfo` → `LimitUpStock` (领域实体)
+  - `StockInfo` → `StockQuote` (领域值对象)
+  - `StockInfo` → `StockQuoteResponse` (API模型)
+  - `ETFInfo` → `ETFQuoteResponse` (API模型)
+- **配置简化**
+  - `config/alert.py` - 简化为仅包含 `enabled` 标志
+  - `config/settings.yaml` - 移除通知渠道详细配置
+
+### Removed
+- 钉钉通知实现 (`DingTalkSender`)
+- 邮件通知实现 (`EmailSender`)
+- 企业微信通知实现 (`WeChatWorkSender`)
 - **领域层 (Domain Layer)**
   - `backend/domain/interfaces.py` - 7个业务接口定义（IQuoteFetcher, IETFHolderProvider等）
-  - `backend/domain/value_objects.py` - 值对象（StockInfo, ETFReference, TradingSignal等）
-  - `backend/domain/models.py` - 领域模型（LimitUpInfo）
+  - `backend/domain/value_objects.py` - 值对象（StockQuote, ETFReference, TradingSignal等）
+  - `backend/domain/models.py` - 领域模型（LimitUpStock）
 - **基础设施层 (Infrastructure Layer)**
   - `backend/infrastructure/cache/ttl_cache.py` - 可复用的TTL缓存组件
   - 支持懒加载、自动过期、统计信息、LRU淘汰策略

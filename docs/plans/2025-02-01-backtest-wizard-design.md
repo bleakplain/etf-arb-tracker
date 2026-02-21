@@ -364,7 +364,7 @@ class SignalDetailResponse:
 @dataclass
 class SignalReason:
     """信号产生原因"""
-    stock_limit_up: LimitUpInfo
+    stock_limit_up: LimitUpStock
     etf_holdings: ETFHoldingInfo
     liquidity_check: LiquidityInfo
 

@@ -13,9 +13,9 @@ from datetime import datetime
 
 
 @dataclass
-class LimitUpInfo:
+class LimitUpStock:
     """
-    涨停信息实体
+    涨停股票实体
 
     表示一只股票在特定时间的涨停状态
     """
@@ -51,7 +51,7 @@ class LimitUpInfo:
         }
 
     @classmethod
-    def from_quote(cls, quote: Dict) -> "LimitUpInfo":
+    def from_quote(cls, quote: Dict) -> "LimitUpStock":
         """从行情字典创建"""
         return cls(
             stock_code=quote.get('code', ''),

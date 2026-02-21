@@ -70,8 +70,8 @@ etf-arb-tracker/
 ├── backend/
 │   ├── domain/                     # 领域层 - 核心业务概念
 │   │   ├── interfaces.py           # 业务接口定义
-│   │   ├── value_objects.py        # 值对象（StockInfo, ETFReference等）
-│   │   └── models.py               # 领域模型（LimitUpInfo）
+│   │   ├── value_objects.py        # 值对象（StockQuote, ETFReference等）
+│   │   └── models.py               # 领域模型（LimitUpStock）
 │   ├── infrastructure/             # 基础设施层 - 技术支撑
 │   │   └── cache/
 │   │       └── ttl_cache.py        # TTL缓存组件

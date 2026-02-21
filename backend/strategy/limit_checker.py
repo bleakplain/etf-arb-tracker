@@ -7,7 +7,7 @@ from datetime import datetime
 from loguru import logger
 
 from backend.domain.interfaces import IQuoteFetcher
-from backend.domain.models import LimitUpInfo
+from backend.domain.models import LimitUpStock
 
 
 class LimitChecker:
@@ -29,7 +29,7 @@ class LimitChecker:
         self._quote_fetcher = quote_fetcher
         self._processed_limits: Set[str] = set()
 
-    def check_limit_up(self, stock_code: str) -> Optional[LimitUpInfo]:
+    def check_limit_up(self, stock_code: str) -> Optional[LimitUpStock]:
         """
         检查单只股票是否涨停
 
@@ -37,7 +37,7 @@ class LimitChecker:
             stock_code: 股票代码
 
         Returns:
-            涨停信息，未涨停或已处理返回None
+            涨停股票，未涨停或已处理返回None
         """
         quote = self._quote_fetcher.get_stock_quote(stock_code)
 
@@ -54,10 +54,10 @@ class LimitChecker:
             logger.debug(f"股票 {stock_code} 今天的涨停已处理过")
             return None
 
-        limit_info = LimitUpInfo.from_quote(quote)
-        logger.info(f"检测到涨停: {limit_info.stock_name} ({limit_info.stock_code})")
+        limit_stock = LimitUpStock.from_quote(quote)
+        logger.info(f"检测到涨停: {limit_stock.stock_name} ({limit_stock.stock_code})")
 
-        return limit_info
+        return limit_stock
 
     def mark_processed(self, stock_code: str) -> None:
         """

@@ -92,27 +92,8 @@ common_stocks:
 # 消息通知配置
 notification:
   # 是否启用通知
+  # 当前默认使用日志输出，用户可通过插件注册表自定义通知方式
   enabled: true
-
-  # 钉钉机器人配置
-  dingtalk:
-    enabled: false
-    webhook: ""
-    secret: ""
-
-  # 邮件配置
-  email:
-    enabled: false
-    smtp_server: "smtp.qq.com"
-    smtp_port: 465
-    sender: ""
-    password: ""
-    receivers: []
-
-  # 企业微信配置
-  wechat_work:
-    enabled: false
-    webhook: ""
 
 # 日志配置
 logging:

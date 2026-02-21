@@ -11,7 +11,7 @@ from backend.domain.interfaces import (
     IETFQuoteProvider,
     ISignalEvaluator
 )
-from backend.domain.models import LimitUpInfo
+from backend.domain.models import LimitUpStock
 from backend.domain.value_objects import ETFReference, TradingSignal
 
 
@@ -52,14 +52,14 @@ class SignalGenerator:
 
     def generate_signal(
         self,
-        limit_info: LimitUpInfo,
+        limit_stock: LimitUpStock,
         eligible_etfs: List[ETFReference]
     ) -> Optional[TradingSignal]:
         """
         生成交易信号
 
         Args:
-            limit_info: 涨停信息
+            limit_stock: 涨停股票
             eligible_etfs: 符合条件的ETF列表
 
         Returns:
@@ -67,7 +67,7 @@ class SignalGenerator:
         """
         if not eligible_etfs:
             logger.info(
-                f"⚠️  {limit_info.stock_code} {limit_info.stock_name} 涨停，"
+                f"⚠️  {limit_stock.stock_code} {limit_stock.stock_name} 涨停，"
                 f"但无符合条件的ETF"
             )
             return None
@@ -105,25 +105,25 @@ class SignalGenerator:
             'in_top10': best_etf.in_top10,
             'top10_ratio': best_etf.top10_ratio
         }
-        limit_dict = limit_info.to_dict()
+        limit_dict = limit_stock.to_dict()
         confidence, risk_level = self._signal_evaluator.evaluate(limit_dict, etf_info)
 
         # 生成信号
         signal = TradingSignal(
-            signal_id=f"SIG_{datetime.now().strftime('%Y%m%d%H%M%S')}_{limit_info.stock_code}",
+            signal_id=f"SIG_{datetime.now().strftime('%Y%m%d%H%M%S')}_{limit_stock.stock_code}",
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            stock_code=limit_info.stock_code,
-            stock_name=limit_info.stock_name,
-            stock_price=limit_info.price,
-            limit_time=limit_info.limit_time,
-            seal_amount=limit_info.seal_amount,
-            change_pct=limit_info.change_pct,
+            stock_code=limit_stock.stock_code,
+            stock_name=limit_stock.stock_name,
+            stock_price=limit_stock.price,
+            limit_time=limit_stock.limit_time,
+            seal_amount=limit_stock.seal_amount,
+            change_pct=limit_stock.change_pct,
             etf_code=best_etf.etf_code,
             etf_name=best_etf.etf_name,
             etf_weight=best_etf.weight,
             etf_price=etf_quote.get('price', 0.0),
             etf_premium=etf_quote.get('premium', 0.0),
-            reason=f"{limit_info.stock_name} 涨停 (+{limit_info.change_pct:.2f}%)，"
+            reason=f"{limit_stock.stock_name} 涨停 (+{limit_stock.change_pct:.2f}%)，"
                    f"在 {best_etf.etf_name} 中持仓占比 {best_etf.weight_pct:.2f}% "
                    f"(排名第{best_etf.rank})",
             confidence=confidence,

@@ -10,14 +10,14 @@ from .interfaces import (
     ISignalSender
 )
 from .value_objects import (
-    StockInfo,
+    StockQuote,
     ETFReference,
     TradingSignal,
     ConfidenceLevel,
     RiskLevel,
     TradingHours
 )
-from .models import LimitUpInfo
+from .models import LimitUpStock
 
 __all__ = [
     # Interfaces
@@ -27,12 +27,12 @@ __all__ = [
     'ISignalRepository',
     'ISignalSender',
     # Value Objects
-    'StockInfo',
+    'StockQuote',
     'ETFReference',
     'TradingSignal',
     'ConfidenceLevel',
     'RiskLevel',
     'TradingHours',
     # Models
-    'LimitUpInfo',
+    'LimitUpStock',
 ]
