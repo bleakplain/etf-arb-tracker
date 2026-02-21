@@ -1,8 +1,34 @@
 """套利领域模型"""
 
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Optional
 from datetime import datetime
+
+
+@dataclass(frozen=True)
+class ChosenETF:
+    """选中的ETF（套利目标）
+
+    由套利策略从候选ETF中选择出来的最优ETF。
+    """
+    etf_code: str
+    etf_name: str
+    weight: float
+    category: str
+    rank: int = -1
+    in_top10: bool = False
+    selection_reason: str = ""
+
+    def __post_init__(self):
+        if not self.etf_code:
+            raise ValueError("ETF代码不能为空")
+        if not 0 <= self.weight <= 1:
+            raise ValueError("权重必须在0-1之间")
+
+    @property
+    def weight_pct(self) -> float:
+        """权重百分比"""
+        return self.weight * 100
 
 
 @dataclass(frozen=True)

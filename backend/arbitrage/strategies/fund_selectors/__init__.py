@@ -8,9 +8,9 @@
 - BalancedSelector: 综合评估选择
 """
 
-from backend.domain.strategy_interfaces import IFundSelectionStrategy, EventInfo
-from backend.core.strategy_registry import fund_selector_registry
-from backend.domain.value_objects import ETFReference
+from backend.arbitrage.domain.interfaces import IFundSelectionStrategy, EventInfo
+from backend.arbitrage.strategy_registry import fund_selector_registry
+from backend.market.domain import CandidateETF
 from typing import List, Optional
 
 
@@ -43,9 +43,9 @@ class HighestWeightSelector(IFundSelectionStrategy):
 
     def select(
         self,
-        eligible_funds: List[ETFReference],
+        eligible_funds: List[CandidateETF],
         event: EventInfo
-    ) -> Optional[ETFReference]:
+    ) -> Optional[CandidateETF]:
         """
         选择权重最高的ETF
 
@@ -62,7 +62,7 @@ class HighestWeightSelector(IFundSelectionStrategy):
         # 按权重降序排序，选择第一个
         return sorted(eligible_funds, key=lambda x: x.weight, reverse=True)[0]
 
-    def get_selection_reason(self, fund: ETFReference) -> str:
+    def get_selection_reason(self, fund: CandidateETF) -> str:
         """获取选择原因"""
         return f"权重最高({fund.weight_pct:.2f}%)"
 
@@ -91,14 +91,14 @@ class BestLiquiditySelector(IFundSelectionStrategy):
 
     def select(
         self,
-        eligible_funds: List[ETFReference],
+        eligible_funds: List[CandidateETF],
         event: EventInfo
-    ) -> Optional[ETFReference]:
+    ) -> Optional[CandidateETF]:
         """
         选择流动性最好的ETF
 
-        注意：当前ETFReference没有流动性信息，
-        实际使用时需要扩展ETFReference或从外部获取流动性数据
+        注意：当前CandidateETF没有流动性信息，
+        实际使用时需要扩展CandidateETF或从外部获取流动性数据
 
         Args:
             eligible_funds: 符合条件的ETF列表
@@ -114,7 +114,7 @@ class BestLiquiditySelector(IFundSelectionStrategy):
         # 实际应该查询ETF的成交额
         return sorted(eligible_funds, key=lambda x: x.weight, reverse=True)[0]
 
-    def get_selection_reason(self, fund: ETFReference) -> str:
+    def get_selection_reason(self, fund: CandidateETF) -> str:
         """获取选择原因"""
         return "流动性最好"
 
@@ -143,13 +143,13 @@ class LowestPremiumSelector(IFundSelectionStrategy):
 
     def select(
         self,
-        eligible_funds: List[ETFReference],
+        eligible_funds: List[CandidateETF],
         event: EventInfo
-    ) -> Optional[ETFReference]:
+    ) -> Optional[CandidateETF]:
         """
         选择溢价最低的ETF
 
-        注意：当前ETFReference没有溢价信息，
+        注意：当前CandidateETF没有溢价信息，
         实际使用时需要从外部获取ETF的实时溢价
 
         Args:
@@ -166,7 +166,7 @@ class LowestPremiumSelector(IFundSelectionStrategy):
         # 实际应该查询ETF的溢价率
         return sorted(eligible_funds, key=lambda x: x.weight, reverse=True)[0]
 
-    def get_selection_reason(self, fund: ETFReference) -> str:
+    def get_selection_reason(self, fund: CandidateETF) -> str:
         """获取选择原因"""
         return "溢价最低"
 
@@ -209,9 +209,9 @@ class BalancedSelector(IFundSelectionStrategy):
 
     def select(
         self,
-        eligible_funds: List[ETFReference],
+        eligible_funds: List[CandidateETF],
         event: EventInfo
-    ) -> Optional[ETFReference]:
+    ) -> Optional[CandidateETF]:
         """
         综合评估选择最优ETF
 
@@ -226,7 +226,7 @@ class BalancedSelector(IFundSelectionStrategy):
             return None
 
         # 简化实现：计算综合得分
-        def calc_score(fund: ETFReference) -> float:
+        def calc_score(fund: CandidateETF) -> float:
             # 权重得分（归一化到0-1）
             weight_score = min(fund.weight / 0.20, 1.0)
 
@@ -238,6 +238,6 @@ class BalancedSelector(IFundSelectionStrategy):
         # 选择得分最高的
         return sorted(eligible_funds, key=calc_score, reverse=True)[0]
 
-    def get_selection_reason(self, fund: ETFReference) -> str:
+    def get_selection_reason(self, fund: CandidateETF) -> str:
         """获取选择原因"""
         return f"综合评估最优（权重{fund.weight_pct:.2f}%）"

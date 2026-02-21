@@ -1,6 +1,6 @@
 """套利领域模块"""
 
-from backend.arbitrage.domain.models import TradingSignal
+from backend.arbitrage.domain.models import TradingSignal, ChosenETF
 from backend.arbitrage.domain.interfaces import (
     IEventDetectorStrategy,
     IFundSelectionStrategy,
@@ -11,6 +11,7 @@ from backend.arbitrage.domain.interfaces import (
 
 __all__ = [
     'TradingSignal',
+    'ChosenETF',
     'IEventDetectorStrategy',
     'IFundSelectionStrategy',
     'ISignalFilterStrategy',

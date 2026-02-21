@@ -8,8 +8,8 @@
 - GapUpDetector: 跳空高开检测
 """
 
-from backend.domain.strategy_interfaces import IEventDetectorStrategy, EventInfo
-from backend.core.strategy_registry import event_detector_registry
+from backend.arbitrage.domain.interfaces import IEventDetectorStrategy, EventInfo
+from backend.arbitrage.strategy_registry import event_detector_registry
 from typing import Dict, Optional
 
 

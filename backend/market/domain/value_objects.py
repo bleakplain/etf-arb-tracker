@@ -45,8 +45,11 @@ class LimitUpEvent:
 
 
 @dataclass(frozen=True)
-class ETFReference:
-    """ETF引用值对象（用于套利策略）"""
+class CandidateETF:
+    """候选ETF值对象（用于套利策略选择）
+
+    表示包含特定股票的ETF候选，套利策略从中选择最优的一个。
+    """
     etf_code: str
     etf_name: str
     weight: float

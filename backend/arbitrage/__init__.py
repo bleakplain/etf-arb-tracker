@@ -2,6 +2,7 @@
 
 from backend.arbitrage.domain import (
     TradingSignal,
+    ChosenETF,
     IEventDetectorStrategy,
     IFundSelectionStrategy,
     ISignalFilterStrategy,
@@ -9,6 +10,7 @@ from backend.arbitrage.domain import (
 
 __all__ = [
     'TradingSignal',
+    'ChosenETF',
     'IEventDetectorStrategy',
     'IFundSelectionStrategy',
     'ISignalFilterStrategy',

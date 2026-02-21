@@ -9,7 +9,7 @@ from typing import List
 from loguru import logger
 
 from backend.domain.interfaces import ISignalRepository
-from backend.domain.value_objects import TradingSignal
+from backend.arbitrage.domain.models import TradingSignal
 from backend.utils.time_utils import today_china
 
 

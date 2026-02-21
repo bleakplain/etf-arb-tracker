@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from backend.arbitrage.domain.models import TradingSignal
 from backend.market.domain.models import LimitUpStock
-from backend.market.domain import ETFReference, ETFCategory
+from backend.market.domain import CandidateETF
 
 
 @dataclass
@@ -121,9 +121,9 @@ class IFundSelectionStrategy(ABC):
     @abstractmethod
     def select(
         self,
-        eligible_funds: List[ETFReference],
+        eligible_funds: List[CandidateETF],
         event: EventInfo
-    ) -> Optional[ETFReference]:
+    ) -> Optional[CandidateETF]:
         """
         从符合条件的基金中选择最优的
 
@@ -137,7 +137,7 @@ class IFundSelectionStrategy(ABC):
         pass
 
     @abstractmethod
-    def get_selection_reason(self, fund: ETFReference) -> str:
+    def get_selection_reason(self, fund: CandidateETF) -> str:
         """
         获取选择原因说明
 
@@ -172,7 +172,7 @@ class ISignalFilterStrategy(ABC):
     def should_filter(
         self,
         event: EventInfo,
-        fund: ETFReference,
+        fund: CandidateETF,
         signal: TradingSignal
     ) -> tuple[bool, str]:
         """

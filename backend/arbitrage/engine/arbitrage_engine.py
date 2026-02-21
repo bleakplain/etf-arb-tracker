@@ -12,7 +12,7 @@ from typing import List, Optional, Dict, Any
 from loguru import logger
 from dataclasses import dataclass
 
-from backend.domain.strategy_interfaces import (
+from backend.arbitrage.domain.interfaces import (
     IEventDetectorStrategy,
     IFundSelectionStrategy,
     ISignalFilterStrategy,

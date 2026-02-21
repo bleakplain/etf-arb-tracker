@@ -2,7 +2,7 @@
 
 from backend.market.domain import (
     LimitUpStock, StockQuote, ETF, Holding,
-    ETFQuote, ETFReference, TradingHours, LimitUpEvent, ETFCategory,
+    ETFQuote, CandidateETF, TradingHours, LimitUpEvent, ETFCategory,
     IQuoteFetcher, IHoldingProvider
 )
 
@@ -12,7 +12,7 @@ __all__ = [
     'ETF',
     'Holding',
     'ETFQuote',
-    'ETFReference',
+    'CandidateETF',
     'TradingHours',
     'LimitUpEvent',
     'ETFCategory',

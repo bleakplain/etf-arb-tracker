@@ -8,10 +8,11 @@
 - ConfidenceFilter: 置信度过滤
 """
 
-from backend.domain.strategy_interfaces import ISignalFilterStrategy
-from backend.core.strategy_registry import signal_filter_registry
-from backend.domain.strategy_interfaces import EventInfo
-from backend.domain.value_objects import ETFReference, TradingSignal
+from backend.arbitrage.domain.interfaces import ISignalFilterStrategy
+from backend.arbitrage.strategy_registry import signal_filter_registry
+from backend.arbitrage.domain.interfaces import EventInfo
+from backend.arbitrage.domain.models import TradingSignal
+from backend.market.domain import CandidateETF
 from typing import Dict
 from datetime import datetime
 
@@ -45,7 +46,7 @@ class TimeFilter(ISignalFilterStrategy):
     def should_filter(
         self,
         event: EventInfo,
-        fund: ETFReference,
+        fund: CandidateETF,
         signal: TradingSignal
     ) -> tuple[bool, str]:
         """
@@ -118,7 +119,7 @@ class LiquidityFilter(ISignalFilterStrategy):
     def should_filter(
         self,
         event: EventInfo,
-        fund: ETFReference,
+        fund: CandidateETF,
         signal: TradingSignal
     ) -> tuple[bool, str]:
         """判断是否过滤该信号"""
@@ -171,7 +172,7 @@ class RiskFilter(ISignalFilterStrategy):
     def should_filter(
         self,
         event: EventInfo,
-        fund: ETFReference,
+        fund: CandidateETF,
         signal: TradingSignal
     ) -> tuple[bool, str]:
         """判断是否过滤该信号"""
@@ -221,7 +222,7 @@ class ConfidenceFilter(ISignalFilterStrategy):
     def should_filter(
         self,
         event: EventInfo,
-        fund: ETFReference,
+        fund: CandidateETF,
         signal: TradingSignal
     ) -> tuple[bool, str]:
         """判断是否过滤该信号"""

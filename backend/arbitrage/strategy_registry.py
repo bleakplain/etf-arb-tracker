@@ -13,14 +13,14 @@ from typing import Dict, List, Optional, Any
 from loguru import logger
 
 from backend.core.registry import PluginRegistry
-from backend.domain.strategy_interfaces import (
+from backend.arbitrage.domain.interfaces import (
     IEventDetectorStrategy,
     IFundSelectionStrategy,
     ISignalFilterStrategy,
     EventInfo,
-    ETFReference,
-    TradingSignal
 )
+from backend.market.domain import CandidateETF
+from backend.arbitrage.domain.models import TradingSignal
 
 
 # =============================================================================
