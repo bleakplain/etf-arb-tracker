@@ -14,12 +14,12 @@
 from typing import List, Optional, Dict, Any
 from loguru import logger
 
-from backend.domain.strategy_interfaces import (
+from backend.arbitrage.domain.interfaces import (
     IEventDetectorStrategy,
     IFundSelectionStrategy,
     ISignalFilterStrategy,
     EventInfo,
-    ETFReference,
+    CandidateETF,
     TradingSignal
 )
 
@@ -65,7 +65,7 @@ class StrategyExecutor:
     def execute(
         self,
         quote: Dict,
-        eligible_funds: List[ETFReference],
+        eligible_funds: List[CandidateETF],
         etf_quote_provider,
         signal_evaluator
     ) -> tuple[Optional[TradingSignal], List[str]]:

@@ -13,11 +13,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import datetime
 
-from backend.engine.arbitrage_engine import ArbitrageEngine, ScanResult
-from backend.engine.strategy_executor import StrategyExecutor
-from backend.strategies.event_detectors import LimitUpDetector
-from backend.strategies.fund_selectors import HighestWeightSelector
-from backend.strategies.signal_filters import TimeFilter
+from backend.arbitrage.engine.arbitrage_engine import ArbitrageEngine, ScanResult
+from backend.arbitrage.engine.strategy_executor import StrategyExecutor
+from backend.arbitrage.strategies.event_detectors import LimitUpDetector
+from backend.arbitrage.strategies.fund_selectors import HighestWeightSelector
+from backend.arbitrage.strategies.signal_filters import TimeFilter
 
 
 class MockQuoteFetcher:
@@ -149,7 +149,7 @@ def test_strategy_executor():
         'timestamp': '14:00:00'
     }
 
-    from backend.domain.value_objects import ETFReference
+    from backend.market.domain import CandidateETF
 
     eligible_funds = [
         ETFReference(

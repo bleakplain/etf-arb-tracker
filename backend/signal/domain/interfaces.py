@@ -1,7 +1,25 @@
 """信号领域接口"""
 
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Tuple, Dict
+
+
+class ISignalEvaluator(ABC):
+    """信号评估器接口"""
+
+    @abstractmethod
+    def evaluate(self, limit_info: Dict, etf_info: Dict) -> Tuple[str, str]:
+        """
+        评估信号质量
+
+        Args:
+            limit_info: 涨停股票信息
+            etf_info: ETF信息
+
+        Returns:
+            (置信度, 风险等级)
+        """
+        pass
 
 
 class ISignalRepository(ABC):

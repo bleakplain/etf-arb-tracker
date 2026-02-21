@@ -23,10 +23,10 @@ from backend.arbitrage.domain.interfaces import (
 from backend.arbitrage.domain.models import TradingSignal
 from backend.market.domain.interfaces import IQuoteFetcher, IHoldingProvider
 from backend.signal.domain.interfaces import ISignalEvaluator
-from backend.domain.value_objects import TradingSignal as VOT
+from backend.arbitrage.domain.models import TradingSignal as VOT
 
-from backend.engine.strategy_executor import StrategyExecutor
-from backend.core.strategy_registry import strategy_manager
+from backend.arbitrage.engine.strategy_executor import StrategyExecutor
+from backend.arbitrage.strategy_registry import strategy_manager
 from config import Config
 
 
@@ -72,7 +72,7 @@ class ArbitrageEngine:
         self,
         quote_fetcher: IQuoteFetcher,
         etf_holder_provider: IHoldingProvider,
-        etf_holdings_provider: IETFHoldingsProvider,
+        etf_holdings_provider: IHoldingProvider,
         etf_quote_provider: IQuoteFetcher,
         watch_securities: List[str],
         strategy_config: StrategyChainConfig = None,
