@@ -126,7 +126,7 @@ def build_mapping():
 def run_monitor():
     """运行监控器"""
     try:
-        from backend.strategy.limit_monitor import main
+        from backend.monitor.limit_monitor import main
         main()
     except Exception as e:
         logger.exception(f"监控器运行异常: {e}")

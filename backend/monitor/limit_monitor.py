@@ -7,6 +7,11 @@
 3. 提供简洁的API接口
 
 采用依赖注入模式，所有依赖通过构造函数传入
+
+架构层次：
+- API层依赖本模块
+- 本模块依赖 strategy, engine, data 层
+- 不应被 domain, data, strategy 等下层依赖
 """
 
 import time
@@ -40,6 +45,7 @@ from backend.strategy.signal_generator import SignalGenerator
 from backend.strategy.signal_repository import FileSignalRepository
 from backend.strategy.signal_evaluators import SignalEvaluatorFactory
 from backend.utils.code_utils import normalize_stock_code
+from backend.domain.strategy_interfaces import StrategyChainConfig
 
 from config import Config
 
@@ -75,7 +81,9 @@ class LimitUpMonitor:
         etf_quote_provider: IETFQuoteProvider,
         watch_stocks: List[StockConfig],
         config: Config = None,
-        evaluator_type: str = "default"
+        evaluator_type: str = "default",
+        use_strategy_chain: bool = False,
+        strategy_config: StrategyChainConfig = None
     ):
         """
         初始化监控器
@@ -88,9 +96,12 @@ class LimitUpMonitor:
             watch_stocks: 监控的股票列表
             config: 应用配置
             evaluator_type: 信号评估器类型
+            use_strategy_chain: 是否使用策略链模式（默认False使用传统模式）
+            strategy_config: 策略链配置（仅当use_strategy_chain=True时使用）
         """
         self.config = config or Config.load()
         self.watch_stocks = watch_stocks
+        self._use_strategy_chain = use_strategy_chain
 
         # 创建信号评估器
         self.signal_evaluator = SignalEvaluatorFactory.create(
@@ -118,6 +129,15 @@ class LimitUpMonitor:
 
         self._signal_repository = FileSignalRepository()
 
+        # 策略链引擎（可选）
+        self._strategy_engine = None
+        if self._use_strategy_chain:
+            self._init_strategy_engine(
+                quote_fetcher, etf_holder_provider,
+                etf_holdings_provider, etf_quote_provider,
+                strategy_config
+            )
+
         # 加载ETF映射
         self._load_or_build_mapping()
 
@@ -140,6 +160,46 @@ class LimitUpMonitor:
             etf_codes = [e.code for e in self.config.watch_etfs]
             self._etf_selector.build_mapping(stock_codes, etf_codes)
             self._etf_selector.save_mapping(mapping_file)
+
+    def _init_strategy_engine(
+        self,
+        quote_fetcher: IQuoteFetcher,
+        etf_holder_provider: IETFHolderProvider,
+        etf_holdings_provider: IETFHoldingsProvider,
+        etf_quote_provider: IETFQuoteProvider,
+        strategy_config: StrategyChainConfig = None
+    ) -> None:
+        """初始化策略链引擎"""
+        from backend.engine.arbitrage_engine import ArbitrageEngine
+
+        # 如果没有提供策略配置，使用默认配置（兼容A股涨停套利）
+        if strategy_config is None:
+            strategy_config = StrategyChainConfig(
+                event_detector="limit_up",
+                fund_selector="highest_weight",
+                signal_filters=["time_filter", "liquidity_filter"],
+                event_config={'min_change_pct': 0.095},
+                fund_config={'min_weight': self.config.strategy.min_weight},
+                filter_configs={
+                    'time_filter': {'min_time_to_close': self.config.strategy.min_time_to_close},
+                    'liquidity_filter': {'min_daily_amount': self.config.strategy.min_etf_volume * 10000}
+                }
+            )
+
+        watch_codes = [s.code for s in self.watch_stocks]
+
+        self._strategy_engine = ArbitrageEngine(
+            quote_fetcher=quote_fetcher,
+            etf_holder_provider=etf_holder_provider,
+            etf_holdings_provider=etf_holdings_provider,
+            etf_quote_provider=etf_quote_provider,
+            watch_securities=watch_codes,
+            strategy_config=strategy_config,
+            signal_evaluator=self.signal_evaluator,
+            config=self.config
+        )
+
+        logger.info(f"策略链引擎已启用: {strategy_config.to_dict()}")
 
     @property
     def stock_etf_mapping(self) -> dict:
@@ -253,6 +313,11 @@ class LimitUpMonitor:
         4. 验证时间、流动性等条件
         5. 生成买入信号
         """
+        # 如果启用了策略链模式，使用 ArbitrageEngine
+        if self._use_strategy_chain and self._strategy_engine:
+            return self._generate_signal_with_strategy_chain(stock_code)
+
+        # 传统模式
         # 1. 检查是否涨停
         limit_info = self._limit_checker.check_limit_up(stock_code)
         if not limit_info:
@@ -271,6 +336,14 @@ class LimitUpMonitor:
         # 4. 标记已处理
         self._limit_checker.mark_processed(stock_code)
 
+        return signal
+
+    def _generate_signal_with_strategy_chain(self, stock_code: str) -> Optional[TradingSignal]:
+        """使用策略链引擎生成信号"""
+        signal = self._strategy_engine.scan_security(stock_code)
+        if signal:
+            # 保存信号
+            self._signal_repository.save(signal)
         return signal
 
     def scan_all_stocks(self) -> List[TradingSignal]:
