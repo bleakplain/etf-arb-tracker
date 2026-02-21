@@ -9,6 +9,14 @@ from .interfaces import (
     ISignalRepository,
     ISignalSender
 )
+from .strategy_interfaces import (
+    IEventDetectorStrategy,
+    IFundSelectionStrategy,
+    ISignalFilterStrategy,
+    IStrategyConfig,
+    EventInfo,
+    StrategyChainConfig
+)
 from .value_objects import (
     StockQuote,
     ETFReference,
@@ -26,6 +34,13 @@ __all__ = [
     'IETFHoldingsProvider',
     'ISignalRepository',
     'ISignalSender',
+    # Strategy Interfaces (新增)
+    'IEventDetectorStrategy',
+    'IFundSelectionStrategy',
+    'ISignalFilterStrategy',
+    'IStrategyConfig',
+    'EventInfo',
+    'StrategyChainConfig',
     # Value Objects
     'StockQuote',
     'ETFReference',
@@ -36,3 +51,4 @@ __all__ = [
     # Models
     'LimitUpStock',
 ]
+

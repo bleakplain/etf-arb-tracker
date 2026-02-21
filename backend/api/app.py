@@ -720,6 +720,53 @@ async def get_plugin_stats():
     return get_plugin_stats()
 
 
+@app.get("/api/strategies")
+async def list_strategies():
+    """
+    列出所有已注册的策略
+
+    Returns:
+        策略列表和元数据 (事件检测、基金选择、信号过滤)
+    """
+    from backend.core.strategy_registry import strategy_manager
+
+    return strategy_manager.get_strategy_summary()
+
+
+@app.get("/api/strategies/validate")
+async def validate_strategy_chain(
+    event_detector: str = "limit_up",
+    fund_selector: str = "highest_weight",
+    filters: str = "time_filter,liquidity_filter"
+):
+    """
+    验证策略链是否有效
+
+    Args:
+        event_detector: 事件检测策略名称
+        fund_selector: 基金选择策略名称
+        filters: 过滤策略名称列表（逗号分隔）
+
+    Returns:
+        {
+            "valid": bool,
+            "errors": [str]
+        }
+    """
+    from backend.core.strategy_registry import strategy_manager
+
+    filter_list = [f.strip() for f in filters.split(",") if f.strip()]
+
+    is_valid, errors = strategy_manager.validate_strategy_chain(
+        event_detector, fund_selector, filter_list
+    )
+
+    return {
+        "valid": is_valid,
+        "errors": errors
+    }
+
+
 @app.get("/api/etfs/{code}/holdings")
 async def get_etf_holdings(code: str):
     """
