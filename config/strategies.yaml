@@ -1,0 +1,97 @@
+# A股ETF套利策略配置文件
+#
+# 本文件定义了套利策略链的配置，包括：
+# - 事件检测策略（检测什么样的套利机会）
+# - 基金选择策略（从候选基金中选择哪一个）
+# - 信号过滤策略（哪些信号应该被过滤）
+
+# 默认策略链配置
+default:
+  # 事件检测策略
+  # 可选值:
+  #   - limit_up: 涨停检测（A股）
+  #   - breakout: 突破检测（美股/港股）
+  event_detector: "limit_up"
+
+  # 事件检测策略配置
+  event_config:
+    min_change_pct: 0.095  # 最小涨幅阈值（9.5%）
+
+  # 基金选择策略
+  # 可选值:
+  #   - highest_weight: 权重最高
+  #   - best_liquidity: 流动性最好
+  #   - lowest_premium: 溢价最低
+  #   - balanced: 综合评估
+  fund_selector: "highest_weight"
+
+  # 基金选择策略配置
+  fund_config:
+    min_weight: 0.05  # 最小持仓权重（5%）
+
+  # 信号过滤策略列表（按顺序执行）
+  signal_filters:
+    - "time_filter"
+    - "liquidity_filter"
+    # 可选的额外过滤器:
+    # - "risk_filter"
+    # - "confidence_filter"
+
+  # 各过滤器的配置
+  filter_configs:
+    time_filter:
+      min_time_to_close: 1800  # 距收盘最小时间（30分钟）
+
+    liquidity_filter:
+      min_daily_amount: 50000000  # 最小日成交额（5000万元）
+
+    risk_filter:
+      max_top10_ratio: 0.70  # 前10持仓最大占比（70%）
+      min_rank: 1             # 最小排名要求（0=不限制）
+
+    confidence_filter:
+      min_confidence: "中"  # 最低置信度（低/中/高）
+
+# 美股策略配置示例（未来实现）
+# us_market:
+#   event_detector: "breakout"
+#   event_config:
+#     breakout_pct: 0.10  # 10%突破
+#     min_volume: 1000000  # 最小成交量
+#   fund_selector: "best_liquidity"
+#   signal_filters:
+#     - "us_trading_hours_filter"
+#     - "us_time_filter"
+
+# 港股策略配置示例（未来实现）
+# hk_market:
+#   event_detector: "breakout"
+#   fund_config:
+#     min_weight: 0.03  # 港股ETF权重要求可以更低
+#   signal_filters:
+#     - "hk_trading_hours_filter"
+
+# 保守策略配置（风险厌恶型）
+# conservative:
+#   event_detector: "limit_up"
+#   fund_selector: "balanced"  # 综合评估而不是只看权重
+#   signal_filters:
+#     - "time_filter"
+#     - "liquidity_filter"
+#     - "risk_filter"      # 添加风险过滤
+#   filter_configs:
+#     time_filter:
+#       min_time_to_close: 3600  # 更保守：1小时
+#     risk_filter:
+#       max_top10_ratio: 0.60  # 更保守：前10占比不超过60%
+
+# 激进策略配置（风险偏好型）
+# aggressive:
+#   event_detector: "limit_up"
+#   fund_selector: "highest_weight"
+#   signal_filters:
+#     - "time_filter"         # 只保留时间过滤
+#     # 移除流动性和风险过滤，追求更多机会
+#   filter_configs:
+#     time_filter:
+#       min_time_to_close: 300  # 更激进：距收盘5分钟即可
