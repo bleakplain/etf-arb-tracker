@@ -30,7 +30,7 @@ except Exception:
     from config.logger import setup, LoggerSettings
     setup(LoggerSettings())
 
-from backend.monitor.limit_monitor import LimitUpMonitor, create_monitor_with_defaults
+from backend.market.service.limit_monitor import LimitUpMonitor, create_monitor_with_defaults
 from backend.notification.sender import create_sender_from_config
 from backend.data.limit_up_stocks import LimitUpStocksFetcher
 from backend.data.kline import KlineDataFetcher
