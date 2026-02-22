@@ -121,7 +121,7 @@ class ArbitrageEngineCN:
     def _get_default_config(self) -> ArbitrageEngineConfig:
         """获取A股默认引擎配置"""
         return ArbitrageEngineConfig(
-            event_detector="limit_up",
+            event_detector="limit_up_cn",
             fund_selector="highest_weight",
             signal_filters=["cn_time_filter", "liquidity_filter"],
             event_config={'min_change_pct': 0.095},

@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import datetime
 
 # 导入策略模块以触发注册
-from backend.arbitrage.cn.strategies.event_detectors import LimitUpDetector
+from backend.arbitrage.cn.strategies.event_detectors import LimitUpDetectorCN
 from backend.arbitrage.cn.strategies.fund_selectors import HighestWeightSelector
 
 from backend.arbitrage.cn import ArbitrageEngineCN as ArbitrageEngine, ScanResult
@@ -133,7 +133,7 @@ def test_arbitrage_engine():
 
     # 创建策略配置（不使用时间过滤器，因为测试可能不在交易时间运行）
     engine_config = ArbitrageEngineConfig(
-        event_detector="limit_up",
+        event_detector="limit_up_cn",
         fund_selector="highest_weight",
         signal_filters=[],  # 不使用过滤器
         event_config={'min_change_pct': 0.095},
