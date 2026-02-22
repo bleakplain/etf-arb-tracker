@@ -728,19 +728,19 @@ async def list_strategies():
     Returns:
         策略列表和元数据 (事件检测、基金选择、信号过滤)
     """
-    from backend.core.strategy_registry import strategy_manager
+    from backend.arbitrage.strategy_registry import strategy_manager
 
     return strategy_manager.get_strategy_summary()
 
 
 @app.get("/api/strategies/validate")
-async def validate_strategy_chain(
+async def validate_strategy_combination(
     event_detector: str = "limit_up",
     fund_selector: str = "highest_weight",
     filters: str = "time_filter,liquidity_filter"
 ):
     """
-    验证策略链是否有效
+    验证策略组合是否有效
 
     Args:
         event_detector: 事件检测策略名称
@@ -753,11 +753,11 @@ async def validate_strategy_chain(
             "errors": [str]
         }
     """
-    from backend.core.strategy_registry import strategy_manager
+    from backend.arbitrage.strategy_registry import strategy_manager
 
     filter_list = [f.strip() for f in filters.split(",") if f.strip()]
 
-    is_valid, errors = strategy_manager.validate_strategy_chain(
+    is_valid, errors = strategy_manager.validate_strategy_combination(
         event_detector, fund_selector, filter_list
     )
 

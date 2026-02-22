@@ -1,8 +1,12 @@
-"""套利领域模型"""
+"""套利领域模型
 
-from dataclasses import dataclass, field
-from typing import Dict, Optional
-from datetime import datetime
+跨市场的通用模型定义：
+- TradingSignal: 交易信号实体
+- ChosenETF: 选中的ETF值对象
+"""
+
+from dataclasses import dataclass
+from typing import Dict
 
 
 @dataclass(frozen=True)
@@ -34,18 +38,16 @@ class ChosenETF:
 @dataclass(frozen=True)
 class TradingSignal:
     """交易信号实体
-    
+
     由套利引擎生成，表示一个套利机会
     """
     signal_id: str
     timestamp: str
 
-    # 涨停股票信息
+    # 事件证券信息
     stock_code: str
     stock_name: str
     stock_price: float
-    limit_time: str
-    seal_amount: float
     change_pct: float
 
     # ETF信息
@@ -64,6 +66,10 @@ class TradingSignal:
     actual_weight: float
     weight_rank: int
     top10_ratio: float
+
+    # A股特有字段（可选，保持向后兼容）
+    limit_time: str = ""
+    seal_amount: float = 0
 
     def __post_init__(self):
         if not self.signal_id:

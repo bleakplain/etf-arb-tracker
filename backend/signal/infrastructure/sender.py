@@ -15,8 +15,8 @@ Example:
 from typing import List
 from loguru import logger
 
-from backend.arbitrage.domain.models import TradingSignal
-from backend.arbitrage.registry import sender_registry
+from backend.arbitrage.models import TradingSignal
+from backend.utils.plugin_registry import sender_registry
 
 
 class NotificationSender:
@@ -127,7 +127,7 @@ def create_sender_from_config(config) -> NotificationSender:
 
 # 测试代码
 if __name__ == "__main__":
-    from backend.arbitrage.domain.models import TradingSignal
+    from backend.arbitrage.models import TradingSignal
     from datetime import datetime
 
     # 创建测试信号

@@ -2,9 +2,9 @@
 策略注册表系统
 
 为套利策略提供插件注册表，支持：
-- 事件检测策略 (IEventDetectorStrategy)
-- 基金选择策略 (IFundSelectionStrategy)
-- 信号过滤策略 (ISignalFilterStrategy)
+- 事件检测策略 (IEventDetector)
+- 基金选择策略 (IFundSelector)
+- 信号过滤策略 (ISignalFilter)
 
 与 plugin_registry.py 配合使用，实现策略的可插拔扩展。
 """
@@ -12,15 +12,15 @@
 from typing import Dict, List, Optional, Any
 from loguru import logger
 
-from backend.arbitrage.registry import PluginRegistry
-from backend.arbitrage.domain.interfaces import (
-    IEventDetectorStrategy,
-    IFundSelectionStrategy,
-    ISignalFilterStrategy,
-    EventInfo,
+from backend.utils.plugin_registry import PluginRegistry
+from backend.arbitrage.cn.strategies.interfaces import (
+    IEventDetector,
+    IFundSelector,
+    ISignalFilter,
 )
+from backend.market.domain.events import MarketEvent
 from backend.market.domain import CandidateETF
-from backend.arbitrage.domain.models import TradingSignal
+from backend.arbitrage.models import TradingSignal
 
 
 # =============================================================================
@@ -30,19 +30,19 @@ from backend.arbitrage.domain.models import TradingSignal
 # 事件检测策略注册表
 event_detector_registry = PluginRegistry(
     "EventDetector",
-    base_class=IEventDetectorStrategy
+    base_class=IEventDetector
 )
 
 # 基金选择策略注册表
 fund_selector_registry = PluginRegistry(
     "FundSelector",
-    base_class=IFundSelectionStrategy
+    base_class=IFundSelector
 )
 
 # 信号过滤策略注册表
 signal_filter_registry = PluginRegistry(
     "SignalFilter",
-    base_class=ISignalFilterStrategy
+    base_class=ISignalFilter
 )
 
 
@@ -58,14 +58,14 @@ class StrategyManager:
     """
 
     def __init__(self):
-        self._event_detectors: Dict[str, IEventDetectorStrategy] = {}
-        self._fund_selectors: Dict[str, IFundSelectionStrategy] = {}
-        self._signal_filters: Dict[str, ISignalFilterStrategy] = {}
+        self._event_detectors: Dict[str, IEventDetector] = {}
+        self._fund_selectors: Dict[str, IFundSelector] = {}
+        self._signal_filters: Dict[str, ISignalFilter] = {}
 
     def register_event_detector(
         self,
         name: str,
-        detector: IEventDetectorStrategy,
+        detector: IEventDetector,
         config: Dict = None
     ) -> None:
         """注册事件检测策略"""
@@ -75,7 +75,7 @@ class StrategyManager:
     def register_fund_selector(
         self,
         name: str,
-        selector: IFundSelectionStrategy,
+        selector: IFundSelector,
         config: Dict = None
     ) -> None:
         """注册基金选择策略"""
@@ -85,22 +85,22 @@ class StrategyManager:
     def register_signal_filter(
         self,
         name: str,
-        filter_strategy: ISignalFilterStrategy,
+        filter_strategy: ISignalFilter,
         config: Dict = None
     ) -> None:
         """注册信号过滤策略"""
         self._signal_filters[name] = filter_strategy
         logger.debug(f"注册信号过滤策略: {name}")
 
-    def get_event_detector(self, name: str) -> Optional[IEventDetectorStrategy]:
+    def get_event_detector(self, name: str) -> Optional[IEventDetector]:
         """获取事件检测策略"""
         return self._event_detectors.get(name)
 
-    def get_fund_selector(self, name: str) -> Optional[IFundSelectionStrategy]:
+    def get_fund_selector(self, name: str) -> Optional[IFundSelector]:
         """获取基金选择策略"""
         return self._fund_selectors.get(name)
 
-    def get_signal_filter(self, name: str) -> Optional[ISignalFilterStrategy]:
+    def get_signal_filter(self, name: str) -> Optional[ISignalFilter]:
         """获取信号过滤策略"""
         return self._signal_filters.get(name)
 
@@ -134,9 +134,9 @@ class StrategyManager:
 
         Returns:
             {
-                'event_detector': IEventDetectorStrategy,
-                'fund_selector': IFundSelectionStrategy,
-                'filters': List[ISignalFilterStrategy]
+                'event_detector': IEventDetector,
+                'fund_selector': IFundSelector,
+                'filters': List[ISignalFilter]
             }
         """
         configs = configs or {}
@@ -186,14 +186,14 @@ class StrategyManager:
             'filters': filters
         }
 
-    def validate_strategy_chain(
+    def validate_strategy_combination(
         self,
         event_detector: str,
         fund_selector: str,
         filters: List[str]
     ) -> tuple[bool, List[str]]:
         """
-        验证策略链是否完整
+        验证策略组合是否完整
 
         Args:
             event_detector: 事件检测策略名称

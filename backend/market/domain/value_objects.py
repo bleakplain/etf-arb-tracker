@@ -7,44 +7,6 @@ from typing import Dict, Any, Optional
 
 
 @dataclass(frozen=True)
-class LimitUpEvent:
-    """涨停事件
-
-    由market模块发布，arbitrage模块监听此事件生成套利信号
-    """
-    event_id: str
-    stock_code: str
-    stock_name: str
-    price: float
-    change_pct: float
-    limit_time: str
-    seal_amount: float = 0
-    timestamp: str = ""
-    metadata: Dict[str, Any] = None
-
-    def __post_init__(self):
-        if not self.event_id:
-            object.__setattr__(self, 'event_id', f"evt_{datetime.now().strftime('%Y%m%d%H%M%S')}_{self.stock_code}")
-        if not self.timestamp:
-            object.__setattr__(self, 'timestamp', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        if self.metadata is None:
-            object.__setattr__(self, 'metadata', {})
-
-    @classmethod
-    def from_limit_up_stock(cls, stock: 'LimitUpStock') -> 'LimitUpEvent':
-        """从LimitUpStock实体创建事件"""
-        return cls(
-            stock_code=stock.stock_code,
-            stock_name=stock.stock_name,
-            price=stock.price,
-            change_pct=stock.change_pct,
-            limit_time=stock.limit_time,
-            seal_amount=stock.seal_amount,
-            timestamp=stock.timestamp
-        )
-
-
-@dataclass(frozen=True)
 class CandidateETF:
     """候选ETF值对象（用于套利策略选择）
 

@@ -9,7 +9,7 @@ from datetime import datetime
 from collections import Counter
 from loguru import logger
 
-from backend.domain.value_objects import TradingSignal
+from backend.arbitrage.models import TradingSignal
 from backend.backtest.metrics import StatisticsCalculator, SignalStatistics
 
 

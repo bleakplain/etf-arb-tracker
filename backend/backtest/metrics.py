@@ -9,7 +9,7 @@ from typing import List, Tuple, Dict, Any
 from datetime import datetime
 from collections import Counter
 
-from backend.domain.value_objects import TradingSignal
+from backend.arbitrage.models import TradingSignal
 
 
 @dataclass

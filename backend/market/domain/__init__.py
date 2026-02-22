@@ -1,7 +1,8 @@
 """市场领域模块"""
 
 from backend.market.domain.models import LimitUpStock, StockQuote, ETF, Holding, ETFCategory
-from backend.market.domain.value_objects import ETFQuote, CandidateETF, TradingHours, LimitUpEvent
+from backend.market.domain.value_objects import ETFQuote, CandidateETF, TradingHours
+from backend.market.domain.events import MarketEvent, LimitUpEvent, BreakoutEvent
 from backend.market.domain.interfaces import IQuoteFetcher, IHoldingProvider
 
 __all__ = [
@@ -14,8 +15,11 @@ __all__ = [
     'ETFQuote',
     'CandidateETF',
     'TradingHours',
-    'LimitUpEvent',
     'ETFCategory',
+    # 事件
+    'MarketEvent',
+    'LimitUpEvent',
+    'BreakoutEvent',
     # 接口
     'IQuoteFetcher',
     'IHoldingProvider',
