@@ -117,45 +117,41 @@ class ETF:
 
 
 @dataclass(frozen=True)
-class MarketSchedule:
-    """市场交易时段（通用值对象，无默认值）"""
-    morning_start: str
-    morning_end: str
-    afternoon_start: str
-    afternoon_end: str
+class TradingSession:
+    """交易时段（起止时间）"""
+    start: str  # 开始时间，格式 "HH:MM"
+    end: str    # 结束时间，格式 "HH:MM"
 
-    def is_trading_time(self, current_time: datetime = None) -> bool:
-        """判断是否在交易时间内"""
+    def is_active(self, current_time: datetime = None) -> bool:
+        """判断当前是否在该时段内"""
         if current_time is None:
             current_time = datetime.now()
 
         from datetime import time
         now = current_time.time()
+        start_time = time.fromisoformat(self.start)
+        end_time = time.fromisoformat(self.end)
 
-        morning_start = time.fromisoformat(self.morning_start)
-        morning_end = time.fromisoformat(self.morning_end)
-        afternoon_start = time.fromisoformat(self.afternoon_start)
-        afternoon_end = time.fromisoformat(self.afternoon_end)
+        return start_time <= now <= end_time
 
-        return (morning_start <= now <= morning_end or
-                afternoon_start <= now <= afternoon_end)
-
-    def get_time_to_close(self, current_time: datetime = None) -> int:
-        """获取距离收盘的秒数"""
+    def get_time_to_end(self, current_time: datetime = None) -> int:
+        """获取距离该时段结束的秒数"""
         if current_time is None:
             current_time = datetime.now()
 
         from datetime import time
-        afternoon_end = time.fromisoformat(self.afternoon_end)
+        end_time = time.fromisoformat(self.end)
 
-        close_time = current_time.replace(
-            hour=afternoon_end.hour,
-            minute=afternoon_end.minute,
+        session_end = current_time.replace(
+            hour=end_time.hour,
+            minute=end_time.minute,
             second=0,
             microsecond=0
         )
 
-        if current_time.hour < afternoon_end.hour:
-            delta = close_time - current_time
-            return int(delta.total_seconds())
-        return -1
+        delta = session_end - current_time
+        return max(0, int(delta.total_seconds()))
+
+
+# 类型别名，保留向后兼容
+MarketSchedule = TradingSession
