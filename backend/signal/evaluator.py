@@ -16,13 +16,16 @@ from backend.utils.plugin_registry import evaluator_registry
 
 class SignalEvaluator(ISignalEvaluator, ABC):
     """
-    信号评估器基类（实现接口）
+    信号评估器基类
 
     所有自定义评估器应继承此类并使用 @evaluator_registry.register() 装饰器注册。
 
     Example:
         @evaluator_registry.register("custom", priority=50, description="My custom evaluator")
         class MyCustomEvaluator(SignalEvaluator):
+            def __init__(self, config: SignalEvaluationConfig):
+                self.config = config
+
             def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
                 return "高", "低"
     """
@@ -120,25 +123,15 @@ class DefaultSignalEvaluator(SignalEvaluator):
 
         return confidence, risk_level
 
-    @staticmethod
-    def _get_time_to_close() -> int:
-        """获取距离收盘的秒数"""
-        now = datetime.now()
-        close_time = now.replace(hour=15, minute=0, second=0, microsecond=0)
 
-        if now.hour < 9 or now.hour >= 15:
-            return -1
-
-        delta = close_time - now
-        return int(delta.total_seconds())
-
-
+@evaluator_registry.register(
+    "conservative",
+    priority=90,
+    description="保守型评估器 - 更严格的评估标准",
+    version="1.0.0"
+)
 class ConservativeEvaluator(SignalEvaluator):
-    """
-    保守型评估器 - 更严格的评估标准
-
-    注意：此类保留用于向后兼容，建议使用自定义评估器
-    """
+    """保守型评估器 - 更严格的评估标准"""
 
     def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
         """保守型评估 - 偏向低置信度、高风险"""
@@ -158,7 +151,7 @@ class ConservativeEvaluator(SignalEvaluator):
             confidence = "低"
 
         # 更保守的时间评估
-        time_to_close = SignalEvaluator._get_time_to_close()
+        time_to_close = self._get_time_to_close()
         if time_to_close < 1800:  # 30分钟内即为高风险
             risk_level = "高"
         elif time_to_close > 7200:  # 2小时以上才低风险
@@ -174,6 +167,12 @@ class ConservativeEvaluator(SignalEvaluator):
         return confidence, risk_level
 
 
+@evaluator_registry.register(
+    "aggressive",
+    priority=80,
+    description="激进型评估器 - 更宽松的评估标准",
+    version="1.0.0"
+)
 class AggressiveEvaluator(SignalEvaluator):
     """激进型评估器 - 更宽松的评估标准"""
 
@@ -196,7 +195,7 @@ class AggressiveEvaluator(SignalEvaluator):
                 confidence = "中"
 
         # 更激进的时间评估
-        time_to_close = SignalEvaluator._get_time_to_close()
+        time_to_close = self._get_time_to_close()
         if time_to_close < 300:  # 5分钟内才高风险
             risk_level = "高"
         elif time_to_close > 1800:  # 30分钟以上即低风险
@@ -210,9 +209,6 @@ class AggressiveEvaluator(SignalEvaluator):
 class SignalEvaluatorFactory:
     """
     信号评估器工厂（使用插件注册表）
-
-    现在支持通过插件注册表动态获取评估器，
-    无需修改此工厂类即可添加新的评估器类型。
     """
 
     @staticmethod
@@ -221,7 +217,7 @@ class SignalEvaluatorFactory:
         创建信号评估器
 
         Args:
-            evaluator_type: 评估器类型 ('default', 'conservative', 'aggressive' 或自定义名称)
+            evaluator_type: 评估器类型
             config: 信号评估配置
 
         Returns:
@@ -231,18 +227,9 @@ class SignalEvaluatorFactory:
             ValueError: 如果指定的评估器类型未注册
         """
         if config is None:
-            # 使用默认配置
             config = SignalEvaluationConfig()
 
-        # 从注册表获取评估器类
         evaluator_cls = evaluator_registry.get(evaluator_type.lower())
-
-        if evaluator_cls is None:
-            # 尝试不区分大小写查找
-            for name in evaluator_registry.list_names():
-                if name.lower() == evaluator_type.lower():
-                    evaluator_cls = evaluator_registry.get(name)
-                    break
 
         if evaluator_cls is None:
             available = ", ".join(evaluator_registry.list_names())

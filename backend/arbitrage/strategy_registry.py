@@ -9,7 +9,7 @@
 与 plugin_registry.py 配合使用，实现策略的可插拔扩展。
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from loguru import logger
 
 from backend.utils.plugin_registry import PluginRegistry
@@ -191,7 +191,7 @@ class StrategyManager:
         event_detector: str,
         fund_selector: str,
         filters: List[str]
-    ) -> tuple[bool, List[str]]:
+    ) -> Tuple[bool, List[str]]:
         """
         验证策略组合是否完整
 
