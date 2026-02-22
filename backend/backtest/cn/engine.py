@@ -65,7 +65,9 @@ class CNBacktestEngine:
 
         # 初始化持仓快照管理器
         self.holdings_manager = HoldingsSnapshotManager(
-            snapshot_dates=config.snapshot_dates
+            snapshot_dates=config.snapshot_dates,
+            start_date=config.start_date,
+            end_date=config.end_date
         )
 
         # 历史行情适配器（后续初始化）
@@ -136,7 +138,7 @@ class CNBacktestEngine:
             # 4. 创建持仓数据提供者适配器
             from .adapters.holding_provider import HistoricalHoldingProviderAdapter
 
-            holding_provider = HistoricalHoldingProviderAdapter(
+            self.holding_provider = HistoricalHoldingProviderAdapter(
                 snapshot_manager=self.holdings_manager,
                 interpolation=self.config.interpolation
             )
@@ -149,7 +151,7 @@ class CNBacktestEngine:
 
             self.arbitrage_engine = ArbitrageEngineCN(
                 quote_fetcher=self.quote_fetcher_adapter,
-                etf_holding_provider=holding_provider,
+                etf_holding_provider=self.holding_provider,
                 signal_evaluator=signal_evaluator,
                 min_time_to_close=self.config.min_time_to_close,
                 min_etf_volume=self.config.min_etf_volume
@@ -190,8 +192,9 @@ class CNBacktestEngine:
                     # 推进时间
                     current_time = self.clock.advance()
 
-                    # 更新行情适配器的当前时间
+                    # 更新适配器的当前时间
                     self.quote_fetcher_adapter.set_current_time(current_time)
+                    self.holding_provider.set_current_time(current_time)
 
                     # 检查是否在交易时间
                     if not self.clock.is_trading_time():

@@ -90,7 +90,9 @@ class HoldingsSnapshotManager:
     def __init__(
         self,
         snapshot_dates: Optional[List[str]] = None,
-        cache_dir: str = "data/historical/holdings"
+        cache_dir: str = "data/historical/holdings",
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
     ):
         """
         初始化持仓快照管理器
@@ -99,13 +101,19 @@ class HoldingsSnapshotManager:
             snapshot_dates: 快照日期列表，格式 "YYYYMMDD"
                           如果不指定，自动生成每季度初的日期
             cache_dir: 缓存目录
+            start_date: 回测开始日期 "YYYYMMDD"（用于生成默认快照日期）
+            end_date: 回测结束日期 "YYYYMMDD"（用于生成默认快照日期）
         """
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # 生成快照日期
+        default_dates = None
+        if snapshot_dates is None and start_date and end_date:
+            default_dates = self._generate_quarterly_dates(start_date, end_date)
+
         self.snapshot_dates = [
-            datetime.strptime(d, "%Y%m%d") for d in (snapshot_dates or self._generate_quarterly_dates())
+            datetime.strptime(d, "%Y%m%d") for d in (snapshot_dates or default_dates or self._generate_quarterly_dates())
         ]
 
         # 存储快照数据
@@ -114,8 +122,43 @@ class HoldingsSnapshotManager:
         logger.info(f"持仓快照管理器初始化，快照日期: {len(self.snapshot_dates)}个")
 
     @staticmethod
-    def _generate_quarterly_dates() -> List[str]:
-        """生成每季度初的日期（年初、4月初、7月初、10月初）"""
+    def _generate_quarterly_dates(start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[str]:
+        """
+        生成每季度初的日期（年初、4月初、7月初、10月初）
+
+        Args:
+            start_date: 开始日期 "YYYYMMDD"（可选）
+            end_date: 结束日期 "YYYYMMDD"（可选）
+
+        Returns:
+            季度日期列表
+        """
+        # 如果提供了日期范围，根据范围生成季度日期
+        if start_date and end_date:
+            try:
+                start = datetime.strptime(start_date, "%Y%m%d")
+                end = datetime.strptime(end_date, "%Y%m%d")
+
+                dates = []
+                current = datetime(start.year, 1, 1)  # 从年初开始
+
+                # 季度起始月份
+                quarter_starts = [1, 4, 7, 10]
+
+                while current <= end:
+                    if current.month in quarter_starts:
+                        if current >= start:
+                            dates.append(current.strftime("%Y%m%d"))
+                    # 移动到下个月
+                    if current.month == 12:
+                        current = current.replace(year=current.year + 1, month=1)
+                    else:
+                        current = current.replace(month=current.month + 1)
+
+                return dates if dates else None
+            except Exception:
+                pass
+
         # 简化：返回固定的季度日期
         # 实际使用时应该根据回测范围生成
         return [

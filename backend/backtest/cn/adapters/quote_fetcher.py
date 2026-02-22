@@ -140,19 +140,26 @@ class HistoricalQuoteFetcherAdapter(IQuoteFetcher):
         """获取指定时间点的行情"""
         from datetime import datetime
 
+        target_date = target_time.date() if isinstance(target_time, datetime) else target_time
+
         # 如果是日级别粒度，直接获取当天的数据
         if self._granularity == TimeGranularity.DAILY:
-            target_date = target_time.date() if isinstance(target_time, datetime) else target_time
             for dt, quote in data.items():
-                if dt.date() == target_date or dt == target_date:
+                data_date = dt.date() if isinstance(dt, datetime) else dt
+                if data_date == target_date:
                     return quote
             return None
 
-        # 分钟级别：找到最接近的时间点
+        # 分钟级别：找到同一天内最接近的时间点
         best_match = None
         min_diff = float('inf')
 
         for dt, quote in data.items():
+            # 确保只匹配同一天的数据
+            data_date = dt.date() if isinstance(dt, datetime) else dt
+            if data_date != target_date:
+                continue
+
             diff = abs((dt - target_time).total_seconds())
             if diff < min_diff:
                 min_diff = diff
