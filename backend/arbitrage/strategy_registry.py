@@ -57,10 +57,17 @@ class StrategyManager:
     负责管理所有策略的注册、创建和执行
     """
 
-    def __init__(self):
+    def __init__(self, use_registries: bool = True):
+        """
+        初始化策略管理器
+
+        Args:
+            use_registries: 是否使用全局注册表。测试时可设为False以避免全局状态
+        """
         self._event_detectors: Dict[str, IEventDetector] = {}
         self._fund_selectors: Dict[str, IFundSelector] = {}
         self._signal_filters: Dict[str, ISignalFilter] = {}
+        self._use_registries = use_registries
 
     def register_event_detector(
         self,
@@ -243,6 +250,69 @@ class StrategyManager:
             }
         }
 
+    def create_direct(
+        self,
+        event_detector: IEventDetector,
+        fund_selector: IFundSelector,
+        filters: List[ISignalFilter] = None
+    ) -> Dict[str, Any]:
+        """
+        直接使用传入的策略实例创建策略组合
+
+        用于测试时直接注入 mock 策略，避免依赖全局注册表
+
+        Args:
+            event_detector: 事件检测策略实例
+            fund_selector: 基金选择策略实例
+            filters: 过滤策略实例列表
+
+        Returns:
+            {
+                'event_detector': IEventDetector,
+                'fund_selector': IFundSelector,
+                'filters': List[ISignalFilter]
+            }
+        """
+        return {
+            'event_detector': event_detector,
+            'fund_selector': fund_selector,
+            'filters': filters or []
+        }
+
+    def reset(self) -> None:
+        """
+        重置策略管理器
+
+        清除所有已注册的策略。用于测试隔离。
+        """
+        self._event_detectors.clear()
+        self._fund_selectors.clear()
+        self._signal_filters.clear()
+        logger.debug("策略管理器已重置")
+
 
 # 全局策略管理器实例
 strategy_manager = StrategyManager()
+
+
+def get_strategy_manager() -> StrategyManager:
+    """
+    获取全局策略管理器实例
+
+    Returns:
+        全局 StrategyManager 实例
+    """
+    return strategy_manager
+
+
+def create_test_strategy_manager() -> StrategyManager:
+    """
+    创建测试专用的策略管理器
+
+    返回一个不使用全局注册表的管理器实例，
+    避免测试之间的状态污染。
+
+    Returns:
+        独立的 StrategyManager 实例
+    """
+    return StrategyManager(use_registries=True)

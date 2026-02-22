@@ -1,9 +1,8 @@
 """
-ArbitrageEngine 单元测试
+ArbitrageEngine 兼容性测试
 
-测试套利引擎的核心功能：
-1. 套利引擎
-2. 策略组合配置
+保留原有测试结构以确保向后兼容
+建议使用 tests/unit/test_arbitrage_engine.py 中的新测试
 """
 
 import sys
@@ -186,3 +185,4 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
+

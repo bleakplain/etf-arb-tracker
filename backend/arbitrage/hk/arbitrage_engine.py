@@ -4,12 +4,15 @@
 港股市场套利引擎框架（待实现）
 """
 
-from typing import List
+from typing import List, TYPE_CHECKING
 from loguru import logger
 
 from backend.market.interfaces import IQuoteFetcher, IETFHoldingProvider
-from backend.signal.interfaces import ISignalEvaluator
 from config import Config
+
+# 延迟导入以避免循环依赖
+if TYPE_CHECKING:
+    from backend.signal.interfaces import ISignalEvaluator
 
 
 class ArbitrageEngineHK:
@@ -26,7 +29,7 @@ class ArbitrageEngineHK:
         etf_holdings_provider: IETFHoldingProvider,
         etf_quote_provider: IQuoteFetcher,
         watch_securities: List[str] = None,
-        signal_evaluator: ISignalEvaluator = None,
+        signal_evaluator: 'ISignalEvaluator' = None,
         config: Config = None
     ):
         """

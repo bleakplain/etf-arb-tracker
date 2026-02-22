@@ -4,7 +4,7 @@ A股套利引擎
 专门处理A股市场的涨停套利逻辑。
 """
 
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any, Tuple, TYPE_CHECKING
 from loguru import logger
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,8 +13,8 @@ from backend.arbitrage.config import ArbitrageEngineConfig
 from backend.arbitrage.models import TradingSignal
 from backend.market import CandidateETF
 from backend.market.interfaces import IQuoteFetcher, IETFHoldingProvider
-from backend.signal.interfaces import ISignalEvaluator
-from backend.arbitrage.strategy_registry import strategy_manager
+from backend.arbitrage.strategy_registry import strategy_manager, StrategyManager
+from backend.arbitrage.interfaces import FileMappingRepository, IMappingRepository
 from backend.arbitrage.cn.strategies.interfaces import (
     IEventDetector,
     IFundSelector,
@@ -23,6 +23,10 @@ from backend.arbitrage.cn.strategies.interfaces import (
 from backend.market.cn.events import LimitUpEvent
 from backend.market.events import MarketEvent
 from config import Config
+
+# 延迟导入以避免循环依赖
+if TYPE_CHECKING:
+    from backend.signal.interfaces import ISignalEvaluator
 
 
 @dataclass
@@ -71,8 +75,10 @@ class ArbitrageEngineCN:
         etf_quote_provider: IQuoteFetcher,
         watch_securities: List[str] = None,
         engine_config: ArbitrageEngineConfig = None,
-        signal_evaluator: ISignalEvaluator = None,
-        config: Config = None
+        signal_evaluator: 'ISignalEvaluator' = None,
+        config: Config = None,
+        strategy_manager_instance: StrategyManager = None,
+        mapping_repository: IMappingRepository = None
     ):
         """
         初始化A股套利引擎
@@ -86,6 +92,8 @@ class ArbitrageEngineCN:
             engine_config: 套利引擎配置
             signal_evaluator: 信号评估器
             config: 应用配置
+            strategy_manager_instance: 策略管理器（用于测试，默认使用全局实例）
+            mapping_repository: 映射仓储（用于测试，默认使用文件仓储）
         """
         self._quote_fetcher = quote_fetcher
         self._etf_holder_provider = etf_holder_provider
@@ -93,6 +101,8 @@ class ArbitrageEngineCN:
         self._etf_quote_provider = etf_quote_provider
         self._signal_evaluator = signal_evaluator
         self._config = config or Config.load()
+        self._strategy_manager = strategy_manager_instance or strategy_manager
+        self._mapping_repository = mapping_repository or FileMappingRepository("data/cn_stock_etf_mapping.json")
 
         # 加载默认监控列表
         if watch_securities is None:
@@ -135,7 +145,7 @@ class ArbitrageEngineCN:
 
     def _init_strategies(self) -> None:
         """初始化策略组件"""
-        strategies = strategy_manager.create_from_registry(
+        strategies = self._strategy_manager.create_from_registry(
             event_detector_name=self._engine_config.event_detector,
             fund_selector_name=self._engine_config.fund_selector,
             filter_names=self._engine_config.signal_filters,
@@ -152,10 +162,8 @@ class ArbitrageEngineCN:
 
     def _build_or_load_mapping(self) -> None:
         """构建或加载证券-基金映射"""
-        mapping_file = self._get_mapping_file_path()
-
         try:
-            self._security_fund_mapping = self._etf_holder_provider.load_mapping(mapping_file) or {}
+            self._security_fund_mapping = self._mapping_repository.load_mapping() or {}
         except Exception:
             self._security_fund_mapping = {}
 
@@ -167,12 +175,8 @@ class ArbitrageEngineCN:
             self._security_fund_mapping = self._etf_holder_provider.build_stock_etf_mapping(
                 self._watch_securities, fund_codes
             )
-            self._etf_holder_provider.save_mapping(self._security_fund_mapping, mapping_file)
+            self._mapping_repository.save_mapping(self._security_fund_mapping)
             logger.info(f"映射构建完成，覆盖 {len(self._security_fund_mapping)} 只证券")
-
-    def _get_mapping_file_path(self) -> str:
-        """获取A股映射文件路径"""
-        return "data/cn_stock_etf_mapping.json"
 
     def _get_watch_fund_codes(self) -> List[str]:
         """获取监控的基金代码列表"""
@@ -331,10 +335,10 @@ class ArbitrageEngineCN:
 
         # 步骤6: 评估信号质量
         if self._signal_evaluator:
+            from dataclasses import replace
             confidence, risk_level = self._signal_evaluator.evaluate(event, selected_fund)
 
-            signal.confidence = confidence
-            signal.risk_level = risk_level
+            signal = replace(signal, confidence=confidence, risk_level=risk_level)
             logs.append(f"✓ 信号评估: 置信度={confidence}, 风险={risk_level}")
 
         logs.append(f"✓ 信号生成完成: {signal.stock_name} → {signal.etf_name}")
