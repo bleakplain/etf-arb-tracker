@@ -36,9 +36,8 @@ from backend.data.limit_up_stocks import LimitUpStocksFetcher
 from backend.data.kline import KlineDataFetcher
 from backend.data.etf_holdings import ETFHoldingsFetcher
 from backend.api.state import get_api_state_manager
-from backend.infrastructure.cache import TTLCache
+from backend.utils.cache_utils import TTLCache
 from backend.backtest import CNBacktestEngine, BacktestConfig
-import uuid
 
 
 # Pydantic模型
