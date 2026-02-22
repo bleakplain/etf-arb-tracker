@@ -2,14 +2,17 @@
 
 # 通用接口和模型
 from backend.market.events import MarketEvent
-from backend.market.interfaces import IQuoteFetcher, IHoldingProvider
+from backend.market.interfaces import IQuoteFetcher, IETFHoldingProvider
 from backend.market.models import (
     ETFCategory, StockQuote, ETFQuote, ETFHolding,
     CandidateETF, ETF, MarketSchedule
 )
 
 # A股
-from backend.market.cn import LimitUpEvent, LimitUpStock, CNQuoteFetcher
+from backend.market.cn import (
+    LimitUpEvent, LimitUpStock, CNQuoteFetcher,
+    CNETFQuoteFetcher, CNETFHoldingProvider
+)
 
 # 港股
 from backend.market.hk import BreakoutEvent, HKQuoteFetcher
@@ -21,7 +24,7 @@ __all__ = [
     # 通用
     'MarketEvent',
     'IQuoteFetcher',
-    'IHoldingProvider',
+    'IETFHoldingProvider',
     'ETFCategory',
     'StockQuote',
     'ETFQuote',
@@ -33,6 +36,8 @@ __all__ = [
     'LimitUpEvent',
     'LimitUpStock',
     'CNQuoteFetcher',
+    'CNETFQuoteFetcher',
+    'CNETFHoldingProvider',
     # 港股
     'BreakoutEvent',
     'HKQuoteFetcher',

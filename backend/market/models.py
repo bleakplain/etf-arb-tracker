@@ -118,11 +118,11 @@ class ETF:
 
 @dataclass(frozen=True)
 class MarketSchedule:
-    """市场交易时段"""
-    morning_start: str = "09:30"
-    morning_end: str = "11:30"
-    afternoon_start: str = "13:00"
-    afternoon_end: str = "15:00"
+    """市场交易时段（通用值对象，无默认值）"""
+    morning_start: str
+    morning_end: str
+    afternoon_start: str
+    afternoon_end: str
 
     def is_trading_time(self, current_time: datetime = None) -> bool:
         """判断是否在交易时间内"""
@@ -145,12 +145,17 @@ class MarketSchedule:
         if current_time is None:
             current_time = datetime.now()
 
+        from datetime import time
+        afternoon_end = time.fromisoformat(self.afternoon_end)
+
         close_time = current_time.replace(
-            hour=15, minute=0, second=0, microsecond=0
+            hour=afternoon_end.hour,
+            minute=afternoon_end.minute,
+            second=0,
+            microsecond=0
         )
 
-        if current_time.hour < 9 or current_time.hour >= 15:
-            return -1
-
-        delta = close_time - current_time
-        return int(delta.total_seconds())
+        if current_time.hour < afternoon_end.hour:
+            delta = close_time - current_time
+            return int(delta.total_seconds())
+        return -1

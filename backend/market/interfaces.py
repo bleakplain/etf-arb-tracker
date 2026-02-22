@@ -4,7 +4,6 @@
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
-from dataclasses import dataclass
 
 
 class IQuoteFetcher(ABC):
@@ -26,8 +25,8 @@ class IQuoteFetcher(ABC):
         pass
 
 
-class IHoldingProvider(ABC):
-    """持仓数据提供接口"""
+class IETFHoldingProvider(ABC):
+    """ETF持仓数据提供接口"""
 
     @abstractmethod
     def get_etf_top_holdings(self, etf_code: str) -> Optional[Dict]:

@@ -7,7 +7,7 @@
 from typing import List
 from loguru import logger
 
-from backend.market.interfaces import IQuoteFetcher, IHoldingProvider
+from backend.market.interfaces import IQuoteFetcher, IETFHoldingProvider
 from backend.signal.domain.interfaces import ISignalEvaluator
 from config import Config
 
@@ -22,8 +22,8 @@ class ArbitrageEngineHK:
     def __init__(
         self,
         quote_fetcher: IQuoteFetcher,
-        etf_holder_provider: IHoldingProvider,
-        etf_holdings_provider: IHoldingProvider,
+        etf_holder_provider: IETFHoldingProvider,
+        etf_holdings_provider: IETFHoldingProvider,
         etf_quote_provider: IQuoteFetcher,
         watch_securities: List[str] = None,
         signal_evaluator: ISignalEvaluator = None,

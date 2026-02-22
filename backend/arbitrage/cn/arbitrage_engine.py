@@ -12,7 +12,7 @@ from datetime import datetime
 from backend.arbitrage.config import ArbitrageEngineConfig
 from backend.arbitrage.models import TradingSignal
 from backend.market import CandidateETF
-from backend.market.interfaces import IQuoteFetcher, IHoldingProvider
+from backend.market.interfaces import IQuoteFetcher, IETFHoldingProvider
 from backend.signal.domain.interfaces import ISignalEvaluator
 from backend.arbitrage.strategy_registry import strategy_manager
 from backend.arbitrage.cn.strategies.interfaces import (
@@ -66,8 +66,8 @@ class ArbitrageEngineCN:
     def __init__(
         self,
         quote_fetcher: IQuoteFetcher,
-        etf_holder_provider: IHoldingProvider,
-        etf_holdings_provider: IHoldingProvider,
+        etf_holder_provider: IETFHoldingProvider,
+        etf_holdings_provider: IETFHoldingProvider,
         etf_quote_provider: IQuoteFetcher,
         watch_securities: List[str] = None,
         engine_config: ArbitrageEngineConfig = None,
