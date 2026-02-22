@@ -8,7 +8,7 @@ import threading
 from typing import List
 from loguru import logger
 
-from backend.domain.interfaces import ISignalRepository
+from backend.signal.interfaces import ISignalRepository
 from backend.arbitrage.models import TradingSignal
 from backend.utils.time_utils import today_china
 

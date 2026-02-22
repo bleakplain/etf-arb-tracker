@@ -13,7 +13,7 @@ from backend.arbitrage.config import ArbitrageEngineConfig
 from backend.arbitrage.models import TradingSignal
 from backend.market import CandidateETF
 from backend.market.interfaces import IQuoteFetcher, IETFHoldingProvider
-from backend.signal.domain.interfaces import ISignalEvaluator
+from backend.signal.interfaces import ISignalEvaluator
 from backend.arbitrage.strategy_registry import strategy_manager
 from backend.arbitrage.cn.strategies.interfaces import (
     IEventDetector,

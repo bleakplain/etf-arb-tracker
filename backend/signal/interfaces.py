@@ -1,4 +1,4 @@
-"""信号领域接口"""
+"""信号接口定义"""
 
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Dict

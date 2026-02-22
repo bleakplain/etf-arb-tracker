@@ -10,7 +10,7 @@ from typing import Dict, Tuple, Type
 from datetime import datetime
 
 from config.strategy import SignalEvaluationConfig
-from backend.signal.domain.interfaces import ISignalEvaluator
+from backend.signal.interfaces import ISignalEvaluator
 from backend.utils.plugin_registry import evaluator_registry
 
 
