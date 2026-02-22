@@ -12,7 +12,11 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from loguru import logger
 
-from backend.domain.value_objects import ETFReference, ETFCategory
+from backend.market import ETFCategory, CandidateETF
+
+
+# 类型别名，保持向后兼容
+ETFReference = CandidateETF
 
 # Module-level constants for ETF names
 DEFAULT_ETF_NAMES = {

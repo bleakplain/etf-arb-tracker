@@ -10,7 +10,7 @@ from collections import Counter
 from loguru import logger
 
 from backend.arbitrage.models import TradingSignal
-from backend.backtest.metrics import StatisticsCalculator, SignalStatistics
+from .metrics import StatisticsCalculator, SignalStatistics
 
 
 class SignalRecorder:
