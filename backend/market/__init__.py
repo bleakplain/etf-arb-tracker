@@ -4,8 +4,8 @@
 from backend.market.events import MarketEvent
 from backend.market.interfaces import IQuoteFetcher, IHoldingProvider
 from backend.market.models import (
-    ETFCategory, StockQuote, ETFQuote, Holding,
-    CandidateETF, ETF, TradingHours
+    ETFCategory, StockQuote, ETFQuote, ETFHolding,
+    CandidateETF, ETF, MarketSchedule
 )
 
 # A股
@@ -25,10 +25,10 @@ __all__ = [
     'ETFCategory',
     'StockQuote',
     'ETFQuote',
-    'Holding',
+    'ETFHolding',
     'CandidateETF',
     'ETF',
-    'TradingHours',
+    'MarketSchedule',
     # A股
     'LimitUpEvent',
     'LimitUpStock',

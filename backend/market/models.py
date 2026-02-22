@@ -56,7 +56,7 @@ class ETFQuote:
 
 
 @dataclass
-class Holding:
+class ETFHolding:
     """ETF持仓"""
     stock_code: str
     stock_name: str
@@ -100,7 +100,7 @@ class ETF:
     code: str
     name: str
     category: ETFCategory
-    holdings: List[Holding] = None
+    holdings: List[ETFHolding] = None
 
     def __post_init__(self):
         if not self.code:
@@ -108,7 +108,7 @@ class ETF:
         if self.holdings is None:
             self.holdings = []
 
-    def get_holding(self, stock_code: str) -> Optional[Holding]:
+    def get_holding(self, stock_code: str) -> Optional[ETFHolding]:
         """获取指定股票的持仓信息"""
         for holding in self.holdings:
             if holding.stock_code == stock_code:
@@ -117,8 +117,8 @@ class ETF:
 
 
 @dataclass(frozen=True)
-class TradingHours:
-    """交易时间值对象"""
+class MarketSchedule:
+    """市场交易时段"""
     morning_start: str = "09:30"
     morning_end: str = "11:30"
     afternoon_start: str = "13:00"
