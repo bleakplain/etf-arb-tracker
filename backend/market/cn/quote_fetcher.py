@@ -29,7 +29,7 @@ class CNQuoteFetcher(IQuoteFetcher):
     def _get_tencent_source(self):
         """获取腾讯数据源"""
         if self._tencent_source is None:
-            from backend.market.cn.sources.tencent_source import TencentSource
+            from backend.market.cn.sources.tencent import TencentSource
             self._tencent_source = TencentSource()
         return self._tencent_source
 

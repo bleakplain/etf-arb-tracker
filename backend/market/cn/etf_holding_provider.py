@@ -17,7 +17,7 @@ class CNETFHoldingProvider:
     def _get_source(self):
         """获取数据源"""
         if self._source is None:
-            from backend.market.cn.sources.tencent_source import TencentSource
+            from backend.market.cn.sources.tencent import TencentSource
             self._source = TencentSource()
         return self._source
 
