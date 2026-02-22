@@ -29,7 +29,7 @@ from backend.market.domain.events import (
 # 各市场引擎
 from backend.arbitrage.cn import ArbitrageEngineCN
 from backend.arbitrage.hk import ArbitrageEngineHK
-from backend.arbitrage.us import USStockArbitrageEngine
+from backend.arbitrage.us import ArbitrageEngineUS
 
 # 向后兼容：默认使用A股引擎
 ArbitrageEngine = ArbitrageEngineCN
@@ -50,6 +50,6 @@ __all__ = [
     # 市场引擎
     'ArbitrageEngineCN',
     'ArbitrageEngineHK',
-    'USStockArbitrageEngine',
+    'ArbitrageEngineUS',
     'ArbitrageEngine',  # 向后兼容，默认A股
 ]
