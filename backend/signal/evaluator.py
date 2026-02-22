@@ -23,7 +23,7 @@ class SignalEvaluator(ISignalEvaluator, ABC):
     Example:
         @evaluator_registry.register("custom", priority=50, description="My custom evaluator")
         class MyCustomEvaluator(SignalEvaluator):
-            def evaluate(self, limit_info: Dict, etf_info: Dict) -> Tuple[str, str]:
+            def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
                 return "高", "低"
     """
 
@@ -31,13 +31,13 @@ class SignalEvaluator(ISignalEvaluator, ABC):
         self.config = config
 
     @abstractmethod
-    def evaluate(self, limit_info: Dict, etf_info: Dict) -> Tuple[str, str]:
+    def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
         """
         评估信号质量
 
         Args:
-            limit_info: 涨停股票信息
-            etf_info: ETF信息
+            market_event: 市场事件（LimitUpEvent 等）
+            etf_holding: ETF持仓信息（CandidateETF）
 
         Returns:
             (confidence, risk_level) - (置信度, 风险等级)
@@ -70,7 +70,7 @@ class SignalEvaluator(ISignalEvaluator, ABC):
 class DefaultSignalEvaluator(SignalEvaluator):
     """默认信号评估器"""
 
-    def evaluate(self, limit_info: Dict, etf_info: Dict) -> Tuple[str, str]:
+    def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
         """
         评估信号质量
 
@@ -84,14 +84,14 @@ class DefaultSignalEvaluator(SignalEvaluator):
         risk_level = "中"
 
         # 1. 权重评估
-        weight = etf_info.get('weight', 0)
+        weight = etf_holding.weight
         if weight >= self.config.confidence_high_weight:
             confidence = "高"
         elif weight < self.config.confidence_low_weight:
             confidence = "低"
 
         # 2. 排名评估
-        rank = etf_info.get('rank', -1)
+        rank = etf_holding.rank
         if rank <= self.config.confidence_high_rank and confidence != "高":
             confidence = "高"
         elif rank > self.config.confidence_low_rank:
@@ -105,7 +105,7 @@ class DefaultSignalEvaluator(SignalEvaluator):
             risk_level = "低"
 
         # 4. 风险等级 - 持仓集中度
-        top10_ratio = etf_info.get('top10_ratio', 0)
+        top10_ratio = etf_holding.top10_ratio
         if top10_ratio > self.config.risk_top10_ratio_high:
             if risk_level == "低":
                 risk_level = "中"
@@ -140,10 +140,10 @@ class ConservativeEvaluator(SignalEvaluator):
     注意：此类保留用于向后兼容，建议使用自定义评估器
     """
 
-    def evaluate(self, limit_info: Dict, etf_info: Dict) -> Tuple[str, str]:
+    def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
         """保守型评估 - 偏向低置信度、高风险"""
-        weight = etf_info.get('weight', 0)
-        rank = etf_info.get('rank', -1)
+        weight = etf_holding.weight
+        rank = etf_holding.rank
 
         # 更严格的权重要求
         if weight >= 0.15:
@@ -167,7 +167,7 @@ class ConservativeEvaluator(SignalEvaluator):
             risk_level = "中"
 
         # 持仓集中度风险
-        top10_ratio = etf_info.get('top10_ratio', 0)
+        top10_ratio = etf_holding.top10_ratio
         if top10_ratio > 0.60:  # 前10占比超过60%即高风险
             risk_level = "高"
 
@@ -177,10 +177,10 @@ class ConservativeEvaluator(SignalEvaluator):
 class AggressiveEvaluator(SignalEvaluator):
     """激进型评估器 - 更宽松的评估标准"""
 
-    def evaluate(self, limit_info: Dict, etf_info: Dict) -> Tuple[str, str]:
+    def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
         """激进型评估 - 偏向高置信度、低风险"""
-        weight = etf_info.get('weight', 0)
-        rank = etf_info.get('rank', -1)
+        weight = etf_holding.weight
+        rank = etf_holding.rank
 
         # 更宽松的权重要求
         if weight >= 0.08:

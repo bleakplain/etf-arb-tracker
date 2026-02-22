@@ -331,13 +331,7 @@ class ArbitrageEngineCN:
 
         # 步骤6: 评估信号质量
         if self._signal_evaluator:
-            etf_info = {
-                'weight': selected_fund.weight,
-                'rank': selected_fund.rank,
-                'in_top10': selected_fund.in_top10,
-                'top10_ratio': selected_fund.top10_ratio
-            }
-            confidence, risk_level = self._signal_evaluator.evaluate(event_dict, etf_info)
+            confidence, risk_level = self._signal_evaluator.evaluate(event, selected_fund)
 
             signal.confidence = confidence
             signal.risk_level = risk_level
