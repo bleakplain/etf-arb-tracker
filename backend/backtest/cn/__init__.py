@@ -1,12 +1,10 @@
-"""A股回测模块"""
+"""A股回测模块（简化版）"""
 
 from .engine import CNBacktestEngine, create_cn_backtest_engine
-from .adapters import ETFReference, HistoricalQuoteFetcherAdapter, HistoricalHoldingProviderAdapter
+from .data_provider import BacktestDataProvider
 
 __all__ = [
     'CNBacktestEngine',
     'create_cn_backtest_engine',
-    'ETFReference',
-    'HistoricalQuoteFetcherAdapter',
-    'HistoricalHoldingProviderAdapter',
+    'BacktestDataProvider',
 ]

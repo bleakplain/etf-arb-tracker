@@ -1,44 +1,25 @@
 """
-回测模块 - 按市场拆分的回测引擎
+回测模块 - 简化版
 
-通用组件 + 各市场特定实现
+只保留核心配置和各市场回测引擎，最大化复用现有模块。
 """
 
-# 通用组件
-from .clock import TimeGranularity, SimulationClock
+# 通用配置
 from .config import BacktestConfig
-from .metrics import SignalStatistics, BacktestResult
-from .data_loader import HistoricalDataLoader
-from .holdings_snapshot import HoldingsSnapshotManager
-from .signal_recorder import SignalRecorder
-from .repository import BacktestRepository, get_backtest_repository
 
 # A股回测
 from .cn import CNBacktestEngine, create_cn_backtest_engine
 
-# 港股回测
+# 港股回测（框架）
 from .hk import HKBacktestEngine
 
-# 美股回测
+# 美股回测（框架）
 from .us import USBacktestEngine
 
 __all__ = [
-    # 通用
-    "TimeGranularity",
-    "SimulationClock",
     "BacktestConfig",
-    "SignalStatistics",
-    "BacktestResult",
-    "HistoricalDataLoader",
-    "HoldingsSnapshotManager",
-    "SignalRecorder",
-    "BacktestRepository",
-    "get_backtest_repository",
-    # A股
     "CNBacktestEngine",
     "create_cn_backtest_engine",
-    # 港股
     "HKBacktestEngine",
-    # 美股
     "USBacktestEngine",
 ]

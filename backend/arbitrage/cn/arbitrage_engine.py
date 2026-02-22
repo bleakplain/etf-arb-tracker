@@ -180,8 +180,8 @@ class ArbitrageEngineCN:
 
     def _load_default_watch_securities(self, config: Config) -> List[str]:
         """加载默认的A股监控列表"""
-        if config and config.stocks:
-            return [s.code for s in config.stocks]
+        if config and config.my_stocks:
+            return [s.code for s in config.my_stocks]
         return []
 
     def get_all_fund_codes(self) -> List[str]:

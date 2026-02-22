@@ -5,7 +5,6 @@ from datetime import datetime
 from loguru import logger
 
 from ..config import BacktestConfig
-from ..clock import SimulationClock, TimeGranularity
 
 
 class HKBacktestEngine:
@@ -14,8 +13,6 @@ class HKBacktestEngine:
     def __init__(
         self,
         config: BacktestConfig,
-        stocks: List,
-        etf_codes: List[str],
         progress_callback: Optional[Callable[[float], None]] = None
     ):
         """初始化港股回测引擎"""

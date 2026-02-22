@@ -1,40 +1,35 @@
 """
-A股回测引擎
+A股回测引擎 - 简化版
 
-复用 ArbitrageEngineCN 的策略链，使用历史数据进行回测。
+最大化复用 ArbitrageEngineCN、Market 和 Signal 模块。
 """
 
-from typing import List, Optional, Callable, Dict, Any
+from typing import List, Dict, Optional, Callable
 from datetime import datetime
 from loguru import logger
 
-from config import Config, Stock
+from config import Config
 from backend.arbitrage.cn import ArbitrageEngineCN
 from backend.arbitrage.models import TradingSignal
 from backend.signal.evaluator import SignalEvaluatorFactory
 
 from ..config import BacktestConfig
-from ..clock import SimulationClock, TimeGranularity
-from ..signal_recorder import SignalRecorder
-from ..holdings_snapshot import HoldingsSnapshotManager
-from ..metrics import BacktestResult
-from .adapters.models import ETFReference
-from .adapters.quote_fetcher import HistoricalQuoteFetcherAdapter
-from .adapters.holding_provider import HistoricalHoldingProviderAdapter
+from .data_provider import BacktestDataProvider
 
 
 class CNBacktestEngine:
     """
-    A股回测引擎
+    A股回测引擎（简化版）
 
-    复用 ArbitrageEngineCN 的策略链，使用历史数据进行回测。
+    核心思路：
+    1. 使用 BacktestDataProvider 提供历史数据
+    2. 直接复用 ArbitrageEngineCN 进行信号生成
+    3. 遍历每个交易日，记录生成的信号
     """
 
     def __init__(
         self,
         config: BacktestConfig,
-        stocks: List[Stock],
-        etf_codes: List[str],
         app_config: Optional[Config] = None,
         progress_callback: Optional[Callable[[float], None]] = None
     ):
@@ -43,302 +38,208 @@ class CNBacktestEngine:
 
         Args:
             config: 回测配置
-            stocks: 股票列表
-            etf_codes: ETF代码列表
-            app_config: 应用配置（可选）
-            progress_callback: 进度回调函数
+            app_config: 应用配置（用于信号评估器）
+            progress_callback: 进度回调函数 (0.0 - 1.0)
         """
         self.config = config
-        self.stocks = stocks
-        self.etf_codes = etf_codes
         self.app_config = app_config or Config.load()
         self.progress_callback = progress_callback
 
-        # 初始化时钟
-        self.clock = SimulationClock(
-            start_date=config.start_date,
-            end_date=config.end_date,
-            granularity=config.time_granularity
-        )
-
-        # 初始化信号记录器
-        self.signal_recorder = SignalRecorder()
-
-        # 初始化持仓快照管理器
-        self.holdings_manager = HoldingsSnapshotManager(
-            snapshot_dates=config.snapshot_dates,
-            start_date=config.start_date,
-            end_date=config.end_date
-        )
-
-        # 历史行情适配器（后续初始化）
-        self.quote_fetcher_adapter: Optional[HistoricalQuoteFetcherAdapter] = None
-
-        # 持仓数据适配器（后续初始化）
-        self.holding_provider: Optional[HistoricalHoldingProviderAdapter] = None
-
-        # A股套利引擎（后续初始化）
+        # 组件（后续初始化）
+        self.data_provider: Optional[BacktestDataProvider] = None
         self.arbitrage_engine: Optional[ArbitrageEngineCN] = None
 
-        logger.info("A股回测引擎初始化完成")
-        logger.info(f"时间范围: {config.start_date} -> {config.end_date}")
-        logger.info(f"时间粒度: {config.time_granularity.value}")
-        logger.info(f"股票数量: {len(stocks)}, ETF数量: {len(etf_codes)}")
+        # 结果存储
+        self.signals: List[TradingSignal] = []
+        self.signal_dates: List[str] = []  # 每个信号对应的日期
 
-    def initialize(self) -> None:
-        """初始化回测环境"""
-        from backend.backtest.data_loader import HistoricalDataLoader
+        logger.info(f"回测引擎初始化: {config.start_date} -> {config.end_date}")
+        logger.info(f"股票: {len(config.stock_codes)}, ETF: {len(config.etf_codes)}")
 
-        logger.info("=" * 60)
-        logger.info("初始化A股回测环境...")
-        logger.info("=" * 60)
+    def initialize(
+        self,
+        quotes: Dict[str, Dict[str, dict]],
+        holdings: Optional[Dict[str, List]] = None
+    ) -> None:
+        """
+        初始化回测环境
 
-        try:
-            # 1. 初始化历史数据加载器
-            stock_codes = [s.code for s in self.stocks]
+        Args:
+            quotes: 历史行情数据 {date: {code: quote_dict}}
+            holdings: 持仓数据 {stock_code: [CandidateETF, ...]}（可选）
+        """
+        logger.info("初始化回测环境...")
 
-            if self.progress_callback:
-                self.progress_callback(0.1)
+        # 1. 创建数据提供者
+        self.data_provider = BacktestDataProvider(
+            quotes=quotes,
+            holdings=holdings,
+            etf_codes=self.config.etf_codes,
+            use_mock_holdings=self.config.use_mock_data,
+            mock_etf_count=self.config.mock_etf_count
+        )
 
-            data_loader = HistoricalDataLoader()
+        # 2. 创建信号评估器
+        signal_evaluator = SignalEvaluatorFactory.create(
+            self.config.evaluator_type,
+            self.app_config.signal_evaluation
+        )
 
-            # 2. 初始化历史行情适配器
-            self.quote_fetcher_adapter = HistoricalQuoteFetcherAdapter(
-                data_loader=data_loader,
-                stock_codes=stock_codes,
-                etf_codes=self.etf_codes,
-                start_date=self.config.start_date,
-                end_date=self.config.end_date,
-                granularity=self.config.time_granularity
-            )
+        # 3. 创建套利引擎（复用）
+        self.arbitrage_engine = ArbitrageEngineCN(
+            quote_fetcher=self.data_provider,           # 行情数据
+            etf_holder_provider=self.data_provider,    # 持仓关系
+            etf_holdings_provider=self.data_provider,  # 持仓详情
+            etf_quote_provider=self.data_provider,     # ETF 行情
+            signal_evaluator=signal_evaluator,
+            config=self.app_config
+        )
 
-            # 加载历史数据
-            def load_progress(loaded, total):
-                if self.progress_callback:
-                    load_progress = 0.1 + (loaded / total) * 0.3
-                    self.progress_callback(min(load_progress, 0.4))
-                if loaded % 50 == 0 or loaded == total:
-                    logger.info(f"数据加载进度: {loaded}/{total} ({loaded*100//total if total > 0 else 0}%)")
+        logger.info(f"回测环境初始化完成")
+        logger.info(f"数据摘要: {self.data_provider.get_data_summary()}")
 
-            self.quote_fetcher_adapter.load_data(progress_callback=load_progress)
-            logger.info("历史行情数据加载完成")
-
-            if self.progress_callback:
-                self.progress_callback(0.4)
-
-            # 3. 加载持仓快照
-            try:
-                self.holdings_manager.load_snapshots(
-                    stock_codes=stock_codes,
-                    etf_codes=self.etf_codes
-                )
-                logger.info("持仓快照加载完成")
-            except Exception as e:
-                logger.warning(f"持仓快照加载失败（将使用模拟持仓数据）: {e}")
-
-            if self.progress_callback:
-                self.progress_callback(0.5)
-
-            # 4. 创建持仓数据提供者适配器
-            from .adapters.holding_provider import HistoricalHoldingProviderAdapter
-
-            self.holding_provider = HistoricalHoldingProviderAdapter(
-                snapshot_manager=self.holdings_manager,
-                interpolation=self.config.interpolation
-            )
-
-            # 5. 初始化A股套利引擎（复用策略链）
-            signal_evaluator = SignalEvaluatorFactory.create(
-                self.config.evaluator_type,
-                self.app_config.signal_evaluation
-            )
-
-            self.arbitrage_engine = ArbitrageEngineCN(
-                quote_fetcher=self.quote_fetcher_adapter,
-                etf_holder_provider=self.holding_provider,
-                etf_holdings_provider=self.holding_provider,
-                etf_quote_provider=self.quote_fetcher_adapter,
-                signal_evaluator=signal_evaluator,
-                config=self.app_config
-            )
-
-            logger.info("A股套利引擎初始化完成")
-            if self.progress_callback:
-                self.progress_callback(0.6)
-
-            logger.info("=" * 60)
-
-        except Exception as e:
-            logger.error(f"回测初始化失败: {e}")
-            raise
-
-    def run(self) -> BacktestResult:
+    def run(self) -> Dict:
         """
         运行回测
 
         Returns:
-            回测结果
+            回测结果字典
         """
-        try:
-            if not self.arbitrage_engine:
-                self.initialize()
+        if not self.data_provider or not self.arbitrage_engine:
+            raise RuntimeError("请先调用 initialize() 初始化回测环境")
 
-            logger.info("=" * 60)
-            logger.info("开始回测...")
-            logger.info("=" * 60)
+        logger.info("=" * 50)
+        logger.info("开始回测...")
+        logger.info("=" * 50)
 
-            total_steps = self._estimate_total_steps()
-            current_step = 0
-            start_progress = 0.6
-            progress_range = 0.4
+        trading_days = self.config.trading_days
+        total_days = len(trading_days)
 
-            while self.clock.has_next():
-                try:
-                    # 推进时间
-                    current_time = self.clock.advance()
-
-                    # 更新适配器的当前时间
-                    self.quote_fetcher_adapter.set_current_time(current_time)
-                    self.holding_provider.set_current_time(current_time)
-
-                    # 检查是否在交易时间
-                    if not self.clock.is_trading_time():
-                        continue
-
-                    # 扫描所有股票
-                    self._scan_stocks(current_time)
-
-                    # 更新进度
-                    current_step += 1
-                    if self.progress_callback and total_steps > 0:
-                        progress = start_progress + (current_step / total_steps) * progress_range
-                        self.progress_callback(min(progress, 0.99))
-
-                    # 日级别输出进度
-                    if self.config.time_granularity == TimeGranularity.DAILY:
-                        signal_count = self.signal_recorder.get_signal_count()
-                        progress_pct = int(current_step * 100 / total_steps) if total_steps > 0 else 0
-                        logger.info(
-                            f"进度: {self.clock.current_date_str} ({progress_pct}%) - "
-                            f"累计 {signal_count} 个信号"
-                        )
-
-                except Exception as e:
-                    logger.error(f"回测过程中出错 (时间: {self.clock.current_datetime_str}): {e}")
-                    continue
-
-            # 生成结果
-            logger.info("=" * 60)
-            logger.info("回测完成，生成结果...")
-            logger.info("=" * 60)
-
-            if self.progress_callback:
-                self.progress_callback(1.0)
-
-            return self._generate_result()
-
-        except Exception as e:
-            logger.error(f"回测失败: {e}")
-            raise RuntimeError(f"回测执行失败: {e}") from e
-
-    def _scan_stocks(self, current_time: datetime) -> None:
-        """扫描所有股票"""
-        for stock in self.stocks:
+        for i, date in enumerate(trading_days):
             try:
-                # 使用套利引擎扫描股票
-                signal, logs = self.arbitrage_engine.scan_security(stock.code)
+                # 更新数据提供者的当前日期
+                self.data_provider.set_current_date(date)
 
-                if signal:
-                    self.signal_recorder.record([signal], current_time)
+                # 扫描所有股票
+                for stock_code in self.config.stock_codes:
+                    try:
+                        signal, logs = self.arbitrage_engine.scan_security(stock_code)
+
+                        if signal:
+                            self.signals.append(signal)
+                            self.signal_dates.append(date)
+
+                    except Exception as e:
+                        logger.debug(f"处理股票 {stock_code} 在 {date} 时出错: {e}")
+
+                # 更新进度
+                if self.progress_callback:
+                    progress = (i + 1) / total_days
+                    self.progress_callback(progress)
+
+                # 每处理 10 个交易日输出一次进度
+                if (i + 1) % 10 == 0 or (i + 1) == total_days:
+                    logger.info(
+                        f"进度: {date} ({i+1}/{total_days}={int((i+1)/total_days*100)}%) - "
+                        f"累计 {len(self.signals)} 个信号"
+                    )
 
             except Exception as e:
-                logger.error(f"处理股票 {stock.code} ({stock.name}) 时出错: {e}")
+                logger.error(f"处理日期 {date} 时出错: {e}")
                 continue
 
-    def _estimate_total_steps(self) -> int:
-        """
-        估算总步数
+        logger.info("=" * 50)
+        logger.info("回测完成")
+        logger.info("=" * 50)
 
-        日级回测：交易日数量
-        分钟级回测：根据交易时长和粒度计算
-        """
-        if self.config.time_granularity == TimeGranularity.DAILY:
-            return len(self.clock.trading_calendar)
+        return self._generate_result()
 
-        # 分钟级：计算实际步数
-        # 每天交易4小时（240分钟）
-        minutes_per_day = 240  # 9:30-11:30, 13:00-15:00
-        granularity_minutes = self.config.time_granularity.delta_minutes
-        slots_per_day = minutes_per_day / granularity_minutes
-        return int(len(self.clock.trading_calendar) * slots_per_day)
-
-    def _generate_result(self) -> BacktestResult:
+    def _generate_result(self) -> Dict:
         """生成回测结果"""
-        from backend.backtest.metrics import StatisticsCalculator
+        # 统计每个股票的信号数量
+        stock_signal_count: Dict[str, int] = {}
+        for signal in self.signals:
+            stock_code = signal.stock_code
+            stock_signal_count[stock_code] = stock_signal_count.get(stock_code, 0) + 1
 
-        statistics = StatisticsCalculator.calculate(self.signal_recorder.signals)
+        # 统计每个 ETF 的出现次数
+        etf_signal_count: Dict[str, int] = {}
+        for signal in self.signals:
+            for etf in signal.candidate_etfs:
+                etf_code = etf.etf_code
+                etf_signal_count[etf_code] = etf_signal_count.get(etf_code, 0) + 1
 
-        return BacktestResult(
-            signals=self.signal_recorder.signals,
-            statistics=statistics,
-            date_range=self.clock.get_date_range(),
-            time_granularity=self.config.time_granularity.value,
-            parameters={
-                "min_weight": self.config.min_weight,
-                "min_time_to_close": self.config.min_time_to_close,
-                "min_etf_volume": self.config.min_etf_volume,
-                "evaluator_type": self.config.evaluator_type,
-                "interpolation": self.config.interpolation,
-                "stocks_count": len(self.stocks),
-                "etfs_count": len(self.etf_codes)
+        # 按日期统计
+        daily_signal_count: Dict[str, int] = {}
+        for date in self.signal_dates:
+            daily_signal_count[date] = daily_signal_count.get(date, 0) + 1
+
+        return {
+            "total_signals": len(self.signals),
+            "stock_signal_count": stock_signal_count,
+            "etf_signal_count": etf_signal_count,
+            "daily_signal_count": daily_signal_count,
+            "signals": [
+                {
+                    "date": self.signal_dates[i],
+                    "stock_code": s.stock_code,
+                    "stock_name": s.stock_name,
+                    "etf_count": len(s.candidate_etfs),
+                    "confidence": s.confidence,
+                    "candidate_etfs": [
+                        {
+                            "etf_code": e.etf_code,
+                            "etf_name": e.etf_name,
+                            "weight": e.weight
+                        }
+                        for e in s.candidate_etfs
+                    ]
+                }
+                for i, s in enumerate(self.signals)
+            ],
+            "config": {
+                "start_date": self.config.start_date,
+                "end_date": self.config.end_date,
+                "stocks_count": len(self.config.stock_codes),
+                "etfs_count": len(self.config.etf_codes),
+                "using_mock_holdings": self.config.use_mock_data
             },
-            data_details={
-                "holdings_snapshot": self.holdings_manager.get_snapshot_summary()
-            }
-        )
-
-    def get_progress(self) -> float:
-        """获取当前进度"""
-        return self.clock.get_progress()
+            "data_summary": self.data_provider.get_data_summary()
+        }
 
 
 def create_cn_backtest_engine(
     start_date: str,
     end_date: str,
-    granularity: str = "daily",
-    min_weight: Optional[float] = None,
-    evaluator_type: str = "default",
+    stock_codes: Optional[List[str]] = None,
+    etf_codes: Optional[List[str]] = None,
     progress_callback: Optional[Callable[[float], None]] = None
 ) -> CNBacktestEngine:
     """
-    创建A股回测引擎（便捷函数）
+    创建 A股回测引擎（便捷函数）
 
     Args:
         start_date: 开始日期 "YYYYMMDD"
         end_date: 结束日期 "YYYYMMDD"
-        granularity: 时间粒度 "daily", "5m", "15m", "30m"
-        min_weight: 最小持仓权重
-        evaluator_type: 评估器类型
+        stock_codes: 股票代码列表（默认使用配置文件）
+        etf_codes: ETF 代码列表（默认使用配置文件）
         progress_callback: 进度回调
 
     Returns:
-        A股回测引擎实例
+        回测引擎实例
     """
     app_config = Config.load()
 
     config = BacktestConfig(
         start_date=start_date,
         end_date=end_date,
-        time_granularity=TimeGranularity(granularity),
-        min_weight=min_weight or app_config.strategy.min_weight,
-        evaluator_type=evaluator_type,
-        use_watchlist=True
+        stock_codes=stock_codes or [s.code for s in app_config.my_stocks],
+        etf_codes=etf_codes or [e.code for e in app_config.watch_etfs],
+        use_mock_data=True
     )
 
     return CNBacktestEngine(
         config=config,
-        stocks=app_config.my_stocks,
-        etf_codes=[e.code for e in app_config.watch_etfs],
         app_config=app_config,
         progress_callback=progress_callback
     )
