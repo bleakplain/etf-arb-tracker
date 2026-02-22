@@ -2,9 +2,8 @@
 ArbitrageEngine 单元测试
 
 测试套利引擎的核心功能：
-1. 策略执行器
-2. 套利引擎
-3. 策略链配置
+1. 套利引擎
+2. 策略组合配置
 """
 
 import sys
@@ -13,11 +12,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import datetime
 
-from backend.arbitrage.engine.arbitrage_engine import ArbitrageEngine, ScanResult
-from backend.arbitrage.engine.strategy_executor import StrategyExecutor
-from backend.arbitrage.strategies.event_detectors import LimitUpDetector
-from backend.arbitrage.strategies.fund_selectors import HighestWeightSelector
-from backend.arbitrage.strategies.signal_filters import TimeFilter
+# 导入策略模块以触发注册
+from backend.arbitrage.cn.strategies.event_detectors import LimitUpDetector
+from backend.arbitrage.cn.strategies.fund_selectors import HighestWeightSelector
+
+from backend.arbitrage.cn import ArbitrageEngineCN as ArbitrageEngine, ScanResult
+from backend.arbitrage.config import ArbitrageEngineConfig
 
 
 class MockQuoteFetcher:
@@ -127,66 +127,18 @@ class MockETFQuoteProvider:
         return True
 
 
-def test_strategy_executor():
-    """测试策略执行器"""
-    print("\n=== 测试策略执行器 ===")
-
-    # 创建策略组件
-    detector = LimitUpDetector(min_change_pct=0.095)
-    selector = HighestWeightSelector(min_weight=0.05)
-    filters = [TimeFilter(min_time_to_close=1800)]
-
-    # 创建执行器
-    executor = StrategyExecutor(detector, selector, filters)
-
-    # 测试数据
-    quote = {
-        'code': '600519',
-        'name': '贵州茅台',
-        'price': 1800.0,
-        'change_pct': 0.10,
-        'is_limit_up': True,
-        'timestamp': '14:00:00'
-    }
-
-    from backend.market.domain import CandidateETF
-
-    eligible_funds = [
-        ETFReference(
-            etf_code='510300',
-            etf_name='沪深300ETF',
-            weight=0.08,
-            category='broad_index',
-            rank=3,
-            in_top10=True,
-            top10_ratio=0.65
-        )
-    ]
-
-    # 执行策略
-    signal, logs = executor.execute(
-        quote=quote,
-        eligible_funds=eligible_funds,
-        etf_quote_provider=MockETFQuoteProvider(),
-        signal_evaluator=None
-    )
-
-    print(f"策略信息: {executor.strategy_info}")
-    print(f"信号生成: {'成功' if signal else '失败'}")
-    for log in logs:
-        print(f"  {log}")
-
-    if signal:
-        print(f"信号ID: {signal.signal_id}")
-        print(f"理由: {signal.reason}")
-
-    assert signal is not None, "应该生成信号"
-    print("✓ 策略执行器测试通过")
-
-
 def test_arbitrage_engine():
     """测试套利引擎"""
     print("\n=== 测试套利引擎 ===")
+
+    # 创建策略配置（不使用时间过滤器，因为测试可能不在交易时间运行）
+    engine_config = ArbitrageEngineConfig(
+        event_detector="limit_up",
+        fund_selector="highest_weight",
+        signal_filters=[],  # 不使用过滤器
+        event_config={'min_change_pct': 0.095},
+        fund_config={'min_weight': 0.05}
+    )
 
     # 创建引擎
     engine = ArbitrageEngine(
@@ -195,6 +147,7 @@ def test_arbitrage_engine():
         etf_holdings_provider=MockETFHoldingsProvider(),
         etf_quote_provider=MockETFQuoteProvider(),
         watch_securities=['600519', '300750'],
+        engine_config=engine_config,
         signal_evaluator=None,
         config=None
     )
@@ -222,7 +175,6 @@ if __name__ == "__main__":
     print("=" * 60)
 
     try:
-        test_strategy_executor()
         test_arbitrage_engine()
         print("\n" + "=" * 60)
         print("所有测试通过! ✓")

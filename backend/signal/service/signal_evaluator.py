@@ -11,7 +11,7 @@ from datetime import datetime
 
 from config.strategy import SignalEvaluationConfig
 from backend.signal.domain.interfaces import ISignalEvaluator
-from backend.shared.infrastructure.registry import evaluator_registry
+from backend.arbitrage.registry import evaluator_registry
 
 
 class SignalEvaluator(ISignalEvaluator, ABC):
