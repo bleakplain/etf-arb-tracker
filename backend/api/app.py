@@ -15,7 +15,7 @@ from datetime import datetime
 import os
 import sys
 import time
-from asyncio import Lock, to_thread
+from asyncio import Lock as AsyncLock, to_thread
 from threading import Lock as ThreadLock
 
 # 添加项目路径
@@ -37,9 +37,7 @@ from backend.data.kline import KlineDataFetcher
 from backend.data.etf_holdings import ETFHoldingsFetcher
 from backend.api.state import get_api_state_manager
 from backend.infrastructure.cache import TTLCache
-from backend.backtest import BacktestEngine, BacktestConfig
-from backend.backtest.clock import TimeGranularity
-from backend.backtest.repository import get_backtest_repository
+from backend.backtest import CNBacktestEngine, BacktestConfig
 import uuid
 
 

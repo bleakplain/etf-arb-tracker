@@ -5,7 +5,7 @@
 import json
 import os
 import threading
-from typing import List
+from typing import List, Optional
 from loguru import logger
 
 from backend.signal.interfaces import ISignalRepository
@@ -61,12 +61,13 @@ class FileSignalRepository(ISignalRepository):
         with open(self._filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
-    def save(self, signal: TradingSignal) -> None:
+    def save(self, signal: TradingSignal) -> bool:
         """保存单个信号（线程安全）"""
         with self._lock:
             self._signals.append(signal)
             self._save_to_file()
         logger.debug(f"保存信号: {signal.stock_name} -> {signal.etf_name}")
+        return True
 
     def save_all(self, signals: List[TradingSignal]) -> None:
         """批量保存信号（线程安全）"""
@@ -108,3 +109,11 @@ class FileSignalRepository(ISignalRepository):
         """获取信号总数（线程安全）"""
         with self._lock:
             return len(self._signals)
+
+    def get_signal(self, signal_id: str) -> Optional[TradingSignal]:
+        """获取单个信号（线程安全）"""
+        with self._lock:
+            for signal in self._signals:
+                if signal.signal_id == signal_id:
+                    return signal
+            return None

@@ -1,7 +1,9 @@
 """信号接口定义"""
 
 from abc import ABC, abstractmethod
-from typing import List, Tuple
+from typing import List, Tuple, Optional
+
+from backend.arbitrage.models import TradingSignal
 
 
 class ISignalEvaluator(ABC):
@@ -26,17 +28,17 @@ class ISignalRepository(ABC):
     """信号仓储接口"""
 
     @abstractmethod
-    def save(self, signal) -> bool:
+    def save(self, signal: TradingSignal) -> bool:
         """保存信号"""
         pass
 
     @abstractmethod
-    def get_all_signals(self) -> List:
+    def get_all_signals(self) -> List[TradingSignal]:
         """获取所有信号"""
         pass
 
     @abstractmethod
-    def get_signal(self, signal_id: str):
+    def get_signal(self, signal_id: str) -> Optional[TradingSignal]:
         """获取单个信号"""
         pass
 
@@ -45,7 +47,7 @@ class ISignalSender(ABC):
     """信号发送器接口"""
 
     @abstractmethod
-    def send_signal(self, signal) -> bool:
+    def send_signal(self, signal: TradingSignal) -> bool:
         """发送信号通知"""
         pass
 
@@ -54,6 +56,6 @@ class ISignalManager(ABC):
     """信号管理器接口"""
 
     @abstractmethod
-    def save_and_notify(self, signal) -> bool:
+    def save_and_notify(self, signal: TradingSignal) -> bool:
         """保存信号并发送通知"""
         pass

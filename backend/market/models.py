@@ -2,13 +2,10 @@
 市场数据模型 - 跨市场通用
 """
 
-from dataclasses import dataclass
-from typing import Dict, List, TYPE_CHECKING, Optional
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
 from enum import Enum
 from datetime import datetime
-
-if TYPE_CHECKING:
-    pass
 
 
 class ETFCategory(Enum):

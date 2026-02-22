@@ -3,11 +3,8 @@ A股行情数据获取
 """
 
 from typing import List, Dict, Optional
-import pandas as pd
-from loguru import logger
 
 from backend.market.interfaces import IQuoteFetcher
-from backend.market.cn.models import LimitUpStock
 
 
 class CNQuoteFetcher(IQuoteFetcher):
@@ -26,6 +23,23 @@ class CNQuoteFetcher(IQuoteFetcher):
         source = self._get_tencent_source()
         return source.get_batch_quotes(codes)
 
+    def is_trading_time(self) -> bool:
+        """判断是否交易时间"""
+        from datetime import datetime, time
+
+        now = datetime.now()
+        if now.weekday() >= 5:
+            return False
+
+        current_time = now.time()
+        morning_start = time(9, 30)
+        morning_end = time(11, 30)
+        afternoon_start = time(13, 0)
+        afternoon_end = time(15, 0)
+
+        return (morning_start <= current_time <= morning_end or
+                afternoon_start <= current_time <= afternoon_end)
+
     def _get_tencent_source(self):
         """获取腾讯数据源"""
         if self._tencent_source is None:
@@ -37,16 +51,3 @@ class CNQuoteFetcher(IQuoteFetcher):
         """获取今日涨停股票"""
         source = self._get_tencent_source()
         return source.get_limit_ups()
-
-    def is_trading_time(self) -> bool:
-        """判断是否A股交易时间"""
-        from datetime import datetime, time
-
-        now = datetime.now().time()
-        morning_start = time(9, 30)
-        morning_end = time(11, 30)
-        afternoon_start = time(13, 0)
-        afternoon_end = time(15, 0)
-
-        return (morning_start <= now <= morning_end or
-                afternoon_start <= now <= afternoon_end)
