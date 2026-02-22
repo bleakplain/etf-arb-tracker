@@ -20,6 +20,7 @@ from ..holdings_snapshot import HoldingsSnapshotManager
 from ..metrics import BacktestResult
 from .adapters.models import ETFReference
 from .adapters.quote_fetcher import HistoricalQuoteFetcherAdapter
+from .adapters.holding_provider import HistoricalHoldingProviderAdapter
 
 
 class CNBacktestEngine:
@@ -72,6 +73,9 @@ class CNBacktestEngine:
 
         # 历史行情适配器（后续初始化）
         self.quote_fetcher_adapter: Optional[HistoricalQuoteFetcherAdapter] = None
+
+        # 持仓数据适配器（后续初始化）
+        self.holding_provider: Optional[HistoricalHoldingProviderAdapter] = None
 
         # A股套利引擎（后续初始化）
         self.arbitrage_engine: Optional[ArbitrageEngineCN] = None
@@ -151,10 +155,11 @@ class CNBacktestEngine:
 
             self.arbitrage_engine = ArbitrageEngineCN(
                 quote_fetcher=self.quote_fetcher_adapter,
-                etf_holding_provider=self.holding_provider,
+                etf_holder_provider=self.holding_provider,
+                etf_holdings_provider=self.holding_provider,
+                etf_quote_provider=self.quote_fetcher_adapter,
                 signal_evaluator=signal_evaluator,
-                min_time_to_close=self.config.min_time_to_close,
-                min_etf_volume=self.config.min_etf_volume
+                config=self.app_config
             )
 
             logger.info("A股套利引擎初始化完成")
@@ -251,10 +256,21 @@ class CNBacktestEngine:
                 continue
 
     def _estimate_total_steps(self) -> int:
-        """估算总步数"""
+        """
+        估算总步数
+
+        日级回测：交易日数量
+        分钟级回测：根据交易时长和粒度计算
+        """
         if self.config.time_granularity == TimeGranularity.DAILY:
             return len(self.clock.trading_calendar)
-        return 1000
+
+        # 分钟级：计算实际步数
+        # 每天交易4小时（240分钟）
+        minutes_per_day = 240  # 9:30-11:30, 13:00-15:00
+        granularity_minutes = self.config.time_granularity.delta_minutes
+        slots_per_day = minutes_per_day / granularity_minutes
+        return int(len(self.clock.trading_calendar) * slots_per_day)
 
     def _generate_result(self) -> BacktestResult:
         """生成回测结果"""
@@ -276,7 +292,9 @@ class CNBacktestEngine:
                 "stocks_count": len(self.stocks),
                 "etfs_count": len(self.etf_codes)
             },
-            data_details={}
+            data_details={
+                "holdings_snapshot": self.holdings_manager.get_snapshot_summary()
+            }
         )
 
     def get_progress(self) -> float:

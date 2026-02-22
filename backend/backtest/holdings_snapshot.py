@@ -119,6 +119,9 @@ class HoldingsSnapshotManager:
         # 存储快照数据
         self.snapshots: Dict[datetime, HoldingsSnapshot] = {}
 
+        # 标记是否使用了模拟数据
+        self._using_mock_data = False
+
         logger.info(f"持仓快照管理器初始化，快照日期: {len(self.snapshot_dates)}个")
 
     @staticmethod
@@ -243,7 +246,8 @@ class HoldingsSnapshotManager:
 
         # 没有真实数据或加载失败，生成模拟持仓
         if use_mock_data:
-            logger.info("使用模拟持仓数据进行回测")
+            self._using_mock_data = True
+            logger.warning("使用模拟持仓数据进行回测（非真实数据）")
             return self._build_mock_snapshot(stock_codes, etf_codes, date)
 
         return None
@@ -509,9 +513,15 @@ class HoldingsSnapshotManager:
             logger.warning(f"保存快照失败 {cache_file}: {e}")
 
     def get_snapshot_summary(self) -> Dict:
-        """获取快照摘要"""
+        """
+        获取快照摘要
+
+        Returns:
+            包含快照信息、数据源类型的字典
+        """
         return {
             "snapshot_dates": [d.strftime("%Y-%m-%d") for d in self.snapshot_dates],
             "loaded_snapshots": len(self.snapshots),
+            "data_source": "mock" if self._using_mock_data else "real",
             "cache_dir": str(self.cache_dir)
         }
