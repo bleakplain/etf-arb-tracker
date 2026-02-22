@@ -7,7 +7,7 @@
 from typing import List
 from loguru import logger
 
-from backend.market.domain.interfaces import IQuoteFetcher, IHoldingProvider
+from backend.market.interfaces import IQuoteFetcher, IHoldingProvider
 from backend.signal.domain.interfaces import ISignalEvaluator
 from config import Config
 

@@ -18,8 +18,8 @@ from backend.arbitrage.cn.strategies.interfaces import (
     IFundSelector,
     ISignalFilter,
 )
-from backend.market.domain.events import MarketEvent
-from backend.market.domain import CandidateETF
+from backend.market.events import MarketEvent
+from backend.market import CandidateETF
 from backend.arbitrage.models import TradingSignal
 
 

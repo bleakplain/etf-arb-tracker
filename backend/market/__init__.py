@@ -3,7 +3,10 @@
 # 通用接口和模型
 from backend.market.events import MarketEvent
 from backend.market.interfaces import IQuoteFetcher, IHoldingProvider
-from backend.market.models import ETFCategory, StockQuote, ETFQuote, Holding
+from backend.market.models import (
+    ETFCategory, StockQuote, ETFQuote, Holding,
+    CandidateETF, ETF, TradingHours
+)
 
 # A股
 from backend.market.cn import LimitUpEvent, LimitUpStock, CNQuoteFetcher
@@ -14,8 +17,12 @@ from backend.market.hk import BreakoutEvent, HKQuoteFetcher
 # 美股
 from backend.market.us import MomentumEvent, USQuoteFetcher
 
-# 兼容旧导入
-from backend.market.domain import ETF, CandidateETF, TradingHours
+# 兼容旧导入（保持向后兼容）
+from backend.market.domain import (
+    ETF as _ETF,
+    CandidateETF as _CandidateETF,
+    TradingHours as _TradingHours
+)
 
 __all__ = [
     # 通用
@@ -26,6 +33,9 @@ __all__ = [
     'StockQuote',
     'ETFQuote',
     'Holding',
+    'CandidateETF',
+    'ETF',
+    'TradingHours',
     # A股
     'LimitUpEvent',
     'LimitUpStock',
@@ -36,8 +46,4 @@ __all__ = [
     # 美股
     'MomentumEvent',
     'USQuoteFetcher',
-    # 旧导入（兼容）
-    'ETF',
-    'CandidateETF',
-    'TradingHours',
 ]

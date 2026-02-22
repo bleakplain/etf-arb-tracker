@@ -9,7 +9,7 @@
 """
 
 from backend.arbitrage.cn.strategies.interfaces import IEventDetector
-from backend.market.domain.events import LimitUpEvent
+from backend.market.cn.events import LimitUpEvent
 from backend.arbitrage.strategy_registry import event_detector_registry
 from typing import Dict, Optional
 

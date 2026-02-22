@@ -10,9 +10,9 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional, Tuple
 
-from backend.market.domain.events import MarketEvent
+from backend.market.events import MarketEvent
 from backend.arbitrage.models import TradingSignal
-from backend.market.domain import CandidateETF
+from backend.market import CandidateETF
 
 
 class IEventDetector(ABC):

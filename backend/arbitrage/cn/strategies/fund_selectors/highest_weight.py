@@ -6,9 +6,9 @@
 """
 
 from backend.arbitrage.cn.strategies.interfaces import IFundSelector
-from backend.market.domain.events import MarketEvent
+from backend.market.events import MarketEvent
 from backend.arbitrage.strategy_registry import fund_selector_registry
-from backend.market.domain import CandidateETF
+from backend.market import CandidateETF
 from typing import List, Optional
 
 

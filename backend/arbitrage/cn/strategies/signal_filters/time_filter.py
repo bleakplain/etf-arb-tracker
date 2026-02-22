@@ -7,10 +7,10 @@ A股交易时间：9:30-11:30, 13:00-15:00
 """
 
 from backend.arbitrage.cn.strategies.interfaces import ISignalFilter
-from backend.market.domain.events import MarketEvent
+from backend.market.events import MarketEvent
 from backend.arbitrage.strategy_registry import signal_filter_registry
 from backend.arbitrage.models import TradingSignal
-from backend.market.domain import CandidateETF
+from backend.market import CandidateETF
 from datetime import datetime
 
 

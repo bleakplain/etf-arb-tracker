@@ -5,10 +5,10 @@
 """
 
 from backend.arbitrage.cn.strategies.interfaces import ISignalFilter
-from backend.market.domain.events import MarketEvent
+from backend.market.events import MarketEvent
 from backend.arbitrage.strategy_registry import signal_filter_registry
 from backend.arbitrage.models import TradingSignal
-from backend.market.domain import CandidateETF
+from backend.market import CandidateETF
 
 
 @signal_filter_registry.register(

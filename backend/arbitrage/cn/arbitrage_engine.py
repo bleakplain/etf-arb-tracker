@@ -11,8 +11,8 @@ from datetime import datetime
 
 from backend.arbitrage.config import ArbitrageEngineConfig
 from backend.arbitrage.models import TradingSignal
-from backend.market.domain import CandidateETF
-from backend.market.domain.interfaces import IQuoteFetcher, IHoldingProvider
+from backend.market import CandidateETF
+from backend.market.interfaces import IQuoteFetcher, IHoldingProvider
 from backend.signal.domain.interfaces import ISignalEvaluator
 from backend.arbitrage.strategy_registry import strategy_manager
 from backend.arbitrage.cn.strategies.interfaces import (
@@ -20,7 +20,8 @@ from backend.arbitrage.cn.strategies.interfaces import (
     IFundSelector,
     ISignalFilter,
 )
-from backend.market.domain.events import MarketEvent, LimitUpEvent
+from backend.market.cn.events import LimitUpEvent
+from backend.market.events import MarketEvent
 from config import Config
 
 

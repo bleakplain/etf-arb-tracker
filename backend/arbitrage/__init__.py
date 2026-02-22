@@ -20,11 +20,9 @@ from backend.arbitrage.cn.strategies.interfaces import (
 )
 
 # 事件类型
-from backend.market.domain.events import (
-    MarketEvent,
-    LimitUpEvent,
-    BreakoutEvent,
-)
+from backend.market.events import MarketEvent
+from backend.market.cn.events import LimitUpEvent
+from backend.market.hk.events import BreakoutEvent
 
 # 各市场引擎
 from backend.arbitrage.cn import ArbitrageEngineCN
