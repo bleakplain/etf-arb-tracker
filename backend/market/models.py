@@ -151,7 +151,3 @@ class TradingSession:
 
         delta = session_end - current_time
         return max(0, int(delta.total_seconds()))
-
-
-# 类型别名，保留向后兼容
-MarketSchedule = TradingSession
