@@ -1,5 +1,5 @@
 """
-A股持仓数据提供
+A股ETF持仓数据提供
 """
 
 from typing import Optional, Dict, List
@@ -8,8 +8,8 @@ import json
 from pathlib import Path
 
 
-class CNHoldingProvider:
-    """A股持仓数据提供器"""
+class CNETFHoldingProvider:
+    """A股ETF持仓数据提供器"""
 
     def __init__(self):
         self._source = None
