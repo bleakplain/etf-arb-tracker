@@ -34,16 +34,6 @@ class CacheConfig:
     FRONTEND_REFRESH_INTERVAL: int = 10  # 前端刷新间隔
 
 
-# ==================== 市场相关常量 ====================
-
-class TradingHours:
-    """交易时间配置"""
-    MORNING_START: Tuple[int, int] = (9, 30)  # 9:30
-    MORNING_END: Tuple[int, int] = (11, 30)  # 11:30
-    AFTERNOON_START: Tuple[int, int] = (13, 0)  # 13:00
-    AFTERNOON_END: Tuple[int, int] = (15, 0)  # 15:00
-
-
 # ==================== 数据源相关常量 ====================
 
 class DataSourceLimits:
@@ -71,10 +61,10 @@ class BacktestConfig:
     DEFAULT_PROGRESS_REPORT_INTERVAL: float = 0.1  # 进度报告间隔（10%）
 
 
-# ==================== 持仓相关常量 ====================
+# ==================== ETF持仓相关常量 ====================
 
-class HoldingConfig:
-    """持仓配置"""
+class ETFHoldingConfig:
+    """ETF持仓配置"""
     TOP10_THRESHOLD: int = 10  # 前10大持仓
     DEFAULT_MAX_POSITIONS: int = 5  # 默认最大持仓数
 
