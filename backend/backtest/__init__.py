@@ -16,6 +16,12 @@ from .repository import BacktestRepository, get_backtest_repository
 # A股回测
 from .cn import CNBacktestEngine, create_cn_backtest_engine
 
+# 港股回测
+from .hk import HKBacktestEngine
+
+# 美股回测
+from .us import USBacktestEngine
+
 __all__ = [
     # 通用
     "TimeGranularity",
@@ -31,4 +37,8 @@ __all__ = [
     # A股
     "CNBacktestEngine",
     "create_cn_backtest_engine",
+    # 港股
+    "HKBacktestEngine",
+    # 美股
+    "USBacktestEngine",
 ]
