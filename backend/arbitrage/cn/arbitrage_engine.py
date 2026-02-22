@@ -123,11 +123,11 @@ class ArbitrageEngineCN:
         return ArbitrageEngineConfig(
             event_detector="limit_up_cn",
             fund_selector="highest_weight",
-            signal_filters=["cn_time_filter", "liquidity_filter"],
+            signal_filters=["time_filter_cn", "liquidity_filter"],
             event_config={'min_change_pct': 0.095},
             fund_config={'min_weight': 0.05},
             filter_configs={
-                'cn_time_filter': {'min_time_to_close': 1800},
+                'time_filter_cn': {'min_time_to_close': 1800},
                 'liquidity_filter': {'min_daily_amount': 50000000}
             }
         )
