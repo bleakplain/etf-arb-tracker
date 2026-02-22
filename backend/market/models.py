@@ -117,7 +117,7 @@ class ETF:
 
 
 @dataclass(frozen=True)
-class TradingSession:
+class TradingPeriod:
     """交易时段（起止时间）"""
     start: str  # 开始时间，格式 "HH:MM"
     end: str    # 结束时间，格式 "HH:MM"
@@ -142,12 +142,12 @@ class TradingSession:
         from datetime import time
         end_time = time.fromisoformat(self.end)
 
-        session_end = current_time.replace(
+        period_end = current_time.replace(
             hour=end_time.hour,
             minute=end_time.minute,
             second=0,
             microsecond=0
         )
 
-        delta = session_end - current_time
+        delta = period_end - current_time
         return max(0, int(delta.total_seconds()))
