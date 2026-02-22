@@ -1,7 +1,7 @@
 """
-回测模块 - 简化版
+回测模块
 
-只保留核心配置和各市场回测引擎，最大化复用现有模块。
+提供 A股/港股/美股的回测引擎。
 """
 
 # 通用配置
@@ -10,10 +10,10 @@ from .config import BacktestConfig
 # A股回测
 from .cn import CNBacktestEngine, create_cn_backtest_engine
 
-# 港股回测（框架）
+# 港股回测
 from .hk import HKBacktestEngine
 
-# 美股回测（框架）
+# 美股回测
 from .us import USBacktestEngine
 
 __all__ = [

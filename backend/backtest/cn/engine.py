@@ -1,7 +1,5 @@
 """
-A股回测引擎 - 简化版
-
-最大化复用 ArbitrageEngineCN、Market 和 Signal 模块。
+A股回测引擎
 """
 
 from typing import List, Dict, Optional, Callable
@@ -19,12 +17,9 @@ from .data_provider import BacktestDataProvider
 
 class CNBacktestEngine:
     """
-    A股回测引擎（简化版）
+    A股回测引擎
 
-    核心思路：
-    1. 使用 BacktestDataProvider 提供历史数据
-    2. 直接复用 ArbitrageEngineCN 进行信号生成
-    3. 遍历每个交易日，记录生成的信号
+    使用历史数据遍历交易日，通过 ArbitrageEngineCN 生成交易信号。
     """
 
     def __init__(
@@ -45,13 +40,13 @@ class CNBacktestEngine:
         self.app_config = app_config or Config.load()
         self.progress_callback = progress_callback
 
-        # 组件（后续初始化）
+        # 组件
         self.data_provider: Optional[BacktestDataProvider] = None
         self.arbitrage_engine: Optional[ArbitrageEngineCN] = None
 
         # 结果存储
         self.signals: List[TradingSignal] = []
-        self.signal_dates: List[str] = []  # 每个信号对应的日期
+        self.signal_dates: List[str] = []
 
         logger.info(f"回测引擎初始化: {config.start_date} -> {config.end_date}")
         logger.info(f"股票: {len(config.stock_codes)}, ETF: {len(config.etf_codes)}")
@@ -85,12 +80,12 @@ class CNBacktestEngine:
             self.app_config.signal_evaluation
         )
 
-        # 3. 创建套利引擎（复用）
+        # 3. 创建套利引擎
         self.arbitrage_engine = ArbitrageEngineCN(
-            quote_fetcher=self.data_provider,           # 行情数据
-            etf_holder_provider=self.data_provider,    # 持仓关系
-            etf_holdings_provider=self.data_provider,  # 持仓详情
-            etf_quote_provider=self.data_provider,     # ETF 行情
+            quote_fetcher=self.data_provider,
+            etf_holder_provider=self.data_provider,
+            etf_holdings_provider=self.data_provider,
+            etf_quote_provider=self.data_provider,
             signal_evaluator=signal_evaluator,
             config=self.app_config
         )
@@ -216,7 +211,7 @@ def create_cn_backtest_engine(
     progress_callback: Optional[Callable[[float], None]] = None
 ) -> CNBacktestEngine:
     """
-    创建 A股回测引擎（便捷函数）
+    创建 A股回测引擎
 
     Args:
         start_date: 开始日期 "YYYYMMDD"

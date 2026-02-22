@@ -1,8 +1,7 @@
 """
-回测数据提供者 - 简化版
+回测数据提供者
 
-同时实现 IQuoteFetcher 和 IETFHoldingProvider 接口，
-为回测提供历史行情和持仓数据。
+同时实现 IQuoteFetcher 和 IETFHoldingProvider 接口。
 """
 
 import random
@@ -16,15 +15,11 @@ from backend.market import CandidateETF, ETFCategory
 
 class BacktestDataProvider(IQuoteFetcher, IETFHoldingProvider):
     """
-    回测数据提供者（简化版）
+    回测数据提供者
 
-    同时实现两个接口：
-    - IQuoteFetcher: 提供历史行情数据
-    - IETFHoldingProvider: 提供持仓数据（固定或 mock）
-
-    数据格式：
-    - quotes: {date: {code: quote_dict}}
-    - holdings: {stock_code: [CandidateETF, ...]}
+    实现 IQuoteFetcher 和 IETFHoldingProvider 接口：
+    - 提供历史行情数据
+    - 提供持仓数据（固定映射或 mock 生成）
     """
 
     # ETF 名称映射
@@ -50,12 +45,12 @@ class BacktestDataProvider(IQuoteFetcher, IETFHoldingProvider):
 
         Args:
             quotes: 历史行情数据 {date: {code: quote_dict}}
-            holdings: 持仓数据 {stock_code: [CandidateETF, ...]}（可选）
-            etf_codes: ETF 代码列表（用于 mock 数据）
+            holdings: 持仓数据（可选）
+            etf_codes: ETF 代码列表
             use_mock_holdings: 是否使用 mock 持仓数据
             mock_etf_count: 每只股票随机关联的 ETF 数量
         """
-        self.quotes = quotes  # {"20240102": {"600519": {...}, ...}}
+        self.quotes = quotes
         self.holdings = holdings or {}
         self.etf_codes = etf_codes or []
         self.use_mock_holdings = use_mock_holdings
@@ -63,7 +58,7 @@ class BacktestDataProvider(IQuoteFetcher, IETFHoldingProvider):
 
         self.current_date: Optional[str] = None
 
-        # 如果使用 mock 且没有持仓数据，生成 mock 数据
+        # 生成 mock 持仓数据
         if use_mock_holdings and not self.holdings and etf_codes:
             self._generate_mock_holdings()
 
@@ -74,20 +69,17 @@ class BacktestDataProvider(IQuoteFetcher, IETFHoldingProvider):
 
     def _generate_mock_holdings(self) -> None:
         """生成 mock 持仓数据"""
-        # 从所有日期中提取股票代码
         stock_codes = set()
         for daily_quotes in self.quotes.values():
             stock_codes.update(daily_quotes.keys())
 
         for stock_code in stock_codes:
-            # 随机选择 ETF
             if len(self.etf_codes) <= self.mock_etf_count:
                 selected_etfs = self.etf_codes
             else:
                 selected_etfs = random.sample(self.etf_codes, self.mock_etf_count)
 
-            # 随机分配权重
-            remaining_weight = 0.40  # 总权重 40%
+            remaining_weight = 0.40
             etf_list = []
 
             for i, etf_code in enumerate(selected_etfs):
@@ -115,10 +107,8 @@ class BacktestDataProvider(IQuoteFetcher, IETFHoldingProvider):
     @staticmethod
     def _get_etf_category(etf_code: str) -> ETFCategory:
         """根据 ETF 代码获取分类"""
-        # 宽基指数
         broad_index = ["510300", "510500", "510050", "159915", "588000",
                        "159901", "512100", "588200"]
-        # 行业/主题
         sector = ["159995", "512480", "515000", "516160", "515790",
                   "512590", "159928", "512170", "512880", "512800"]
 
@@ -132,12 +122,7 @@ class BacktestDataProvider(IQuoteFetcher, IETFHoldingProvider):
     # ========== IQuoteFetcher 接口 ==========
 
     def set_current_date(self, date: str) -> None:
-        """
-        设置当前日期
-
-        Args:
-            date: 日期字符串 "YYYYMMDD"
-        """
+        """设置当前日期"""
         self.current_date = date
 
     def get_stock_quote(self, code: str) -> Optional[Dict]:
@@ -152,25 +137,18 @@ class BacktestDataProvider(IQuoteFetcher, IETFHoldingProvider):
         return {code: self.get_stock_quote(code) for code in codes}
 
     def is_trading_time(self) -> bool:
-        """判断是否交易时间（简化：总是返回 True）"""
+        """判断是否交易时间"""
         return True
 
     # ========== IETFHoldingProvider 接口 ==========
 
     def get_etf_top_holdings(self, etf_code: str) -> Optional[Dict]:
-        """
-        获取 ETF 前十大持仓
-
-        简化版：返回空数据
-        回测主要使用"哪些 ETF 持有某只股票"的反向查询
-        """
+        """获取 ETF 前十大持仓"""
         return {"top_holdings": [], "total_weight": 0}
 
     def get_etfs_holding_stock(self, stock_code: str) -> List[CandidateETF]:
         """
         获取持有指定股票的 ETF 列表
-
-        这是回测的核心查询方法
 
         Args:
             stock_code: 股票代码
@@ -181,15 +159,15 @@ class BacktestDataProvider(IQuoteFetcher, IETFHoldingProvider):
         return self.holdings.get(stock_code, [])
 
     def load_mapping(self, filepath: str) -> Optional[Dict]:
-        """加载映射文件（不适用）"""
+        """加载映射文件"""
         return None
 
     def save_mapping(self, mapping: Dict, filepath: str) -> None:
-        """保存映射文件（不适用）"""
+        """保存映射文件"""
         pass
 
     def build_stock_etf_mapping(self, stock_codes: List[str], etf_codes: List[str]) -> Dict:
-        """构建映射（不适用）"""
+        """构建映射"""
         return {}
 
     # ========== 辅助方法 ==========

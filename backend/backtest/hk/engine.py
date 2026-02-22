@@ -1,14 +1,13 @@
-"""港股回测引擎（框架）"""
+"""港股回测引擎"""
 
 from typing import List, Optional, Callable
-from datetime import datetime
 from loguru import logger
 
 from ..config import BacktestConfig
 
 
 class HKBacktestEngine:
-    """港股回测引擎（框架）"""
+    """港股回测引擎"""
 
     def __init__(
         self,
