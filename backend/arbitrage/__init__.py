@@ -28,7 +28,7 @@ from backend.market.domain.events import (
 
 # 各市场引擎
 from backend.arbitrage.cn import ArbitrageEngineCN
-from backend.arbitrage.hk import HKStockArbitrageEngine
+from backend.arbitrage.hk import ArbitrageEngineHK
 from backend.arbitrage.us import USStockArbitrageEngine
 
 # 向后兼容：默认使用A股引擎
@@ -49,7 +49,7 @@ __all__ = [
     'BreakoutEvent',
     # 市场引擎
     'ArbitrageEngineCN',
-    'HKStockArbitrageEngine',
+    'ArbitrageEngineHK',
     'USStockArbitrageEngine',
     'ArbitrageEngine',  # 向后兼容，默认A股
 ]
