@@ -7,12 +7,13 @@ Tests the cache utilities, code utilities, and plugin registry.
 import pytest
 import time
 from threading import Thread
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from backend.utils.cache_utils import TTLCache, CacheEntry, CacheStats
 from backend.utils.code_utils import normalize_stock_code, add_market_prefix
 from backend.utils.plugin_registry import PluginRegistry
 from backend.utils import time_utils
+from backend.utils.clock import Clock, FrozenClock, ShiftClock, set_clock, reset_clock, CHINA_TZ
 
 
 @pytest.mark.unit
@@ -302,3 +303,87 @@ class TestTimeUtils:
         seconds = time_utils.time_to_close()
         # 非交易时间可能返回None
         assert seconds is None or isinstance(seconds, int)
+
+
+@pytest.mark.unit
+class TestClockAbstraction:
+    """测试时钟抽象 - 用于确定性测试"""
+
+    def setup_method(self):
+        """每个测试前保存原始时钟"""
+        self._original_clock = time_utils.get_clock()
+
+    def teardown_method(self):
+        """每个测试后恢复原始时钟"""
+        reset_clock()
+
+    def test_frozen_clock_returns_fixed_time(self):
+        """测试FrozenClock返回固定时间"""
+        # 2024-01-15 14:30:00 中国时区
+        frozen_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=CHINA_TZ)
+        frozen_clock = FrozenClock(frozen_time)
+
+        # 多次调用返回相同时间
+        assert frozen_clock.now(CHINA_TZ) == frozen_time
+        assert frozen_clock.now(CHINA_TZ) == frozen_time
+
+    def test_shift_clock_adds_offset(self):
+        """测试ShiftClock添加时间偏移"""
+        base_time = datetime(2024, 1, 15, 10, 0, 0, tzinfo=CHINA_TZ)
+        base_clock = FrozenClock(base_time)
+
+        # 创建偏移1小时的时钟
+        offset = timedelta(hours=1)
+        shift_clock = ShiftClock(base_clock, offset)
+
+        result = shift_clock.now(CHINA_TZ)
+        expected = datetime(2024, 1, 15, 11, 0, 0, tzinfo=CHINA_TZ)
+        assert result == expected
+
+    def test_time_utils_with_frozen_clock(self):
+        """测试time_utils使用FrozenClock进行确定性测试"""
+        # 设置固定时间：2024-01-15 14:30:00 (交易时间内)
+        frozen_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=CHINA_TZ)
+        set_clock(FrozenClock(frozen_time))
+
+        # now_china应该返回固定时间
+        now = time_utils.now_china()
+        assert now == frozen_time
+
+        # now_china_str应该返回固定格式字符串
+        time_str = time_utils.now_china_str()
+        assert time_str == "2024-01-15 14:30:00"
+
+        # is_trading_time应该返回True（14:30在交易时间内）
+        assert time_utils.is_trading_time() is True
+
+    def test_time_utils_outside_trading_hours(self):
+        """测试非交易时间的确定性"""
+        # 设置固定时间：2024-01-15 16:00:00 (交易时间后)
+        frozen_time = datetime(2024, 1, 15, 16, 0, 0, tzinfo=CHINA_TZ)
+        set_clock(FrozenClock(frozen_time))
+
+        # is_trading_time应该返回False
+        assert time_utils.is_trading_time() is False
+
+        # time_to_close应该返回None（不在交易时间）
+        assert time_utils.time_to_close() is None
+
+    def test_time_to_close_deterministic(self):
+        """测试距离收盘时间的确定性计算"""
+        # 设置固定时间：2024-01-15 14:00:00 (距离下午收盘还有1小时)
+        frozen_time = datetime(2024, 1, 15, 14, 0, 0, tzinfo=CHINA_TZ)
+        set_clock(FrozenClock(frozen_time))
+
+        # time_to_close应该返回3600秒（1小时）
+        seconds = time_utils.time_to_close()
+        assert seconds == 3600
+
+    def test_today_china_deterministic(self):
+        """测试日期获取的确定性"""
+        # 设置固定时间：2024-01-15
+        frozen_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=CHINA_TZ)
+        set_clock(FrozenClock(frozen_time))
+
+        assert time_utils.today_china() == "2024-01-15"
+        assert time_utils.today_china_compact() == "20240115"

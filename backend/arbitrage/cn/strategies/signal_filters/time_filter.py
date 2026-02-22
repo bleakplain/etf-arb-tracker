@@ -6,12 +6,13 @@ A股时间过滤策略
 A股交易时间：9:30-11:30, 13:00-15:00
 """
 
+from typing import Optional
 from backend.arbitrage.cn.strategies.interfaces import ISignalFilter
 from backend.market.events import MarketEvent
 from backend.arbitrage.strategy_registry import signal_filter_registry
 from backend.arbitrage.models import TradingSignal
 from backend.market import CandidateETF
-from datetime import datetime
+from backend.utils.clock import Clock, SystemClock, CHINA_TZ
 
 
 @signal_filter_registry.register(
@@ -27,14 +28,16 @@ class TimeFilterCN(ISignalFilter):
     检查距离A股收盘的时间（15:00），避免在收盘前太短时间内发出信号。
     """
 
-    def __init__(self, min_time_to_close: int = 1800):
+    def __init__(self, min_time_to_close: int = 1800, clock: Optional[Clock] = None):
         """
         初始化A股时间过滤器
 
         Args:
             min_time_to_close: 距收盘最小时间（秒），默认30分钟
+            clock: 时钟实例，用于测试时注入
         """
         self.min_time_to_close = min_time_to_close
+        self._clock = clock or SystemClock()
 
     @property
     def strategy_name(self) -> str:
@@ -70,10 +73,9 @@ class TimeFilterCN(ISignalFilter):
 
         return False, ""
 
-    @staticmethod
-    def _get_time_to_close() -> int:
+    def _get_time_to_close(self) -> int:
         """获取距离A股收盘的秒数（15:00收盘）"""
-        now = datetime.now()
+        now = self._clock.now(CHINA_TZ)
         close_time = now.replace(hour=15, minute=0, second=0, microsecond=0)
 
         if now.hour < 9 or now.hour >= 15:

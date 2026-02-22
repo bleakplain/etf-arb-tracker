@@ -269,6 +269,63 @@ def mock_http_client():
         yield session
 
 
+# ==================== Fixtures for Global State Cleanup ====================
+
+@pytest.fixture(autouse=True)
+def reset_clock_state():
+    """Auto-reset clock state before and after each test"""
+    from backend.utils.clock import reset_clock
+    # Reset before test
+    reset_clock()
+    yield
+    # Reset after test
+    reset_clock()
+
+
+@pytest.fixture(autouse=True)
+def clean_global_registries():
+    """Auto-clean global registries before and after each test"""
+    from backend.arbitrage.strategy_registry import (
+        event_detector_registry,
+        fund_selector_registry,
+        signal_filter_registry,
+    )
+    from backend.utils.plugin_registry import evaluator_registry
+
+    # Save original registry state
+    original_event_detectors = dict(event_detector_registry._plugins)
+    original_fund_selectors = dict(fund_selector_registry._plugins)
+    original_signal_filters = dict(signal_filter_registry._plugins)
+    original_evaluators = dict(evaluator_registry._plugins)
+
+    yield
+
+    # Restore registry state after test
+    event_detector_registry._plugins.clear()
+    event_detector_registry._plugins.update(original_event_detectors)
+
+    fund_selector_registry._plugins.clear()
+    fund_selector_registry._plugins.update(original_fund_selectors)
+
+    signal_filter_registry._plugins.clear()
+    signal_filter_registry._plugins.update(original_signal_filters)
+
+    evaluator_registry._plugins.clear()
+    evaluator_registry._plugins.update(original_evaluators)
+
+
+@pytest.fixture(autouse=True)
+def reset_singletons():
+    """Auto-reset singleton instances before and after each test"""
+    from backend.api.state import reset_api_state_manager
+    from backend.arbitrage.strategy_registry import reset_strategy_manager
+
+    # Reset singletons after test
+    yield
+    reset_api_state_manager()
+    reset_strategy_manager()
+
+
 @pytest.fixture
 def mock_rate_limiting():
     """Mock rate limiting to speed up tests"""

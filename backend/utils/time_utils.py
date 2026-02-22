@@ -6,9 +6,8 @@
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-
-# 中国时区（UTC+8）
-CHINA_TZ = timezone(timedelta(hours=8))
+# 引入时钟抽象
+from backend.utils.clock import get_clock, CHINA_TZ
 
 
 def now_china() -> datetime:
@@ -18,7 +17,7 @@ def now_china() -> datetime:
     Returns:
         timezone-aware的datetime对象
     """
-    return datetime.now(CHINA_TZ)
+    return get_clock().now(CHINA_TZ)
 
 
 def now_china_str(fmt: str = "%Y-%m-%d %H:%M:%S") -> str:

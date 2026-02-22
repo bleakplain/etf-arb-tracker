@@ -316,3 +316,12 @@ def create_test_strategy_manager() -> StrategyManager:
         独立的 StrategyManager 实例
     """
     return StrategyManager(use_registries=True)
+
+
+def reset_strategy_manager() -> None:
+    """
+    重置全局策略管理器（主要用于测试）
+
+    警告：此方法会清空所有已注册的策略，仅应在测试环境中使用
+    """
+    strategy_manager.reset()

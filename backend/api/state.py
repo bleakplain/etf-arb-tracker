@@ -174,3 +174,15 @@ def get_api_state_manager() -> APIStateManager:
     if _api_state_manager is None:
         _api_state_manager = APIStateManager()
     return _api_state_manager
+
+
+def reset_api_state_manager() -> None:
+    """
+    重置API状态管理器（主要用于测试）
+
+    警告：此方法会清空所有状态，仅应在测试环境中使用
+    """
+    global _api_state_manager
+    if _api_state_manager is not None:
+        _api_state_manager._monitor_state.reset()
+    _api_state_manager = None

@@ -88,7 +88,8 @@ pytest -m "not slow"
 | **US (美股)** | test_market_us.py | 3 | 框架 |
 | | test_backtest_us.py | 1 | 框架 |
 | **跨市场** | test_signal_evaluator.py | 14 | ✓ 完整 |
-| | test_utils.py | 29 | ✓ 完整 |
+| | test_utils.py | 35 | ✓ 完整 (含Clock抽象测试) |
+| | test_repository.py | 10 | ✓ 完整 (仓储测试) |
 
 ## 待补充测试
 

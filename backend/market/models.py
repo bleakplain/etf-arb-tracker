@@ -3,9 +3,12 @@
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, time
+
+if TYPE_CHECKING:
+    from backend.utils.clock import Clock
 
 
 class ETFCategory(Enum):
@@ -119,24 +122,48 @@ class TradingPeriod:
     start: str  # 开始时间，格式 "HH:MM"
     end: str    # 结束时间，格式 "HH:MM"
 
-    def is_active(self, current_time: datetime = None) -> bool:
-        """判断当前是否在该时段内"""
-        if current_time is None:
-            current_time = datetime.now()
+    def is_active(self, current_time: datetime = None, clock: 'Clock' = None) -> bool:
+        """
+        判断当前是否在该时段内
 
-        from datetime import time
+        Args:
+            current_time: 当前时间（兼容旧API，优先使用此参数）
+            clock: 时钟实例（新API，用于测试时注入）
+
+        Returns:
+            是否在该时段内
+        """
+        if current_time is None:
+            if clock is not None:
+                from backend.utils.clock import CHINA_TZ
+                current_time = clock.now(CHINA_TZ)
+            else:
+                current_time = datetime.now()
+
         now = current_time.time()
         start_time = time.fromisoformat(self.start)
         end_time = time.fromisoformat(self.end)
 
         return start_time <= now <= end_time
 
-    def get_time_to_end(self, current_time: datetime = None) -> int:
-        """获取距离该时段结束的秒数"""
-        if current_time is None:
-            current_time = datetime.now()
+    def get_time_to_end(self, current_time: datetime = None, clock: 'Clock' = None) -> int:
+        """
+        获取距离该时段结束的秒数
 
-        from datetime import time
+        Args:
+            current_time: 当前时间（兼容旧API，优先使用此参数）
+            clock: 时钟实例（新API，用于测试时注入）
+
+        Returns:
+            距离结束的秒数
+        """
+        if current_time is None:
+            if clock is not None:
+                from backend.utils.clock import CHINA_TZ
+                current_time = clock.now(CHINA_TZ)
+            else:
+                current_time = datetime.now()
+
         end_time = time.fromisoformat(self.end)
 
         period_end = current_time.replace(

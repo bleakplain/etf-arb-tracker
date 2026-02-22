@@ -6,12 +6,13 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple, Type
+from typing import Dict, Tuple, Type, Optional
 from datetime import datetime
 
 from config.strategy import SignalEvaluationConfig
 from backend.signal.interfaces import ISignalEvaluator
 from backend.utils.plugin_registry import evaluator_registry
+from backend.utils.clock import Clock, SystemClock, CHINA_TZ
 
 
 class SignalEvaluator(ISignalEvaluator, ABC):
@@ -30,8 +31,9 @@ class SignalEvaluator(ISignalEvaluator, ABC):
                 return "高", "低"
     """
 
-    def __init__(self, config: SignalEvaluationConfig):
+    def __init__(self, config: SignalEvaluationConfig, clock: Optional[Clock] = None):
         self.config = config
+        self._clock = clock or SystemClock()
 
     @abstractmethod
     def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
@@ -46,15 +48,14 @@ class SignalEvaluator(ISignalEvaluator, ABC):
             (confidence, risk_level) - (置信度, 风险等级)
         """
 
-    @staticmethod
-    def _get_time_to_close() -> int:
+    def _get_time_to_close(self) -> int:
         """
         获取距离收盘的秒数
 
         Returns:
             距离15:00收盘的秒数，不在交易时间返回-1
         """
-        now = datetime.now()
+        now = self._clock.now(CHINA_TZ)
         close_time = now.replace(hour=15, minute=0, second=0, microsecond=0)
 
         if now.hour < 9 or now.hour >= 15:
@@ -116,7 +117,7 @@ class DefaultSignalEvaluator(SignalEvaluator):
                 risk_level = "高"
 
         # 5. 涨停时间因素
-        current_hour = datetime.now().hour
+        current_hour = self._clock.now(CHINA_TZ).hour
         if current_hour < self.config.risk_morning_hour:
             if risk_level == "高":
                 risk_level = "中"
