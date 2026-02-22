@@ -17,13 +17,6 @@ from backend.market.hk import BreakoutEvent, HKQuoteFetcher
 # 美股
 from backend.market.us import MomentumEvent, USQuoteFetcher
 
-# 兼容旧导入（保持向后兼容）
-from backend.market.domain import (
-    ETF as _ETF,
-    CandidateETF as _CandidateETF,
-    TradingHours as _TradingHours
-)
-
 __all__ = [
     # 通用
     'MarketEvent',
