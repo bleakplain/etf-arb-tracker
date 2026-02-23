@@ -1,7 +1,7 @@
 """
-配置和插件路由
+配置和策略路由
 
-提供配置信息、股票-ETF映射、插件列表、策略列表等端点
+提供配置信息、股票-ETF映射、策略列表等端点
 """
 
 from fastapi import APIRouter, HTTPException
@@ -47,32 +47,6 @@ async def get_stock_etf_mapping():
     from backend.api.dependencies import get_engine
     engine = get_engine()
     return engine.get_security_fund_mapping()
-
-
-@router.get("/api/plugins")
-async def list_plugins():
-    """
-    列出所有已注册的插件
-
-    Returns:
-        插件列表和元数据
-    """
-    from backend.core.plugin_manager import list_all_plugins
-
-    return list_all_plugins()
-
-
-@router.get("/api/plugins/stats")
-async def get_plugin_stats():
-    """
-    获取插件统计信息
-
-    Returns:
-        插件统计
-    """
-    from backend.core.plugin_manager import get_plugin_stats
-
-    return get_plugin_stats()
 
 
 @router.get("/api/strategies")
