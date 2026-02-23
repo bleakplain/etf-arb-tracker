@@ -17,8 +17,8 @@ class MomentumEvent(MarketEvent):
     stock_name: str
     price: float
     change_pct: float
-    volume_ratio: float
     timestamp: str = ""
+    volume_ratio: float = 0.0
 
     @property
     def event_type(self) -> str:

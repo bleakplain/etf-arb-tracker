@@ -11,6 +11,7 @@ from typing import List, Dict, Optional, Tuple, TYPE_CHECKING
 from loguru import logger
 from datetime import datetime
 from dataclasses import replace
+import threading
 
 from backend.arbitrage.models import TradingSignal
 from backend.market import CandidateETF
@@ -26,6 +27,20 @@ from backend.market.events import MarketEvent
 # 延迟导入以避免循环依赖
 if TYPE_CHECKING:
     from backend.signal.interfaces import ISignalEvaluator
+
+# 全局信号计数器（线程安全）
+_signal_counter = 0
+_signal_counter_lock = threading.Lock()
+
+
+def _generate_signal_id(stock_code: str) -> str:
+    """生成唯一信号ID"""
+    global _signal_counter
+    with _signal_counter_lock:
+        _signal_counter += 1
+        counter = _signal_counter
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    return f"SIG_{timestamp}_{counter:04d}_{stock_code}"
 
 
 class StrategyExecutor:
@@ -116,14 +131,7 @@ class StrategyExecutor:
             logs.append(f"事件验证失败: {event.event_type}")
             return None
 
-        # 获取证券名称
-        if isinstance(event, LimitUpEvent):
-            security_name = event.stock_name
-        else:
-            event_dict = event.to_dict()
-            security_name = event_dict.get('stock_name', event_dict.get('security_name', ''))
-
-        logs.append(f"✓ 检测到事件: {event.event_type} - {security_name}")
+        logs.append(f"✓ 检测到事件: {event.event_type} - {event.stock_name}")
         logs.append(f"  涨幅: +{event.change_pct*100:.2f}%, 价格: ¥{event.price:.2f}")
 
         return event
@@ -171,27 +179,21 @@ class StrategyExecutor:
         logs: List[str]
     ) -> Optional[TradingSignal]:
         """生成交易信号"""
-        event_dict = event.to_dict()
-
-        # 提取事件信息
+        # 获取事件特有的属性（A股特有）
+        limit_time = ""
+        locked_amount = 0
         if isinstance(event, LimitUpEvent):
-            stock_code = event.stock_code
-            stock_name = event.stock_name
             limit_time = event.limit_time
             locked_amount = event.locked_amount
             event_desc = f"涨停 ({event.change_pct*100:.2f}%)"
         else:
-            stock_code = event_dict.get('stock_code', '')
-            stock_name = event_dict.get('stock_name', '')
-            limit_time = event_dict.get('limit_time', event_dict.get('event_time', ''))
-            locked_amount = event_dict.get('locked_amount', 0)
             event_desc = f"{event.event_type} ({event.change_pct*100:.2f}%)"
 
         signal = TradingSignal(
-            signal_id=f"SIG_{datetime.now().strftime('%Y%m%d%H%M%S')}_{stock_code}",
+            signal_id=_generate_signal_id(event.stock_code),
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            stock_code=stock_code,
-            stock_name=stock_name,
+            stock_code=event.stock_code,
+            stock_name=event.stock_name,
             stock_price=event.price,
             limit_time=limit_time,
             locked_amount=locked_amount,
@@ -201,7 +203,7 @@ class StrategyExecutor:
             etf_weight=selected_fund.weight,
             etf_price=etf_quote.get('price', 0.0),
             etf_premium=etf_quote.get('premium', 0.0),
-            reason=f"{stock_name} {event_desc}，"
+            reason=f"{event.stock_name} {event_desc}，"
                    f"在 {selected_fund.etf_name} 中持仓占比 {selected_fund.weight_pct:.2f}% "
                    f"(排名第{selected_fund.rank})",
             confidence="",

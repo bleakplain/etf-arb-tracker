@@ -23,12 +23,13 @@ class LimitUpEvent(MarketEvent):
     stock_name: str
     price: float
     change_pct: float
-    limit_time: str
+    timestamp: str = ""
+    limit_time: str = ""
     locked_amount: float = 0
     open_count: int = 0
     is_first_limit: bool = True
-    timestamp: str = ""
 
+    # 使用dataclass字段作为属性，避免to_dict调用
     @property
     def event_type(self) -> str:
         return "limit_up"
