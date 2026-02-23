@@ -9,7 +9,6 @@ from loguru import logger
 from pathlib import Path
 from typing import Dict
 
-from backend.api.dependencies import get_monitor, BASE_DIR
 from backend.api.models import AddStockRequest
 
 router = APIRouter()
@@ -36,10 +35,9 @@ def _save_watchlist_config(config: Dict) -> None:
 
 
 def _clear_monitor_cache() -> None:
-    """清除监控器和配置缓存"""
-    global _monitor_instance
-    from backend.api.dependencies import _monitor_instance
-    _monitor_instance = None
+    """清除引擎和配置缓存"""
+    from backend.api.dependencies import _engine_instance
+    _engine_instance = None
 
     # 清除配置模块的全局缓存
     from config import _config

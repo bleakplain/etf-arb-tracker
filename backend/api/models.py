@@ -5,7 +5,7 @@ API请求和响应模型
 """
 
 from pydantic import BaseModel, validator
-from typing import List, Optional, Dict
+from typing import Optional, List, Dict
 from datetime import datetime
 
 

@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from loguru import logger
 
 from backend.api.dependencies import get_monitor, get_limit_up_cache
-from backend.api.models import StockQuoteResponse, ETFQuoteResponse, LimitUpStockResponse
+from backend.api.models import StockQuoteResponse, LimitUpStockResponse
 from backend.data.limit_up_stocks import LimitUpStocksFetcher
 from backend.data.kline import KlineDataFetcher
 from backend.data.etf_holdings import ETFHoldingsFetcher

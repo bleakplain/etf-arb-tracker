@@ -7,7 +7,6 @@ A股套利引擎
 from typing import List, Optional, Dict, Any, Tuple, TYPE_CHECKING
 from loguru import logger
 from dataclasses import dataclass
-from datetime import datetime
 
 from backend.arbitrage.config import ArbitrageEngineConfig
 from backend.arbitrage.models import TradingSignal
@@ -20,8 +19,6 @@ from backend.arbitrage.cn.strategies.interfaces import (
     IFundSelector,
     ISignalFilter,
 )
-from backend.market.cn.events import LimitUpEvent
-from backend.market.events import MarketEvent
 from backend.arbitrage.cn.strategy_executor import StrategyExecutor
 from config import Config
 
@@ -167,7 +164,6 @@ class ArbitrageEngineCN:
         from backend.utils.constants import (
             CNMarketConstants,
             DEFAULT_MIN_TIME_TO_CLOSE,
-            DEFAULT_MIN_ETF_VOLUME
         )
 
         return ArbitrageEngineConfig(
