@@ -4,7 +4,7 @@ API请求和响应模型
 定义所有API的请求和响应数据结构
 """
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from typing import Optional, List, Dict
 from datetime import datetime
 
@@ -78,7 +78,8 @@ class BacktestRequest(BaseModel):
     max_stocks: Optional[int] = 0  # 0表示不限制，用于快速测试
     max_etfs: Optional[int] = 0    # 0表示不限制
 
-    @validator('start_date', 'end_date')
+    @field_validator('start_date', 'end_date')
+    @classmethod
     def validate_date_format(cls, v):
         """验证日期格式"""
         if not v:
@@ -99,11 +100,12 @@ class BacktestRequest(BaseModel):
 
         return v
 
-    @validator('end_date')
-    def validate_date_range(cls, v, values):
+    @field_validator('end_date')
+    @classmethod
+    def validate_date_range(cls, v, info):
         """验证结束日期必须晚于开始日期"""
-        if 'start_date' in values:
-            start_date = values['start_date']
+        if 'start_date' in info.data:
+            start_date = info.data['start_date']
             start_dt = datetime.strptime(start_date, "%Y%m%d")
             end_dt = datetime.strptime(v, "%Y%m%d")
 
@@ -118,7 +120,8 @@ class BacktestRequest(BaseModel):
 
         return v
 
-    @validator('granularity')
+    @field_validator('granularity')
+    @classmethod
     def validate_granularity(cls, v):
         """验证时间粒度"""
         valid_granularities = ["daily", "5m", "15m", "30m"]
@@ -126,7 +129,8 @@ class BacktestRequest(BaseModel):
             raise ValueError(f'时间粒度必须是{valid_granularities}之一')
         return v
 
-    @validator('min_weight')
+    @field_validator('min_weight')
+    @classmethod
     def validate_min_weight(cls, v):
         """验证最小权重"""
         if v is not None:
@@ -134,7 +138,8 @@ class BacktestRequest(BaseModel):
                 raise ValueError('权重必须在0.001到1.0之间')
         return v
 
-    @validator('evaluator_type')
+    @field_validator('evaluator_type')
+    @classmethod
     def validate_evaluator_type(cls, v):
         """验证评估器类型"""
         valid_types = ["default", "conservative", "aggressive"]
@@ -142,7 +147,8 @@ class BacktestRequest(BaseModel):
             raise ValueError(f'评估器类型必须是{valid_types}之一')
         return v
 
-    @validator('interpolation')
+    @field_validator('interpolation')
+    @classmethod
     def validate_interpolation(cls, v):
         """验证插值方式"""
         valid_interpolations = ["linear", "step"]
@@ -167,7 +173,8 @@ class AddStockRequest(BaseModel):
     market: str = "sz"
     notes: str = ""
 
-    @validator('code')
+    @field_validator('code')
+    @classmethod
     def validate_code(cls, v):
         """验证股票代码"""
         if not v:
@@ -176,14 +183,16 @@ class AddStockRequest(BaseModel):
             raise ValueError('股票代码必须是6位数字')
         return v
 
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         """验证股票名称"""
         if not v or not v.strip():
             raise ValueError('股票名称不能为空')
         return v.strip()
 
-    @validator('market')
+    @field_validator('market')
+    @classmethod
     def validate_market(cls, v):
         """验证市场代码"""
         valid_markets = ["sh", "sz"]

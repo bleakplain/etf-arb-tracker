@@ -3,6 +3,7 @@ Web API服务
 提供RESTful接口供前端调用
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
@@ -35,11 +36,25 @@ from backend.api.routes.backtest import router as backtest_router
 # 导入依赖
 from backend.api.dependencies import load_historical_backtest_jobs
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    # 启动时执行
+    logger.info("API服务启动")
+    count = load_historical_backtest_jobs()
+    logger.info(f"加载了 {count} 个历史回测任务")
+    yield
+    # 关闭时执行
+    logger.info("API服务关闭")
+
+
 # 全局变量
 app = FastAPI(
     title="A股涨停ETF溢价监控API",
     description="监控个股涨停，通过ETF获取溢价的辅助工具",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # 添加CORS支持
@@ -50,15 +65,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-async def startup_event():
-    """应用启动时的初始化"""
-    logger.info("API服务启动")
-    # 加载历史回测任务到内存
-    count = load_historical_backtest_jobs()
-    logger.info(f"加载了 {count} 个历史回测任务")
 
 
 # 注册所有路由

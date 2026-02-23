@@ -54,7 +54,7 @@ async def start_backtest(request: BacktestRequest, background_tasks: BackgroundT
     job_id = str(uuid.uuid4())
 
     # 创建回测任务记录（线程安全）
-    await create_backtest_job(job_id, request.dict())
+    await create_backtest_job(job_id, request.model_dump())
 
     # 后台执行回测
     async def run_backtest_job():

@@ -253,7 +253,7 @@ class TestConfigAPIRoutes:
 
     def test_get_stock_etf_mapping(self, test_client):
         """测试获取股票-ETF映射"""
-        response = test_client.get("/api/config/stock-etf-mapping")
+        response = test_client.get("/api/mapping")
 
         assert response.status_code == 200
         data = response.json()

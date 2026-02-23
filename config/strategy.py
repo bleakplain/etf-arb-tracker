@@ -34,6 +34,9 @@ class TradingHours:
 class StrategySettings:
     """策略设置"""
 
+    # 扫描间隔（秒）
+    scan_interval: int = 120
+
     # ETF持仓权重阈值
     min_weight: float = 0.05
 
@@ -53,6 +56,7 @@ class StrategySettings:
     def from_dict(cls, data: dict) -> "StrategySettings":
         """从字典创建配置"""
         return cls(
+            scan_interval=data.get("scan_interval", 120),
             min_weight=data.get("min_weight", 0.05),
             min_order_amount=data.get("min_order_amount", 10.0),
             min_time_to_close=data.get("min_time_to_close", 1800),

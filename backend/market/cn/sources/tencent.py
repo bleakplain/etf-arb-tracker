@@ -80,6 +80,9 @@ class TencentSource:
                 volume = 0
                 amount = 0.0
 
+            # 判断是否涨停: 涨跌幅 >= 9.9% (考虑浮点误差)
+            is_limit_up = change_pct >= 9.9
+
             return {
                 'code': stock_code,
                 'name': name,
@@ -87,6 +90,7 @@ class TencentSource:
                 'change_pct': change_pct,
                 'volume': volume,
                 'amount': amount,
+                'is_limit_up': is_limit_up,
                 'timestamp': '',
                 'data_source': 'Tencent'
             }
