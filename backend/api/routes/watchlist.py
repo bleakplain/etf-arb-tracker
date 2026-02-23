@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict
 
 from backend.api.models import AddStockRequest
+from backend.api.routes.error_handlers import handle_api_errors, handle_file_errors
 
 router = APIRouter()
 
@@ -47,6 +48,8 @@ def _clear_monitor_cache() -> None:
 
 
 @router.post("/api/watchlist/add")
+@handle_api_errors("添加自选股")
+@handle_file_errors("添加自选股")
 async def add_to_watchlist(request: AddStockRequest):
     """
     添加股票到自选列表
@@ -57,49 +60,45 @@ async def add_to_watchlist(request: AddStockRequest):
     Returns:
         操作结果
     """
-    try:
-        config = _load_watchlist_config()
-        my_stocks = config.get('my_stocks', [])
+    config = _load_watchlist_config()
+    my_stocks = config.get('my_stocks', [])
 
-        # 检查是否已存在
-        for stock in my_stocks:
-            if stock['code'] == request.code:
-                return {
-                    "status": "already_exists",
-                    "message": f"股票 {request.code} 已在自选列表中"
-                }
+    # 检查是否已存在
+    for stock in my_stocks:
+        if stock['code'] == request.code:
+            return {
+                "status": "already_exists",
+                "message": f"股票 {request.code} 已在自选列表中"
+            }
 
-        # 添加新股票
-        new_stock = {
-            "code": request.code,
-            "name": request.name,
-            "market": request.market
-        }
-        if request.notes:
-            new_stock["notes"] = request.notes
+    # 添加新股票
+    new_stock = {
+        "code": request.code,
+        "name": request.name,
+        "market": request.market
+    }
+    if request.notes:
+        new_stock["notes"] = request.notes
 
-        my_stocks.append(new_stock)
-        config['my_stocks'] = my_stocks
+    my_stocks.append(new_stock)
+    config['my_stocks'] = my_stocks
 
-        # 保存配置
-        _save_watchlist_config(config)
+    # 保存配置
+    _save_watchlist_config(config)
 
-        # 清除缓存
-        _clear_monitor_cache()
+    # 清除缓存
+    _clear_monitor_cache()
 
-        logger.info(f"已添加股票 {request.code} {request.name} 到自选列表")
+    logger.info(f"已添加股票 {request.code} {request.name} 到自选列表")
 
-        return {
-            "status": "success",
-            "message": f"已添加 {request.name} 到自选列表"
-        }
-
-    except Exception as e:
-        logger.error(f"添加自选股失败: {e}")
-        raise HTTPException(status_code=500, detail=f"添加失败: {e}")
+    return {
+        "status": "success",
+        "message": f"已添加 {request.name} 到自选列表"
+    }
 
 
 @router.delete("/api/watchlist/{code}")
+@handle_file_errors("删除自选股")
 async def remove_from_watchlist(code: str):
     """
     从自选列表删除股票
@@ -110,44 +109,38 @@ async def remove_from_watchlist(code: str):
     Returns:
         操作结果
     """
-    try:
-        config = _load_watchlist_config()
+    config = _load_watchlist_config()
 
-        if not config:
-            raise HTTPException(status_code=404, detail="配置文件不存在")
+    if not config:
+        raise HTTPException(status_code=404, detail="配置文件不存在")
 
-        my_stocks = config.get('my_stocks', [])
+    my_stocks = config.get('my_stocks', [])
 
-        # 查找并删除
-        original_count = len(my_stocks)
-        my_stocks = [s for s in my_stocks if s['code'] != code]
+    # 查找并删除
+    original_count = len(my_stocks)
+    my_stocks = [s for s in my_stocks if s['code'] != code]
 
-        if len(my_stocks) == original_count:
-            raise HTTPException(status_code=404, detail=f"股票 {code} 不在自选列表中")
+    if len(my_stocks) == original_count:
+        raise HTTPException(status_code=404, detail=f"股票 {code} 不在自选列表中")
 
-        config['my_stocks'] = my_stocks
+    config['my_stocks'] = my_stocks
 
-        # 保存配置
-        _save_watchlist_config(config)
+    # 保存配置
+    _save_watchlist_config(config)
 
-        # 清除缓存
-        _clear_monitor_cache()
+    # 清除缓存
+    _clear_monitor_cache()
 
-        logger.info(f"已从自选列表删除股票 {code}")
+    logger.info(f"已从自选列表删除股票 {code}")
 
-        return {
-            "status": "success",
-            "message": f"已删除股票 {code}"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"删除自选股失败: {e}")
-        raise HTTPException(status_code=500, detail=f"删除失败: {e}")
+    return {
+        "status": "success",
+        "message": f"已删除股票 {code}"
+    }
 
 
 @router.get("/api/watchlist")
+@handle_api_errors("获取自选列表")
 async def get_watchlist():
     """
     获取自选股列表
@@ -155,11 +148,7 @@ async def get_watchlist():
     Returns:
         自选股列表
     """
-    try:
-        config = _load_watchlist_config()
-        return {
-            "my_stocks": config.get('my_stocks', [])
-        }
-    except Exception as e:
-        logger.error(f"获取自选列表失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取失败: {e}")
+    config = _load_watchlist_config()
+    return {
+        "my_stocks": config.get('my_stocks', [])
+    }
