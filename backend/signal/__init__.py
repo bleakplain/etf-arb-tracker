@@ -1,6 +1,6 @@
 """信号模块 - 信号管理、通知"""
 
-from backend.signal.interfaces import ISignalRepository, ISignalSender, ISignalManager, ISignalEvaluator
+from backend.signal.interfaces import ISignalRepository, ISignalSender, ISignalEvaluator
 from backend.signal.repository import FileSignalRepository, InMemorySignalRepository
 from backend.signal.manager import SignalManager
 from backend.signal.evaluator import SignalEvaluator, SignalEvaluatorFactory
@@ -10,7 +10,6 @@ __all__ = [
     # 接口
     'ISignalRepository',
     'ISignalSender',
-    'ISignalManager',
     'ISignalEvaluator',
     # 实现
     'FileSignalRepository',

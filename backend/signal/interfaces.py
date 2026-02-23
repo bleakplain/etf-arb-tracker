@@ -58,12 +58,3 @@ class ISignalSender(ABC):
     def send_signal(self, signal: TradingSignal) -> bool:
         """发送信号通知"""
         pass
-
-
-class ISignalManager(ABC):
-    """信号管理器接口"""
-
-    @abstractmethod
-    def save_and_notify(self, signal: TradingSignal) -> bool:
-        """保存信号并发送通知"""
-        pass

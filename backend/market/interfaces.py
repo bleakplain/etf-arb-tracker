@@ -3,11 +3,7 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional, TYPE_CHECKING
-from dataclasses import dataclass
-
-if TYPE_CHECKING:
-    from datetime import time
+from typing import List, Dict, Optional
 
 
 class IQuoteFetcher(ABC):
@@ -113,53 +109,5 @@ class IETFHoldingProvider(ABC):
 
         Returns:
             股票代码到ETF列表的映射字典
-        """
-        pass
-
-
-# =============================================================================
-# HTTP客户端接口 - 用于抽象外部API调用
-# =============================================================================
-
-@dataclass
-class HTTPResponse:
-    """HTTP响应"""
-    status_code: int
-    text: str
-    encoding: str = "utf-8"
-
-    @property
-    def is_success(self) -> bool:
-        """是否成功"""
-        return self.status_code == 200
-
-
-class IHTTPClient(ABC):
-    """
-    HTTP客户端接口
-
-    用于抽象HTTP请求，便于测试时mock
-    """
-
-    @abstractmethod
-    def get(
-        self,
-        url: str,
-        headers: Dict[str, str] = None,
-        timeout: int = 10
-    ) -> HTTPResponse:
-        """
-        发送GET请求
-
-        Args:
-            url: 请求URL
-            headers: 请求头字典
-            timeout: 超时时间（秒）
-
-        Returns:
-            HTTPResponse对象，包含:
-            - status_code: HTTP状态码
-            - text: 响应内容
-            - encoding: 编码
         """
         pass
