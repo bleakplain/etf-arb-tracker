@@ -9,6 +9,7 @@ from backend.arbitrage.cn.strategies.interfaces import IFundSelector
 from backend.market.events import MarketEvent
 from backend.arbitrage.strategy_registry import fund_selector_registry
 from backend.market import CandidateETF
+from backend.utils.constants import CNMarketConstants
 from typing import List, Optional
 
 
@@ -26,14 +27,14 @@ class HighestWeightSelector(IFundSelector):
     这是最直接的策略，权重高意味着该事件对ETF影响最大。
     """
 
-    def __init__(self, min_weight: float = 0.05):
+    def __init__(self, min_weight: float = None):
         """
         初始化最高权重选择器
 
         Args:
-            min_weight: 最小权重阈值
+            min_weight: 最小权重阈值（默认使用A股默认阈值5%）
         """
-        self.min_weight = min_weight
+        self.min_weight = min_weight if min_weight is not None else CNMarketConstants.DEFAULT_MIN_WEIGHT
 
     @property
     def strategy_name(self) -> str:

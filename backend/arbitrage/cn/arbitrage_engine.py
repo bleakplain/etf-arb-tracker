@@ -137,15 +137,21 @@ class ArbitrageEngineCN:
 
     def _get_default_config(self) -> ArbitrageEngineConfig:
         """获取A股默认引擎配置"""
+        from backend.utils.constants import (
+            CNMarketConstants,
+            DEFAULT_MIN_TIME_TO_CLOSE,
+            DEFAULT_MIN_ETF_VOLUME
+        )
+
         return ArbitrageEngineConfig(
             event_detector="limit_up_cn",
             fund_selector="highest_weight",
             signal_filters=["time_filter_cn", "liquidity_filter"],
-            event_config={'min_change_pct': 0.095},
-            fund_config={'min_weight': 0.05},
+            event_config={'min_change_pct': CNMarketConstants.DEFAULT_LIMIT_UP_THRESHOLD},
+            fund_config={'min_weight': CNMarketConstants.DEFAULT_MIN_WEIGHT},
             filter_configs={
-                'time_filter_cn': {'min_time_to_close': 1800},
-                'liquidity_filter': {'min_daily_amount': 50000000}
+                'time_filter_cn': {'min_time_to_close': DEFAULT_MIN_TIME_TO_CLOSE},
+                'liquidity_filter': {'min_daily_amount': CNMarketConstants.DEFAULT_MIN_DAILY_AMOUNT}
             }
         )
 
@@ -245,7 +251,8 @@ class ArbitrageEngineCN:
                     weight = h['weight']
                     break
 
-            min_weight = self._engine_config.fund_config.get('min_weight', 0.05)
+            from backend.utils.constants import CNMarketConstants
+            min_weight = self._engine_config.fund_config.get('min_weight', CNMarketConstants.DEFAULT_MIN_WEIGHT)
             if weight >= min_weight:
                 results.append(CandidateETF(
                     etf_code=fund_code,

@@ -11,6 +11,7 @@
 from backend.arbitrage.cn.strategies.interfaces import IEventDetector
 from backend.market.cn.events import LimitUpEvent
 from backend.arbitrage.strategy_registry import event_detector_registry
+from backend.utils.constants import CNMarketConstants
 from typing import Dict, Optional
 
 
@@ -31,14 +32,14 @@ class LimitUpDetectorCN(IEventDetector):
     - 北交所: 30%
     """
 
-    def __init__(self, min_change_pct: float = 0.095):
+    def __init__(self, min_change_pct: float = None):
         """
         初始化涨停检测器
 
         Args:
-            min_change_pct: 最小涨幅阈值（默认9.5%）
+            min_change_pct: 最小涨幅阈值（默认使用A股默认阈值）
         """
-        self.min_change_pct = min_change_pct
+        self.min_change_pct = min_change_pct or CNMarketConstants.DEFAULT_LIMIT_UP_THRESHOLD
 
     @property
     def strategy_name(self) -> str:

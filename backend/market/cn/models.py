@@ -4,6 +4,7 @@ A股市场模型
 
 from dataclasses import dataclass
 from typing import Dict
+from backend.utils.constants import CNMarketConstants
 
 
 @dataclass
@@ -26,7 +27,7 @@ class LimitUpStock:
         """检查涨停信息是否有效"""
         return (
             self.price > 0
-            and self.change_pct > 9.5
+            and self.change_pct > CNMarketConstants.LIMIT_UP_VALID_THRESHOLD
             and self.stock_code is not None
         )
 

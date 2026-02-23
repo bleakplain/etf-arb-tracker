@@ -248,10 +248,12 @@ class ArbitrageEngineFactory:
     @staticmethod
     def _get_default_test_config() -> ArbitrageEngineConfig:
         """获取默认测试配置"""
+        from backend.utils.constants import CNMarketConstants
+
         return ArbitrageEngineConfig(
             event_detector="limit_up_cn",
             fund_selector="highest_weight",
             signal_filters=[],  # 测试时不使用过滤器
-            event_config={'min_change_pct': 0.095},
-            fund_config={'min_weight': 0.05}
+            event_config={'min_change_pct': CNMarketConstants.DEFAULT_LIMIT_UP_THRESHOLD},
+            fund_config={'min_weight': CNMarketConstants.DEFAULT_MIN_WEIGHT}
         )
