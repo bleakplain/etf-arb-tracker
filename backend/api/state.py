@@ -52,9 +52,16 @@ class MonitorState:
     def uptime_seconds(self) -> Optional[float]:
         """获取运行时长（秒）"""
         with self._lock:
-            if not self._running or self._start_time is None:
+            if self._start_time is None:
                 return None
-            end = self._stop_time if self._stop_time else datetime.now()
+            # 运行时：计算从启动到现在；停止时：计算从启动到停止
+            if self._running:
+                end = datetime.now()
+            else:
+                # 已停止，但没有stop_time的情况返回None
+                if self._stop_time is None:
+                    return None
+                end = self._stop_time
             return (end - self._start_time).total_seconds()
 
     def start(self) -> bool:
