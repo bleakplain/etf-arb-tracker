@@ -203,6 +203,7 @@ class StrategyExecutor:
             etf_weight=selected_fund.weight,
             etf_price=etf_quote.get('price', 0.0),
             etf_premium=etf_quote.get('premium', 0.0),
+            etf_amount=etf_quote.get('amount', 0.0),
             reason=f"{event.stock_name} {event_desc}，"
                    f"在 {selected_fund.etf_name} 中持仓占比 {selected_fund.weight_pct:.2f}% "
                    f"(排名第{selected_fund.rank})",

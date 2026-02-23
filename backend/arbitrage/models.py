@@ -41,6 +41,7 @@ class TradingSignal:
 
     由套利引擎生成，表示一个套利机会
     """
+    # 必需字段
     signal_id: str
     timestamp: str
 
@@ -67,9 +68,10 @@ class TradingSignal:
     weight_rank: int
     top10_ratio: float
 
-    # A股特有字段（可选，保持向后兼容）
-    limit_time: str = ""
-    locked_amount: float = 0
+    # 可选字段（有默认值）
+    etf_amount: float = 0.0  # ETF成交额
+    limit_time: str = ""  # A股涨停时间
+    locked_amount: float = 0  # A股封单金额
 
     def __post_init__(self):
         if not self.signal_id:

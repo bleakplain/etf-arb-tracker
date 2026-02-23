@@ -47,20 +47,15 @@ class LiquidityFilter(ISignalFilter):
         """
         判断是否过滤该信号
 
-        从signal.etf_premium字段推断成交额信息。
-        如果信号创建时已获取ETF行情，这里应检查成交额。
+        使用signal.etf_amount检查ETF流动性。
         """
         # 检查ETF是否有足够的流动性
-        # 这里通过检查signal的隐含信息来判断
-        # 实际流动性数据需要在生成signal时从etf_quote中获取
+        if signal.etf_amount <= 0:
+            return True, f"ETF成交额异常（¥{signal.etf_amount:,.0f}），流动性无法确认"
 
-        # 简化实现：如果有ETF价格信息，假设流动性满足要求
-        # 生产环境应通过etf_quote_provider.get_etf_quote()获取真实成交额
-        if signal.etf_price <= 0:
-            return True, "ETF价格异常，流动性无法确认"
+        if signal.etf_amount < self.min_daily_amount:
+            return True, f"ETF流动性不足（成交额¥{signal.etf_amount:,.0f} < ¥{self.min_daily_amount:,.0f}）"
 
-        # TODO: 从etf_quote中获取amount进行真实流动性检查
-        # 当前简化实现：假设所有价格正常的ETF都满足流动性要求
         return False, ""
 
     @property
