@@ -1,18 +1,12 @@
-"""套利模块 - 核心业务逻辑
+"""套利模块 - A股套利业务逻辑"""
 
-按市场拆分的套利模块：
-- cn: A股套利引擎和策略
-- hk: 港股套利引擎和策略（框架）
-- us: 美股套利引擎和策略（框架）
-"""
-
-# 核心模型（跨市场通用）
+# 核心模型
 from backend.arbitrage.models import TradingSignal, ChosenETF
 
-# 配置（跨市场通用）
+# 配置
 from backend.arbitrage.config import ArbitrageEngineConfig
 
-# 策略接口（从cn导入）
+# 策略接口
 from backend.arbitrage.cn.strategies.interfaces import (
     IEventDetector,
     IFundSelector,
@@ -22,12 +16,9 @@ from backend.arbitrage.cn.strategies.interfaces import (
 # 事件类型
 from backend.market.events import MarketEvent
 from backend.market.cn.events import LimitUpEvent
-from backend.market.hk.events import BreakoutEvent
 
-# 各市场引擎
+# A股套利引擎
 from backend.arbitrage.cn import ArbitrageEngineCN
-from backend.arbitrage.hk import ArbitrageEngineHK
-from backend.arbitrage.us import ArbitrageEngineUS
 
 # 向后兼容：默认使用A股引擎
 ArbitrageEngine = ArbitrageEngineCN
@@ -44,10 +35,7 @@ __all__ = [
     # 事件类型
     'MarketEvent',
     'LimitUpEvent',
-    'BreakoutEvent',
     # 市场引擎
     'ArbitrageEngineCN',
-    'ArbitrageEngineHK',
-    'ArbitrageEngineUS',
     'ArbitrageEngine',  # 向后兼容，默认A股
 ]

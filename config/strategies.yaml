@@ -8,9 +8,6 @@
 # 默认策略链配置
 default:
   # 事件检测策略
-  # 可选值:
-  #   - limit_up: 涨停检测（A股）
-  #   - breakout: 突破检测（美股/港股）
   event_detector: "limit_up"
 
   # 事件检测策略配置
@@ -18,11 +15,6 @@ default:
     min_change_pct: 0.095  # 最小涨幅阈值（9.5%）
 
   # 基金选择策略
-  # 可选值:
-  #   - highest_weight: 权重最高
-  #   - best_liquidity: 流动性最好
-  #   - lowest_premium: 溢价最低
-  #   - balanced: 综合评估
   fund_selector: "highest_weight"
 
   # 基金选择策略配置
@@ -51,25 +43,6 @@ default:
 
     confidence_filter:
       min_confidence: "中"  # 最低置信度（低/中/高）
-
-# 美股策略配置示例（未来实现）
-# us_market:
-#   event_detector: "breakout"
-#   event_config:
-#     breakout_pct: 0.10  # 10%突破
-#     min_volume: 1000000  # 最小成交量
-#   fund_selector: "best_liquidity"
-#   signal_filters:
-#     - "us_trading_hours_filter"
-#     - "us_time_filter"
-
-# 港股策略配置示例（未来实现）
-# hk_market:
-#   event_detector: "breakout"
-#   fund_config:
-#     min_weight: 0.03  # 港股ETF权重要求可以更低
-#   signal_filters:
-#     - "hk_trading_hours_filter"
 
 # 保守策略配置（风险厌恶型）
 # conservative:

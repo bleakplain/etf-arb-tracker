@@ -1,0 +1,17 @@
+{
+  "job_id": "db887eb6-df2c-408b-8a9c-969b5a09d208",
+  "request": {
+    "start_date": "20240101",
+    "end_date": "20240131",
+    "granularity": "daily",
+    "min_weight": null,
+    "evaluator_type": "default",
+    "interpolation": "linear",
+    "max_stocks": 0,
+    "max_etfs": 0
+  },
+  "status": "failed",
+  "progress": 0.0,
+  "result": null,
+  "error": "type object 'TimeGranularity' has no attribute 'MINUTE_5'"
+}
