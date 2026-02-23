@@ -112,6 +112,9 @@ class ArbitrageEngineCN:
         # 加载或使用默认引擎配置
         self._engine_config = engine_config or self._get_default_config()
 
+        # 验证配置有效性
+        self._engine_config.assert_valid()
+
         # 策略组件
         self._event_detector: Optional[IEventDetector] = None
         self._fund_selector: Optional[IFundSelector] = None

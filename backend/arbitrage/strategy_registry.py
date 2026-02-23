@@ -148,44 +148,36 @@ class StrategyManager:
         """
         configs = configs or {}
 
-        # 从注册表获取策略类
-        detector_cls = event_detector_registry.get(event_detector_name)
-        if detector_cls is None:
-            raise ValueError(f"未找到事件检测策略: {event_detector_name}")
-
-        selector_cls = fund_selector_registry.get(fund_selector_name)
-        if selector_cls is None:
-            raise ValueError(f"未找到基金选择策略: {fund_selector_name}")
-
-        # 创建实例（需要配置）
+        # 使用 PluginRegistry 的 create_from_config 方法
         event_config = configs.get('event_config', {})
         fund_config = configs.get('fund_config', {})
+        filter_configs = configs.get('filter_configs', {})
 
-        # 注意：这里假设策略类有 from_config 类方法
-        # 如果没有，需要直接实例化
-        try:
-            detector = detector_cls.from_config(event_config) if hasattr(detector_cls, 'from_config') else detector_cls()
-            selector = selector_cls.from_config(fund_config) if hasattr(selector_cls, 'from_config') else selector_cls()
-        except Exception as e:
-            logger.warning(f"创建策略实例失败，尝试无参构造: {e}")
-            detector = detector_cls()
-            selector = selector_cls()
+        # 创建事件检测器
+        detector = event_detector_registry.create_from_config(
+            event_detector_name,
+            event_config
+        )
+        if detector is None:
+            raise ValueError(f"未找到事件检测策略: {event_detector_name}")
+
+        # 创建基金选择器
+        selector = fund_selector_registry.create_from_config(
+            fund_selector_name,
+            fund_config
+        )
+        if selector is None:
+            raise ValueError(f"未找到基金选择策略: {fund_selector_name}")
 
         # 创建过滤器
         filters = []
-        filter_configs = configs.get('filter_configs', {})
         for filter_name in filter_names:
-            filter_cls = signal_filter_registry.get(filter_name)
-            if filter_cls is None:
-                logger.warning(f"未找到过滤策略: {filter_name}，跳过")
-                continue
-
             filter_config = filter_configs.get(filter_name, {})
-            try:
-                f = filter_cls.from_config(filter_config) if hasattr(filter_cls, 'from_config') else filter_cls()
+            f = signal_filter_registry.create_from_config(filter_name, filter_config)
+            if f is not None:
                 filters.append(f)
-            except Exception as e:
-                logger.warning(f"创建过滤器 {filter_name} 失败: {e}")
+            else:
+                logger.warning(f"未找到过滤策略: {filter_name}，跳过")
 
         return {
             'event_detector': detector,

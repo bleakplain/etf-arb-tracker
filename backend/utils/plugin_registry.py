@@ -167,6 +167,32 @@ class PluginRegistry:
             return None
         return cls(*args, **kwargs)
 
+    def create_from_config(self, name: str, config: Optional[Dict] = None) -> Optional[T]:
+        """
+        Create a plugin instance using from_config factory method.
+
+        This method uses the plugin's from_config() class method if available,
+        otherwise falls back to direct instantiation.
+
+        Args:
+            name: Plugin name
+            config: Configuration dictionary for the plugin
+
+        Returns:
+            Plugin instance or None if not found
+        """
+        cls = self.get(name)
+        if cls is None:
+            logger.warning(f"[{self._name}] Plugin '{name}' not found")
+            return None
+
+        # Try to use from_config if available
+        if hasattr(cls, 'from_config'):
+            return cls.from_config(config)
+
+        # Fall back to direct instantiation
+        return cls(**(config or {}))
+
     def list_all(self) -> Dict[str, Type[T]]:
         """
         List all registered plugins.

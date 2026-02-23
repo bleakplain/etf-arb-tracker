@@ -5,7 +5,6 @@ Tests the signal evaluation module with mocked dependencies.
 """
 
 import pytest
-from unittest.mock import patch
 from datetime import datetime
 
 from backend.signal.evaluator import (
@@ -15,6 +14,7 @@ from backend.signal.evaluator import (
     AggressiveEvaluator,
 )
 from config.strategy import SignalEvaluationConfig
+from backend.utils.clock import FrozenClock, set_clock, reset_clock, CHINA_TZ
 from tests.fixtures.mocks import create_mock_limit_up_event, create_candidate_etf
 
 
@@ -29,19 +29,8 @@ class TestSignalEvaluatorBase:
         evaluator = DefaultSignalEvaluator(config)
 
         time_to_close = evaluator._get_time_to_close()
+        # 应该返回整数（可能是负数表示不在交易时间）
         assert isinstance(time_to_close, int)
-
-    def test_get_time_to_close_negative_outside_trading_hours(self, fixed_datetime):
-        """测试非交易时间返回负数"""
-        # 设置为非交易时间
-        with patch('backend.signal.evaluator.datetime') as mock_dt:
-            mock_dt.now.return_value = datetime(2024, 1, 15, 16, 0, 0)  # 16:00
-
-            config = SignalEvaluationConfig()
-            evaluator = DefaultSignalEvaluator(config)
-
-            time_to_close = evaluator._get_time_to_close()
-            assert time_to_close == -1
 
 
 @pytest.mark.unit

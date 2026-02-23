@@ -8,11 +8,16 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, TypeVar, Type
 
 from backend.market.events import MarketEvent
 from backend.arbitrage.models import TradingSignal
 from backend.market import CandidateETF
+
+
+T = TypeVar('T', bound='IEventDetector')
+U = TypeVar('U', bound='IFundSelector')
+V = TypeVar('V', bound='ISignalFilter')
 
 
 class IEventDetector(ABC):
@@ -37,6 +42,22 @@ class IEventDetector(ABC):
     def is_valid(self, event: MarketEvent) -> bool:
         """验证事件是否有效"""
         pass
+
+    @classmethod
+    def from_config(cls: Type[T], config: Optional[Dict] = None) -> T:
+        """
+        从配置创建策略实例
+
+        Args:
+            config: 策略配置参数
+
+        Returns:
+            策略实例
+
+        Note:
+            默认实现直接调用构造函数，子类可覆盖以自定义初始化
+        """
+        return cls(**(config or {}))
 
 
 class IFundSelector(ABC):
@@ -65,6 +86,22 @@ class IFundSelector(ABC):
     def get_selection_reason(self, fund: CandidateETF) -> str:
         """获取选择原因说明"""
         pass
+
+    @classmethod
+    def from_config(cls: Type[U], config: Optional[Dict] = None) -> U:
+        """
+        从配置创建策略实例
+
+        Args:
+            config: 策略配置参数
+
+        Returns:
+            策略实例
+
+        Note:
+            默认实现直接调用构造函数，子类可覆盖以自定义初始化
+        """
+        return cls(**(config or {}))
 
 
 class ISignalFilter(ABC):
@@ -100,3 +137,19 @@ class ISignalFilter(ABC):
             (是否通过, 原因说明)
         """
         pass
+
+    @classmethod
+    def from_config(cls: Type[V], config: Optional[Dict] = None) -> V:
+        """
+        从配置创建策略实例
+
+        Args:
+            config: 策略配置参数
+
+        Returns:
+            策略实例
+
+        Note:
+            默认实现直接调用构造函数，子类可覆盖以自定义初始化
+        """
+        return cls(**(config or {}))

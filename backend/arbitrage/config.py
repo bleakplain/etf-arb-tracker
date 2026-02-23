@@ -5,8 +5,9 @@
 跨市场通用，各市场引擎可设置自己的默认值。
 """
 
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
+from loguru import logger
 
 
 @dataclass
@@ -62,3 +63,70 @@ class ArbitrageEngineConfig:
             "fund_config": self.fund_config,
             "filter_configs": self.filter_configs
         }
+
+    def validate(self) -> Tuple[bool, List[str]]:
+        """
+        验证配置是否有效
+
+        检查策略名称是否在注册表中存在。
+
+        Returns:
+            (is_valid, error_messages)
+        """
+        errors = []
+
+        # 导入注册表（延迟导入避免循环依赖）
+        from backend.arbitrage.strategy_registry import (
+            event_detector_registry,
+            fund_selector_registry,
+            signal_filter_registry,
+        )
+
+        # 验证事件检测策略
+        if not self.event_detector:
+            errors.append("event_detector 不能为空")
+        elif not event_detector_registry.is_registered(self.event_detector):
+            available = event_detector_registry.list_names()
+            errors.append(
+                f"event_detector '{self.event_detector}' 未注册。"
+                f"可用策略: {', '.join(available) if available else '(无)'}"
+            )
+
+        # 验证基金选择策略
+        if not self.fund_selector:
+            errors.append("fund_selector 不能为空")
+        elif not fund_selector_registry.is_registered(self.fund_selector):
+            available = fund_selector_registry.list_names()
+            errors.append(
+                f"fund_selector '{self.fund_selector}' 未注册。"
+                f"可用策略: {', '.join(available) if available else '(无)'}"
+            )
+
+        # 验证信号过滤策略
+        for filter_name in self.signal_filters:
+            if not signal_filter_registry.is_registered(filter_name):
+                available = signal_filter_registry.list_names()
+                errors.append(
+                    f"signal_filter '{filter_name}' 未注册。"
+                    f"可用策略: {', '.join(available) if available else '(无)'}"
+                )
+
+        is_valid = len(errors) == 0
+        if not is_valid:
+            logger.warning(f"配置验证失败: {'; '.join(errors)}")
+
+        return is_valid, errors
+
+    def assert_valid(self) -> None:
+        """
+        断言配置有效，无效时抛出异常
+
+        Raises:
+            ValueError: 配置无效时
+        """
+        is_valid, errors = self.validate()
+        if not is_valid:
+            raise ValueError(
+                f"ArbitrageEngineConfig 验证失败:\n" +
+                "\n".join(f"  - {e}" for e in errors)
+            )
