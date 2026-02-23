@@ -8,7 +8,12 @@ import pytest
 from datetime import datetime
 
 from backend.arbitrage.cn.strategies.event_detectors import LimitUpDetectorCN
-from backend.arbitrage.cn.strategies.fund_selectors import HighestWeightSelector
+from backend.arbitrage.cn.strategies.fund_selectors import (
+    HighestWeightSelector,
+    BalancedSelector,
+    BestLiquiditySelector,
+    LowestPremiumSelector,
+)
 from backend.market.cn.events import LimitUpEvent
 from tests.fixtures.mocks import create_candidate_etf
 
@@ -99,3 +104,140 @@ class TestHighestWeightSelector:
         reason = selector.get_selection_reason(fund)
 
         assert '权重最高' in reason
+
+
+@pytest.mark.unit
+class TestBalancedSelector:
+    """测试综合评估选择器"""
+
+    @pytest.fixture
+    def selector(self):
+        return BalancedSelector()
+
+    @pytest.fixture
+    def mock_event(self):
+        from tests.fixtures.mocks import create_mock_limit_up_event
+        return create_mock_limit_up_event('600519')
+
+    def test_select_balanced_etf(self, selector, mock_event):
+        """测试综合评估选择最优ETF"""
+        funds = [
+            create_candidate_etf('510300', weight=0.05, rank=3),
+            create_candidate_etf('510500', weight=0.08, rank=1),
+            create_candidate_etf('516160', weight=0.06, rank=2),
+        ]
+
+        selected = selector.select(funds, mock_event)
+
+        assert selected is not None
+        assert selected.etf_code == '510500'  # 权重最高
+        assert selected.weight == 0.08
+
+    def test_select_returns_none_for_empty_list(self, selector, mock_event):
+        """测试空列表返回None"""
+        selected = selector.select([], mock_event)
+        assert selected is None
+
+    def test_get_selection_reason(self, selector):
+        """测试获取选择原因"""
+        fund = create_candidate_etf('510500', weight=0.08, rank=1)
+        reason = selector.get_selection_reason(fund)
+
+        assert '综合评估' in reason
+        assert '8.00%' in reason
+
+    def test_custom_score_weights(self, selector, mock_event):
+        """测试自定义评分权重"""
+        selector_custom = BalancedSelector(
+            weight_score=0.3,
+            liquidity_score=0.5,
+            premium_score=0.2
+        )
+
+        funds = [
+            create_candidate_etf('510300', weight=0.10, rank=1),
+            create_candidate_etf('510500', weight=0.08, rank=2),
+        ]
+
+        selected = selector_custom.select(funds, mock_event)
+        assert selected is not None
+
+
+@pytest.mark.unit
+class TestBestLiquiditySelector:
+    """测试最佳流动性选择器"""
+
+    @pytest.fixture
+    def selector(self):
+        from backend.arbitrage.cn.strategies.fund_selectors import BestLiquiditySelector
+        return BestLiquiditySelector()
+
+    @pytest.fixture
+    def mock_event(self):
+        from tests.fixtures.mocks import create_mock_limit_up_event
+        return create_mock_limit_up_event('600519')
+
+    def test_select_highest_liquidity_etf(self, selector, mock_event):
+        """测试选择流动性最高的ETF"""
+        # 创建不同流动性的ETF
+        funds = [
+            create_candidate_etf('510300', weight=0.05, rank=3),
+            create_candidate_etf('510500', weight=0.08, rank=1),
+            create_candidate_etf('516160', weight=0.06, rank=2),
+        ]
+
+        selected = selector.select(funds, mock_event)
+
+        assert selected is not None
+
+    def test_select_returns_none_for_empty_list(self, selector, mock_event):
+        """测试空列表返回None"""
+        selected = selector.select([], mock_event)
+        assert selected is None
+
+    def test_get_selection_reason(self, selector):
+        """测试获取选择原因"""
+        fund = create_candidate_etf('510500', weight=0.08, rank=1)
+        reason = selector.get_selection_reason(fund)
+
+        assert '流动性' in reason
+
+
+@pytest.mark.unit
+class TestLowestPremiumSelector:
+    """测试最低溢价选择器"""
+
+    @pytest.fixture
+    def selector(self):
+        from backend.arbitrage.cn.strategies.fund_selectors import LowestPremiumSelector
+        return LowestPremiumSelector()
+
+    @pytest.fixture
+    def mock_event(self):
+        from tests.fixtures.mocks import create_mock_limit_up_event
+        return create_mock_limit_up_event('600519')
+
+    def test_select_lowest_premium_etf(self, selector, mock_event):
+        """测试选择溢价最低的ETF"""
+        funds = [
+            create_candidate_etf('510300', weight=0.05, rank=3),
+            create_candidate_etf('510500', weight=0.08, rank=1),
+            create_candidate_etf('516160', weight=0.06, rank=2),
+        ]
+
+        selected = selector.select(funds, mock_event)
+
+        assert selected is not None
+
+    def test_select_returns_none_for_empty_list(self, selector, mock_event):
+        """测试空列表返回None"""
+        selected = selector.select([], mock_event)
+        assert selected is None
+
+    def test_get_selection_reason(self, selector):
+        """测试获取选择原因"""
+        fund = create_candidate_etf('510500', weight=0.08, rank=1)
+        reason = selector.get_selection_reason(fund)
+
+        assert '溢价' in reason
+
