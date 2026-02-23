@@ -9,34 +9,60 @@ from typing import Optional, Dict, Callable
 from threading import Lock as ThreadLock
 from asyncio import Lock as AsyncLock
 
-from backend.market.service.limit_monitor import LimitUpMonitor, create_monitor_with_defaults
 from backend.api.state import get_api_state_manager
 from backend.utils.cache_utils import TTLCache
 from backend.data.backtest_repository import get_backtest_repository
+from backend.arbitrage.cn import ArbitrageEngineCN
+from backend.arbitrage.cn.factory import ArbitrageEngineFactory
+from backend.market.cn.quote_fetcher import CNQuoteFetcher
+from backend.market.cn.etf_holding_provider import CNETFHoldingProvider
+from backend.market.cn.etf_quote import CNETFQuoteFetcher
+from config import Config
 
 # 获取项目根目录
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 状态管理器和监控器实例（使用单例模式）
+# 状态管理器
 _api_state_manager = get_api_state_manager()
-_monitor_instance: Optional[LimitUpMonitor] = None
+
+# 套利引擎实例（单例）
+_engine_instance: Optional[ArbitrageEngineCN] = None
+_config_instance: Optional[Config] = None
+_signal_history: list = []
 
 # 涨停股缓存
 _limit_up_cache = TTLCache(ttl=30, name="limit_up_cache")
 
 # 回测任务存储（带线程安全锁）
-_backtest_jobs: Dict[str, Dict] = {}  # backtest_id -> job_info (内存缓存，用于快速访问)
-_backtest_lock: AsyncLock = Lock()  # 异步锁，保护API端点的并发访问
-_backtest_thread_lock = ThreadLock()  # 线程锁，保护progress_callback的同步访问
-_backtest_repo = get_backtest_repository()  # 持久化存储仓库
+_backtest_jobs: Dict[str, Dict] = {}
+_backtest_lock: AsyncLock = Lock()
+_backtest_thread_lock = ThreadLock()
+_backtest_repo = get_backtest_repository()
 
 
-def get_monitor() -> LimitUpMonitor:
-    """获取或创建监控器实例"""
-    global _monitor_instance
-    if _monitor_instance is None:
-        _monitor_instance = create_monitor_with_defaults()
-    return _monitor_instance
+def get_engine() -> ArbitrageEngineCN:
+    """获取或创建套利引擎实例"""
+    global _engine_instance, _config_instance
+    if _engine_instance is None:
+        _config_instance = Config.load()
+        _engine_instance = _create_engine(_config_instance)
+    return _engine_instance
+
+
+def _create_engine(config: Config) -> ArbitrageEngineCN:
+    """创建套利引擎"""
+    quote_fetcher = CNQuoteFetcher()
+    etf_holder_provider = CNETFHoldingProvider()
+    etf_holdings_provider = CNETFHoldingProvider()
+    etf_quote_provider = CNETFQuoteFetcher()
+
+    return ArbitrageEngineFactory.create_engine(
+        quote_fetcher=quote_fetcher,
+        etf_holder_provider=etf_holder_provider,
+        etf_holdings_provider=etf_holdings_provider,
+        etf_quote_provider=etf_quote_provider,
+        config=config
+    )
 
 
 def get_state_manager():
@@ -50,17 +76,17 @@ def get_limit_up_cache():
 
 
 def get_backtest_jobs():
-    """获取回测任务字典（用于内部访问）"""
+    """获取回测任务字典"""
     return _backtest_jobs
 
 
-async def get_backtest_job(backtest_id: str) -> Optional[Dict]:
-    """
-    获取回测任务（异步安全）
+def get_signal_history() -> list:
+    """获取信号历史"""
+    return _signal_history
 
-    先从内存缓存中获取，如果没有则从持久化存储加载
-    """
-    # 先从内存获取
+
+async def get_backtest_job(backtest_id: str) -> Optional[Dict]:
+    """获取回测任务（异步安全）"""
     job = _backtest_jobs.get(backtest_id)
     if not job:
         job = _backtest_repo.load_job(backtest_id)
@@ -85,11 +111,7 @@ async def create_backtest_job(job_id: str, request_data: Dict) -> Dict:
 
 
 def create_progress_callback(job_id: str) -> Callable[[float], None]:
-    """
-    创建进度回调函数（线程安全）
-
-    用于回测过程中更新进度
-    """
+    """创建进度回调函数（线程安全）"""
     def progress_callback(p: float):
         try:
             with _backtest_thread_lock:
@@ -97,7 +119,7 @@ def create_progress_callback(job_id: str) -> Callable[[float], None]:
                 if job:
                     job["progress"] = p
         except Exception:
-            pass  # 忽略进度更新错误
+            pass
     return progress_callback
 
 
@@ -115,8 +137,6 @@ async def update_backtest_job_status(job_id: str, status: str, progress: float =
             job["result"] = result
         if error is not None:
             job["error"] = error
-
-        # 保存到持久化存储
         _backtest_repo.save_job(job_id, job)
 
 
@@ -143,7 +163,21 @@ def load_historical_backtest_jobs():
         return 0
 
 
-# 创建异步锁的辅助函数
 def Lock() -> AsyncLock:
     """创建异步锁"""
     return AsyncLock()
+
+
+# 向后兼容的别名
+def get_monitor() -> ArbitrageEngineCN:
+    """获取引擎实例（向后兼容）"""
+    return get_engine()
+
+
+# 暴露配置实例
+def get_config() -> Config:
+    """获取配置实例"""
+    global _config_instance
+    if _config_instance is None:
+        _config_instance = Config.load()
+    return _config_instance

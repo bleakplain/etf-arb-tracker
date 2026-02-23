@@ -135,6 +135,33 @@ class ArbitrageEngineCN:
         logger.info(f"监控证券数量: {len(self._watch_securities)}")
         logger.info(f"覆盖基金数量: {len(self.get_all_fund_codes())}")
 
+        # 信号历史
+        self._signal_history: List[TradingSignal] = []
+
+    # ========================================================================
+    # API便捷属性
+    # ========================================================================
+
+    @property
+    def watch_stocks(self):
+        """获取自选股列表（API兼容）"""
+        return self._config.my_stocks if self._config else []
+
+    @property
+    def stock_fetcher(self):
+        """获取股票行情获取器（API兼容）"""
+        return self._quote_fetcher
+
+    @property
+    def etf_fetcher(self):
+        """获取ETF行情获取器（API兼容）"""
+        return self._etf_quote_provider
+
+    @property
+    def signal_history(self) -> List[TradingSignal]:
+        """获取信号历史（API兼容）"""
+        return self._signal_history
+
     def _get_default_config(self) -> ArbitrageEngineConfig:
         """获取A股默认引擎配置"""
         from backend.utils.constants import (
@@ -319,6 +346,7 @@ class ArbitrageEngineCN:
                 signal = self.scan_security(security_code)
                 if signal:
                     signals.append(signal)
+                    self._signal_history.append(signal)
                     total_events += 1
                 else:
                     filtered_count += 1
