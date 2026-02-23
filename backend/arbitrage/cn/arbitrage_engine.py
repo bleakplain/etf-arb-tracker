@@ -22,6 +22,7 @@ from backend.arbitrage.cn.strategies.interfaces import (
 )
 from backend.market.cn.events import LimitUpEvent
 from backend.market.events import MarketEvent
+from backend.arbitrage.cn.strategy_executor import StrategyExecutor
 from config import Config
 
 # 延迟导入以避免循环依赖
@@ -119,6 +120,7 @@ class ArbitrageEngineCN:
         self._event_detector: Optional[IEventDetector] = None
         self._fund_selector: Optional[IFundSelector] = None
         self._signal_filters: List[ISignalFilter] = []
+        self._strategy_executor: Optional[StrategyExecutor] = None
 
         # 构建证券-基金映射
         self._security_fund_mapping: Dict[str, List[Dict]] = {}
@@ -126,6 +128,7 @@ class ArbitrageEngineCN:
 
         # 初始化策略
         self._init_strategies()
+        self._init_strategy_executor()
 
         logger.info("套利引擎初始化完成")
         logger.info(f"引擎配置: {self._engine_config.to_dict()}")
@@ -163,11 +166,26 @@ class ArbitrageEngineCN:
         self._fund_selector = strategies['fund_selector']
         self._signal_filters = strategies['filters']
 
+    def _init_strategy_executor(self) -> None:
+        """初始化策略执行器"""
+        if not all([self._event_detector, self._fund_selector]):
+            logger.warning("策略组件未完全初始化，跳过策略执行器初始化")
+            return
+
+        self._strategy_executor = StrategyExecutor(
+            event_detector=self._event_detector,
+            fund_selector=self._fund_selector,
+            signal_filters=self._signal_filters,
+            etf_quote_provider=self._etf_quote_provider,
+            signal_evaluator=self._signal_evaluator
+        )
+
     def _build_or_load_mapping(self) -> None:
         """构建或加载证券-基金映射"""
         try:
             self._security_fund_mapping = self._mapping_repository.load_mapping() or {}
-        except Exception:
+        except Exception as e:
+            logger.warning(f"加载映射关系失败: {e}，将重新构建")
             self._security_fund_mapping = {}
 
         if self._security_fund_mapping:
@@ -253,99 +271,10 @@ class ArbitrageEngineCN:
         Returns:
             (signal, logs) - (交易信号或None, 执行日志列表)
         """
-        logs = []
+        if not self._strategy_executor:
+            return None, ["策略执行器未初始化"]
 
-        # 步骤1: 事件检测
-        event = self._event_detector.detect(quote)
-        if not event:
-            return None, [f"未检测到事件: {self._event_detector.strategy_name}"]
-
-        if not self._event_detector.is_valid(event):
-            return None, [f"事件验证失败: {event.event_type}"]
-
-        # 获取证券名称
-        if isinstance(event, LimitUpEvent):
-            security_name = event.stock_name
-        else:
-            event_dict = event.to_dict()
-            security_name = event_dict.get('stock_name', event_dict.get('security_name', ''))
-
-        logs.append(f"✓ 检测到事件: {event.event_type} - {security_name}")
-        logs.append(f"  涨幅: +{event.change_pct*100:.2f}%, 价格: ¥{event.price:.2f}")
-
-        # 步骤2: 基金选择
-        selected_fund = self._fund_selector.select(eligible_funds, event)
-        if not selected_fund:
-            return None, [f"无符合条件的基金: {len(eligible_funds)}个候选"]
-
-        reason = self._fund_selector.get_selection_reason(selected_fund)
-        logs.append(f"✓ 选择基金: {selected_fund.etf_name}")
-        logs.append(f"  理由: {reason}")
-
-        # 步骤3: 获取ETF行情
-        etf_quote = self._etf_quote_provider.get_etf_quote(selected_fund.etf_code)
-        if not etf_quote:
-            return None, [f"无法获取基金行情: {selected_fund.etf_code}"]
-
-        # 步骤4: 生成信号
-        event_dict = event.to_dict()
-        if isinstance(event, LimitUpEvent):
-            stock_code = event.stock_code
-            stock_name = event.stock_name
-            limit_time = event.limit_time
-            locked_amount = event.locked_amount
-            event_desc = f"涨停 ({event.change_pct*100:.2f}%)"
-        else:
-            stock_code = event_dict.get('stock_code', '')
-            stock_name = event_dict.get('stock_name', '')
-            limit_time = event_dict.get('limit_time', event_dict.get('event_time', ''))
-            locked_amount = event_dict.get('locked_amount', 0)
-            event_desc = f"{event.event_type} ({event.change_pct*100:.2f}%)"
-
-        signal = TradingSignal(
-            signal_id=f"SIG_{datetime.now().strftime('%Y%m%d%H%M%S')}_{stock_code}",
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            stock_code=stock_code,
-            stock_name=stock_name,
-            stock_price=event.price,
-            limit_time=limit_time,
-            locked_amount=locked_amount,
-            change_pct=event.change_pct,
-            etf_code=selected_fund.etf_code,
-            etf_name=selected_fund.etf_name,
-            etf_weight=selected_fund.weight,
-            etf_price=etf_quote.get('price', 0.0),
-            etf_premium=etf_quote.get('premium', 0.0),
-            reason=f"{stock_name} {event_desc}，"
-                   f"在 {selected_fund.etf_name} 中持仓占比 {selected_fund.weight_pct:.2f}% "
-                   f"(排名第{selected_fund.rank})",
-            confidence="",
-            risk_level="",
-            actual_weight=selected_fund.weight,
-            weight_rank=selected_fund.rank,
-            top10_ratio=selected_fund.top10_ratio
-        )
-
-        # 步骤5: 信号过滤
-        for filter_strategy in self._signal_filters:
-            should_filter, reason = filter_strategy.filter(event, selected_fund, signal)
-
-            if should_filter:
-                if filter_strategy.is_required:
-                    return None, [f"信号被拒绝({filter_strategy.strategy_name}): {reason}"]
-                else:
-                    logs.append(f"⚠️  警告({filter_strategy.strategy_name}): {reason}")
-
-        # 步骤6: 评估信号质量
-        if self._signal_evaluator:
-            from dataclasses import replace
-            confidence, risk_level = self._signal_evaluator.evaluate(event, selected_fund)
-
-            signal = replace(signal, confidence=confidence, risk_level=risk_level)
-            logs.append(f"✓ 信号评估: 置信度={confidence}, 风险={risk_level}")
-
-        logs.append(f"✓ 信号生成完成: {signal.stock_name} → {signal.etf_name}")
-        return signal, logs
+        return self._strategy_executor.execute(quote, eligible_funds)
 
     def scan_security(self, security_code: str) -> Optional[TradingSignal]:
         """扫描单个证券"""
@@ -418,6 +347,7 @@ class ArbitrageEngineCN:
         """重新加载策略配置"""
         self._engine_config = new_config
         self._init_strategies()
+        self._init_strategy_executor()
         logger.info(f"策略已重新加载: {new_config.to_dict()}")
 
     def get_security_fund_mapping(self) -> Dict:

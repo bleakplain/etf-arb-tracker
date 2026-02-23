@@ -1,0 +1,264 @@
+"""
+策略执行器 - 负责执行完整的套利策略流程
+
+职责：
+1. 协调事件检测、基金选择、信号生成
+2. 应用信号过滤策略
+3. 评估信号质量
+"""
+
+from typing import List, Dict, Optional, Tuple, TYPE_CHECKING
+from loguru import logger
+from datetime import datetime
+from dataclasses import replace
+
+from backend.arbitrage.models import TradingSignal
+from backend.market import CandidateETF
+from backend.market.interfaces import IQuoteFetcher
+from backend.arbitrage.cn.strategies.interfaces import (
+    IEventDetector,
+    IFundSelector,
+    ISignalFilter,
+)
+from backend.market.cn.events import LimitUpEvent
+from backend.market.events import MarketEvent
+
+# 延迟导入以避免循环依赖
+if TYPE_CHECKING:
+    from backend.signal.interfaces import ISignalEvaluator
+
+
+class StrategyExecutor:
+    """
+    策略执行器
+
+    负责执行完整的套利策略流程，从事件检测到信号生成。
+    """
+
+    def __init__(
+        self,
+        event_detector: IEventDetector,
+        fund_selector: IFundSelector,
+        signal_filters: List[ISignalFilter],
+        etf_quote_provider: IQuoteFetcher,
+        signal_evaluator: 'ISignalEvaluator' = None
+    ):
+        """
+        初始化策略执行器
+
+        Args:
+            event_detector: 事件检测器
+            fund_selector: 基金选择器
+            signal_filters: 信号过滤器列表
+            etf_quote_provider: ETF行情提供者
+            signal_evaluator: 信号评估器（可选）
+        """
+        self._event_detector = event_detector
+        self._fund_selector = fund_selector
+        self._signal_filters = signal_filters
+        self._etf_quote_provider = etf_quote_provider
+        self._signal_evaluator = signal_evaluator
+
+    def execute(
+        self,
+        quote: Dict,
+        eligible_funds: List[CandidateETF]
+    ) -> Tuple[Optional[TradingSignal], List[str]]:
+        """
+        执行完整策略流程
+
+        Args:
+            quote: 证券行情数据
+            eligible_funds: 符合条件的候选ETF列表
+
+        Returns:
+            (signal, logs) - (交易信号或None, 执行日志列表)
+        """
+        logs = []
+
+        # 步骤1: 事件检测
+        event = self._detect_event(quote, logs)
+        if not event:
+            return None, logs
+
+        # 步骤2: 基金选择
+        selected_fund = self._select_fund(eligible_funds, event, logs)
+        if not selected_fund:
+            return None, logs
+
+        # 步骤3: 获取ETF行情
+        etf_quote = self._get_etf_quote(selected_fund, logs)
+        if not etf_quote:
+            return None, logs
+
+        # 步骤4: 生成信号
+        signal = self._generate_signal(event, selected_fund, etf_quote, logs)
+        if not signal:
+            return None, logs
+
+        # 步骤5: 信号过滤
+        if not self._apply_signal_filters(event, selected_fund, signal, logs):
+            return None, logs
+
+        # 步骤6: 评估信号质量
+        signal = self._evaluate_signal(event, selected_fund, signal, logs)
+
+        return signal, logs
+
+    def _detect_event(self, quote: Dict, logs: List[str]) -> Optional[MarketEvent]:
+        """检测市场事件"""
+        event = self._event_detector.detect(quote)
+        if not event:
+            logs.append(f"未检测到事件: {self._event_detector.strategy_name}")
+            return None
+
+        if not self._event_detector.is_valid(event):
+            logs.append(f"事件验证失败: {event.event_type}")
+            return None
+
+        # 获取证券名称
+        if isinstance(event, LimitUpEvent):
+            security_name = event.stock_name
+        else:
+            event_dict = event.to_dict()
+            security_name = event_dict.get('stock_name', event_dict.get('security_name', ''))
+
+        logs.append(f"✓ 检测到事件: {event.event_type} - {security_name}")
+        logs.append(f"  涨幅: +{event.change_pct*100:.2f}%, 价格: ¥{event.price:.2f}")
+
+        return event
+
+    def _select_fund(
+        self,
+        eligible_funds: List[CandidateETF],
+        event: MarketEvent,
+        logs: List[str]
+    ) -> Optional[CandidateETF]:
+        """选择最优基金"""
+        if not eligible_funds:
+            logs.append("无符合条件的候选基金")
+            return None
+
+        selected_fund = self._fund_selector.select(eligible_funds, event)
+        if not selected_fund:
+            logs.append(f"无符合条件的基金: {len(eligible_funds)}个候选")
+            return None
+
+        reason = self._fund_selector.get_selection_reason(selected_fund)
+        logs.append(f"✓ 选择基金: {selected_fund.etf_name}")
+        logs.append(f"  理由: {reason}")
+
+        return selected_fund
+
+    def _get_etf_quote(
+        self,
+        selected_fund: CandidateETF,
+        logs: List[str]
+    ) -> Optional[Dict]:
+        """获取ETF行情"""
+        etf_quote = self._etf_quote_provider.get_etf_quote(selected_fund.etf_code)
+        if not etf_quote:
+            logs.append(f"无法获取基金行情: {selected_fund.etf_code}")
+            return None
+
+        return etf_quote
+
+    def _generate_signal(
+        self,
+        event: MarketEvent,
+        selected_fund: CandidateETF,
+        etf_quote: Dict,
+        logs: List[str]
+    ) -> Optional[TradingSignal]:
+        """生成交易信号"""
+        event_dict = event.to_dict()
+
+        # 提取事件信息
+        if isinstance(event, LimitUpEvent):
+            stock_code = event.stock_code
+            stock_name = event.stock_name
+            limit_time = event.limit_time
+            locked_amount = event.locked_amount
+            event_desc = f"涨停 ({event.change_pct*100:.2f}%)"
+        else:
+            stock_code = event_dict.get('stock_code', '')
+            stock_name = event_dict.get('stock_name', '')
+            limit_time = event_dict.get('limit_time', event_dict.get('event_time', ''))
+            locked_amount = event_dict.get('locked_amount', 0)
+            event_desc = f"{event.event_type} ({event.change_pct*100:.2f}%)"
+
+        signal = TradingSignal(
+            signal_id=f"SIG_{datetime.now().strftime('%Y%m%d%H%M%S')}_{stock_code}",
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            stock_code=stock_code,
+            stock_name=stock_name,
+            stock_price=event.price,
+            limit_time=limit_time,
+            locked_amount=locked_amount,
+            change_pct=event.change_pct,
+            etf_code=selected_fund.etf_code,
+            etf_name=selected_fund.etf_name,
+            etf_weight=selected_fund.weight,
+            etf_price=etf_quote.get('price', 0.0),
+            etf_premium=etf_quote.get('premium', 0.0),
+            reason=f"{stock_name} {event_desc}，"
+                   f"在 {selected_fund.etf_name} 中持仓占比 {selected_fund.weight_pct:.2f}% "
+                   f"(排名第{selected_fund.rank})",
+            confidence="",
+            risk_level="",
+            actual_weight=selected_fund.weight,
+            weight_rank=selected_fund.rank,
+            top10_ratio=selected_fund.top10_ratio
+        )
+
+        return signal
+
+    def _apply_signal_filters(
+        self,
+        event: MarketEvent,
+        selected_fund: CandidateETF,
+        signal: TradingSignal,
+        logs: List[str]
+    ) -> bool:
+        """
+        应用信号过滤器
+
+        Returns:
+            True表示通过所有过滤器，False表示被拒绝
+        """
+        for filter_strategy in self._signal_filters:
+            should_filter, reason = filter_strategy.filter(event, selected_fund, signal)
+
+            if should_filter:
+                if filter_strategy.is_required:
+                    logs.append(f"✗ 信号被拒绝({filter_strategy.strategy_name}): {reason}")
+                    return False
+                else:
+                    logs.append(f"⚠️  警告({filter_strategy.strategy_name}): {reason}")
+
+        return True
+
+    def _evaluate_signal(
+        self,
+        event: MarketEvent,
+        selected_fund: CandidateETF,
+        signal: TradingSignal,
+        logs: List[str]
+    ) -> TradingSignal:
+        """
+        评估信号质量
+
+        Returns:
+            评估后的信号（使用 dataclasses.replace 创建新实例）
+        """
+        if not self._signal_evaluator:
+            # 默认评估
+            confidence = "中"
+            risk_level = "中"
+        else:
+            confidence, risk_level = self._signal_evaluator.evaluate(event, selected_fund)
+
+        logs.append(f"✓ 信号评估: 置信度={confidence}, 风险={risk_level}")
+
+        # 使用 replace 创建新实例（因为 TradingSignal 是 frozen）
+        return replace(signal, confidence=confidence, risk_level=risk_level)
