@@ -35,8 +35,8 @@ _limit_up_cache = TTLCache(ttl=30, name="limit_up_cache")
 
 # 回测任务存储（带线程安全锁）
 _backtest_jobs: Dict[str, Dict] = {}
-_backtest_lock: AsyncLock = Lock()
-_backtest_thread_lock = ThreadLock()
+_backtest_lock: AsyncLock = None  # 延迟初始化
+_backtest_thread_lock: ThreadLock = ThreadLock()
 _backtest_repo = get_backtest_repository()
 
 
@@ -97,6 +97,10 @@ async def get_backtest_job(backtest_id: str) -> Optional[Dict]:
 
 async def create_backtest_job(job_id: str, request_data: Dict) -> Dict:
     """创建回测任务记录"""
+    global _backtest_lock
+    if _backtest_lock is None:
+        _backtest_lock = Lock()
+
     job = {
         "job_id": job_id,
         "request": request_data,
@@ -125,6 +129,10 @@ def create_progress_callback(job_id: str) -> Callable[[float], None]:
 
 async def update_backtest_job_status(job_id: str, status: str, progress: float = None, result: Dict = None, error: str = None):
     """更新回测任务状态"""
+    global _backtest_lock
+    if _backtest_lock is None:
+        _backtest_lock = Lock()
+
     async with _backtest_lock:
         job = _backtest_jobs.get(job_id)
         if not job:
@@ -142,6 +150,10 @@ async def update_backtest_job_status(job_id: str, status: str, progress: float =
 
 async def delete_backtest_job(job_id: str):
     """从内存中删除回测任务"""
+    global _backtest_lock
+    if _backtest_lock is None:
+        _backtest_lock = Lock()
+
     async with _backtest_lock:
         if job_id in _backtest_jobs:
             del _backtest_jobs[job_id]

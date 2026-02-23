@@ -10,7 +10,7 @@ import time
 
 from backend.api.dependencies import get_engine, get_state_manager, get_config
 from backend.api.models import MonitorStatus
-from backend.notification.sender import create_sender_from_config
+from backend.signal.sender import create_sender_from_config
 from datetime import datetime
 
 router = APIRouter()

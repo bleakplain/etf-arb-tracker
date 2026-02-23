@@ -8,6 +8,7 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from loguru import logger
 from asyncio import to_thread
+from enum import Enum
 
 from backend.api.dependencies import (
     get_backtest_job,
@@ -20,7 +21,15 @@ from backend.api.dependencies import (
 from backend.api.models import BacktestRequest, BacktestResponse
 from backend.data.backtest_repository import get_backtest_repository
 from backend.backtest import CNBacktestEngine as BacktestEngine, BacktestConfig
-from backend.backtest.models import TimeGranularity
+
+
+class TimeGranularity(Enum):
+    """时间粒度枚举"""
+    DAILY = "daily"
+    MIN_5 = "5m"
+    MIN_15 = "15m"
+    MIN_30 = "30m"
+
 
 router = APIRouter()
 _backtest_repo = get_backtest_repository()

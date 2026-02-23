@@ -7,10 +7,6 @@ my_stocks:
   name: 比亚迪
   market: sz
   notes: 新能源汽车
-- code: '600519'
-  name: 贵州茅台
-  market: sh
-  notes: 白酒龙头
 - code: 000858
   name: 五粮液
   market: sz
