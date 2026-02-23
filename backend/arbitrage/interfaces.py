@@ -9,12 +9,16 @@ from typing import Dict, List, Optional
 from pathlib import Path
 
 
-class IMappingRepository(ABC):
+class IStockETFMappingRepository(ABC):
     """
     股票-ETF映射仓储接口
 
-    用于抽象映射数据的存储和加载操作
+    用于抽象映射数据的存储、加载和查询操作
     """
+
+    # =========================================================================
+    # 持久化操作
+    # =========================================================================
 
     @abstractmethod
     def load_mapping(self, filepath: str = None) -> Dict[str, List[Dict]]:
@@ -69,8 +73,53 @@ class IMappingRepository(ABC):
         """
         pass
 
+    # =========================================================================
+    # 查询操作
+    # =========================================================================
 
-class FileMappingRepository(IMappingRepository):
+    @abstractmethod
+    def get_etf_list(self, stock_code: str) -> List[Dict]:
+        """
+        获取包含指定股票的ETF列表
+
+        Args:
+            stock_code: 股票代码（6位数字）
+
+        Returns:
+            ETF列表，每个ETF包含code、name、weight等字段
+            如果股票不存在于映射中，返回空列表
+        """
+        pass
+
+    @abstractmethod
+    def has_stock(self, stock_code: str) -> bool:
+        """
+        检查映射中是否包含指定股票
+
+        Args:
+            stock_code: 股票代码（6位数字）
+
+        Returns:
+            是否包含该股票的映射
+        """
+        pass
+
+    @abstractmethod
+    def get_all_stocks(self) -> List[str]:
+        """
+        获取所有已映射的股票代码列表
+
+        Returns:
+            股票代码列表
+        """
+        pass
+
+
+# 向后兼容的别名
+IMappingRepository = IStockETFMappingRepository
+
+
+class FileMappingRepository(IStockETFMappingRepository):
     """
     基于文件的映射仓储实现
 
@@ -85,6 +134,11 @@ class FileMappingRepository(IMappingRepository):
             default_filepath: 默认映射文件路径
         """
         self._default_filepath = default_filepath
+        self._cached_mapping: Optional[Dict[str, List[Dict]]] = None
+
+    # =========================================================================
+    # 持久化操作
+    # =========================================================================
 
     def load_mapping(self, filepath: str = None) -> Dict[str, List[Dict]]:
         """从文件加载映射关系"""
@@ -97,16 +151,19 @@ class FileMappingRepository(IMappingRepository):
             path = Path(target_path)
             if not path.exists():
                 logger.debug(f"映射文件不存在: {target_path}")
+                self._cached_mapping = {}
                 return {}
 
             with open(path, 'r', encoding='utf-8') as f:
                 mapping = json.load(f)
 
+            self._cached_mapping = mapping
             logger.info(f"从 {target_path} 加载了 {len(mapping)} 个股票的映射")
             return mapping
 
         except Exception as e:
             logger.warning(f"加载映射文件失败 ({target_path}): {e}")
+            self._cached_mapping = {}
             return {}
 
     def save_mapping(self, mapping: Dict[str, List[Dict]], filepath: str = None) -> bool:
@@ -123,6 +180,7 @@ class FileMappingRepository(IMappingRepository):
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(mapping, f, ensure_ascii=False, indent=2)
 
+            self._cached_mapping = mapping
             logger.info(f"映射关系已保存到 {target_path}")
             return True
 
@@ -145,6 +203,7 @@ class FileMappingRepository(IMappingRepository):
             path = Path(target_path)
             if path.exists():
                 path.unlink()
+                self._cached_mapping = None
                 logger.info(f"已删除映射文件: {target_path}")
                 return True
             return False
@@ -153,8 +212,48 @@ class FileMappingRepository(IMappingRepository):
             logger.warning(f"删除映射文件失败 ({target_path}): {e}")
             return False
 
+    # =========================================================================
+    # 查询操作
+    # =========================================================================
 
-class InMemoryMappingRepository(IMappingRepository):
+    def get_etf_list(self, stock_code: str) -> List[Dict]:
+        """
+        获取包含指定股票的ETF列表
+
+        Args:
+            stock_code: 股票代码（6位数字）
+
+        Returns:
+            ETF列表，每个ETF包含code、name、weight等字段
+        """
+        mapping = self._cached_mapping or self.load_mapping()
+        return mapping.get(stock_code, []).copy()
+
+    def has_stock(self, stock_code: str) -> bool:
+        """
+        检查映射中是否包含指定股票
+
+        Args:
+            stock_code: 股票代码（6位数字）
+
+        Returns:
+            是否包含该股票的映射
+        """
+        mapping = self._cached_mapping or self.load_mapping()
+        return stock_code in mapping
+
+    def get_all_stocks(self) -> List[str]:
+        """
+        获取所有已映射的股票代码列表
+
+        Returns:
+            股票代码列表
+        """
+        mapping = self._cached_mapping or self.load_mapping()
+        return list(mapping.keys())
+
+
+class InMemoryMappingRepository(IStockETFMappingRepository):
     """
     内存映射仓储实现
 
@@ -164,6 +263,10 @@ class InMemoryMappingRepository(IMappingRepository):
     def __init__(self):
         """初始化内存映射仓储"""
         self._mapping: Dict[str, List[Dict]] = {}
+
+    # =========================================================================
+    # 持久化操作
+    # =========================================================================
 
     def load_mapping(self, filepath: str = None) -> Dict[str, List[Dict]]:
         """从内存加载映射关系"""
@@ -182,3 +285,40 @@ class InMemoryMappingRepository(IMappingRepository):
         """清除内存中的映射"""
         self._mapping.clear()
         return True
+
+    # =========================================================================
+    # 查询操作
+    # =========================================================================
+
+    def get_etf_list(self, stock_code: str) -> List[Dict]:
+        """
+        获取包含指定股票的ETF列表
+
+        Args:
+            stock_code: 股票代码（6位数字）
+
+        Returns:
+            ETF列表，每个ETF包含code、name、weight等字段
+        """
+        return self._mapping.get(stock_code, []).copy()
+
+    def has_stock(self, stock_code: str) -> bool:
+        """
+        检查映射中是否包含指定股票
+
+        Args:
+            stock_code: 股票代码（6位数字）
+
+        Returns:
+            是否包含该股票的映射
+        """
+        return stock_code in self._mapping
+
+    def get_all_stocks(self) -> List[str]:
+        """
+        获取所有已映射的股票代码列表
+
+        Returns:
+            股票代码列表
+        """
+        return list(self._mapping.keys())

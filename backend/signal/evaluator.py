@@ -13,6 +13,7 @@ from config.strategy import SignalEvaluationConfig
 from backend.signal.interfaces import ISignalEvaluator
 from backend.utils.plugin_registry import evaluator_registry
 from backend.utils.clock import Clock, SystemClock, CHINA_TZ
+from backend.utils.constants import HIGH_RISK_TIME_THRESHOLD
 
 
 class SignalEvaluator(ISignalEvaluator, ABC):
@@ -153,7 +154,7 @@ class ConservativeEvaluator(SignalEvaluator):
 
         # 更保守的时间评估
         time_to_close = self._get_time_to_close()
-        if time_to_close < 1800:  # 30分钟内即为高风险
+        if time_to_close < HIGH_RISK_TIME_THRESHOLD:  # 30分钟内即为高风险
             risk_level = "高"
         elif time_to_close > 7200:  # 2小时以上才低风险
             risk_level = "低"
@@ -199,7 +200,7 @@ class AggressiveEvaluator(SignalEvaluator):
         time_to_close = self._get_time_to_close()
         if time_to_close < 300:  # 5分钟内才高风险
             risk_level = "高"
-        elif time_to_close > 1800:  # 30分钟以上即低风险
+        elif time_to_close > HIGH_RISK_TIME_THRESHOLD:  # 30分钟以上即低风险
             risk_level = "低"
         else:
             risk_level = "中"

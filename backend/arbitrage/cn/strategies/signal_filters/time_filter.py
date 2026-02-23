@@ -13,6 +13,7 @@ from backend.arbitrage.strategy_registry import signal_filter_registry
 from backend.arbitrage.models import TradingSignal
 from backend.market import CandidateETF
 from backend.utils.clock import Clock, SystemClock, CHINA_TZ
+from backend.utils.constants import DEFAULT_MIN_TIME_TO_CLOSE
 
 
 @signal_filter_registry.register(
@@ -28,7 +29,7 @@ class TimeFilterCN(ISignalFilter):
     检查距离A股收盘的时间（15:00），避免在收盘前太短时间内发出信号。
     """
 
-    def __init__(self, min_time_to_close: int = 1800, clock: Optional[Clock] = None):
+    def __init__(self, min_time_to_close: int = None, clock: Optional[Clock] = None):
         """
         初始化A股时间过滤器
 
@@ -36,7 +37,7 @@ class TimeFilterCN(ISignalFilter):
             min_time_to_close: 距收盘最小时间（秒），默认30分钟
             clock: 时钟实例，用于测试时注入
         """
-        self.min_time_to_close = min_time_to_close
+        self.min_time_to_close = min_time_to_close or DEFAULT_MIN_TIME_TO_CLOSE
         self._clock = clock or SystemClock()
 
     @property

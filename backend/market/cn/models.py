@@ -14,7 +14,7 @@ class LimitUpStock:
     price: float
     change_pct: float
     limit_time: str
-    seal_amount: float = 0
+    locked_amount: float = 0
     timestamp: str = ""
 
     def __post_init__(self):
@@ -49,5 +49,5 @@ class LimitUpStock:
             price=quote.get('price', 0.0),
             change_pct=quote.get('change_pct', 0.0),
             limit_time=quote.get('timestamp', ''),
-            seal_amount=quote.get('seal_amount', 0)
+            locked_amount=quote.get('locked_amount', 0)
         )

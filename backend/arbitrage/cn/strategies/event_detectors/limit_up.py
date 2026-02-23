@@ -63,7 +63,7 @@ class LimitUpDetectorCN(IEventDetector):
             price=quote.get('price', 0.0),
             change_pct=quote.get('change_pct', 0.0),
             limit_time=quote.get('limit_time', quote.get('timestamp', '')),
-            seal_amount=quote.get('seal_amount', 0),
+            locked_amount=quote.get('locked_amount', 0),
             open_count=quote.get('open_count', 0),
             is_first_limit=quote.get('is_first_limit', True),
             timestamp=quote.get('timestamp', '')

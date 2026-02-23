@@ -293,13 +293,13 @@ class ArbitrageEngineCN:
             stock_code = event.stock_code
             stock_name = event.stock_name
             limit_time = event.limit_time
-            seal_amount = event.seal_amount
+            locked_amount = event.locked_amount
             event_desc = f"涨停 ({event.change_pct*100:.2f}%)"
         else:
             stock_code = event_dict.get('stock_code', '')
             stock_name = event_dict.get('stock_name', '')
             limit_time = event_dict.get('limit_time', event_dict.get('event_time', ''))
-            seal_amount = event_dict.get('seal_amount', 0)
+            locked_amount = event_dict.get('locked_amount', 0)
             event_desc = f"{event.event_type} ({event.change_pct*100:.2f}%)"
 
         signal = TradingSignal(
@@ -309,7 +309,7 @@ class ArbitrageEngineCN:
             stock_name=stock_name,
             stock_price=event.price,
             limit_time=limit_time,
-            seal_amount=seal_amount,
+            locked_amount=locked_amount,
             change_pct=event.change_pct,
             etf_code=selected_fund.etf_code,
             etf_name=selected_fund.etf_name,

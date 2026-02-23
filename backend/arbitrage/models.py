@@ -69,7 +69,7 @@ class TradingSignal:
 
     # A股特有字段（可选，保持向后兼容）
     limit_time: str = ""
-    seal_amount: float = 0
+    locked_amount: float = 0
 
     def __post_init__(self):
         if not self.signal_id:

@@ -96,7 +96,7 @@ class LimitUpStockResponse(BaseModel):
     amount: float
     turnover: float
     limit_time: str
-    seal_amount: int
+    locked_amount: int
 
 
 # 回测相关模型
@@ -117,19 +117,18 @@ class BacktestRequest(BaseModel):
         if not v:
             raise ValueError('日期不能为空')
         try:
-            datetime.strptime(v, "%Y%m%d")
+            dt = datetime.strptime(v, "%Y%m%d")
         except ValueError:
             raise ValueError('日期格式错误，应为YYYYMMDD格式，例如: 20240101')
 
         # 限制日期范围（防止极端值）
-        min_date = datetime.strptime("20000101", "%Y%m%d")
-        max_date = datetime.strptime("20991231", "%Y%m%d")
-        input_date = datetime.strptime(v, "%Y%m%d")
+        min_date = datetime(2000, 1, 1)
+        max_date = datetime(2099, 12, 31)
 
-        if input_date < min_date:
-            raise ValueError('开始日期不能早于20000101')
-        if input_date > max_date:
-            raise ValueError('结束日期不能晚于20991231')
+        if dt < min_date:
+            raise ValueError('日期不能早于20000101')
+        if dt > max_date:
+            raise ValueError('日期不能晚于20991231')
 
         return v
 
@@ -626,7 +625,7 @@ async def get_limit_up_stocks():
                 amount=s['amount'],
                 turnover=s['turnover'],
                 limit_time=s['limit_time'],
-                seal_amount=s['seal_amount']
+                locked_amount=s.get('locked_amount', 0)
             )
             for s in stocks
         ]

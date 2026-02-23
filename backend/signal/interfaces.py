@@ -1,16 +1,24 @@
 """信号接口定义"""
 
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, TYPE_CHECKING
 
 from backend.arbitrage.models import TradingSignal
+
+if TYPE_CHECKING:
+    from backend.market.events import MarketEvent
+    from backend.market import CandidateETF
 
 
 class ISignalEvaluator(ABC):
     """信号评估器接口"""
 
     @abstractmethod
-    def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
+    def evaluate(
+        self,
+        market_event: 'MarketEvent',
+        etf_holding: 'CandidateETF'
+    ) -> Tuple[str, str]:
         """
         评估信号质量
 

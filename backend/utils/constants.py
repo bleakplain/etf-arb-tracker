@@ -13,6 +13,10 @@ DEFAULT_MIN_WEIGHT: float = 0.05  # 5%
 
 # 时间相关（秒）
 DEFAULT_MIN_TIME_TO_CLOSE: int = 1800  # 30分钟
+HIGH_RISK_TIME_THRESHOLD: int = 1800  # 30分钟，高风险时间阈值
+
+# 涨停相关
+STRONG_LIMIT_SEAL_AMOUNT_THRESHOLD: int = 1_000_000  # 100万元，强势涨停封单金额阈值
 
 # 成交额相关（万元）
 DEFAULT_MIN_ETF_VOLUME: int = 5000  # 5000万元 = 5亿元

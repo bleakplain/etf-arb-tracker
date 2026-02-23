@@ -138,7 +138,7 @@ if __name__ == "__main__":
         stock_name="宁德时代",
         stock_price=256.80,
         limit_time="14:35:00",
-        seal_amount=1500000000,
+        locked_amount=1500000000,
         change_pct=10.01,
         etf_code="516160",
         etf_name="新能源车ETF",
