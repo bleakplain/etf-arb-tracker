@@ -64,7 +64,7 @@ class TestArbitrageEngineCN:
         assert engine is not None
         assert len(engine._watch_securities) == 2
 
-    def test_scan_security_with_limit_up(self, mock_providers, engine_config, mock_mapping_repository):
+    def test_analyze_security_with_limit_up(self, mock_providers, engine_config, mock_mapping_repository):
         """测试扫描涨停股票"""
         engine = ArbitrageEngineCN(
             quote_fetcher=mock_providers['quote_fetcher'],
@@ -76,13 +76,13 @@ class TestArbitrageEngineCN:
             mapping_repository=mock_mapping_repository,
         )
 
-        signal = engine.scan_security('600519')
+        signal = engine.analyze_security('600519')
 
         # 600519是涨停股票，应该生成信号
         assert signal is not None
         assert signal.stock_code == '600519'
 
-    def test_scan_security_without_limit_up(self, mock_providers, engine_config, mock_mapping_repository):
+    def test_analyze_security_without_limit_up(self, mock_providers, engine_config, mock_mapping_repository):
         """测试扫描非涨停股票"""
         engine = ArbitrageEngineCN(
             quote_fetcher=mock_providers['quote_fetcher'],
@@ -94,7 +94,7 @@ class TestArbitrageEngineCN:
             mapping_repository=mock_mapping_repository,
         )
 
-        signal = engine.scan_security('000001')
+        signal = engine.analyze_security('000001')
 
         # 000001不是涨停股票，不应该生成信号
         assert signal is None
@@ -172,7 +172,7 @@ class TestArbitrageEngineCN:
             mapping_repository=mock_mapping_repository,
         )
 
-        signal = engine.scan_security('600519')
+        signal = engine.analyze_security('600519')
 
         assert signal is not None
         assert signal.confidence == '高'

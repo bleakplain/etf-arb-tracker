@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks
 from loguru import logger
 import time
 
-from backend.api.dependencies import get_monitor, get_state_manager
+from backend.api.dependencies import get_engine, get_state_manager, get_config
 from backend.api.models import MonitorStatus
 from backend.notification.sender import create_sender_from_config
 from datetime import datetime
@@ -24,24 +24,24 @@ async def get_status():
     Returns:
         监控状态信息
     """
-    mon = get_monitor()
+    engine = get_engine()
     state = get_state_manager().monitor_state
-    is_trading = mon.stock_fetcher.is_trading_time()
+    is_trading = engine.stock_fetcher.is_trading_time()
 
     # 统计今天的信号数量
     today = datetime.now().strftime("%Y-%m-%d")
     today_signals = [
-        s for s in mon.signal_history
+        s for s in engine.signal_history
         if s.timestamp.startswith(today)
     ]
 
     return MonitorStatus(
         is_running=state.is_running,
         is_trading_time=is_trading,
-        watch_stocks_count=len(mon.watch_stocks),
-        covered_etfs_count=len(mon.get_all_etfs()),
+        watch_stocks_count=len(engine.watch_stocks),
+        covered_etfs_count=len(engine.get_all_fund_codes()),
         today_signals_count=len(today_signals),
-        last_scan_time=mon.signal_history[-1].timestamp if mon.signal_history else None
+        last_scan_time=engine.signal_history[-1].timestamp if engine.signal_history else None
     )
 
 
@@ -53,19 +53,17 @@ async def manual_scan(background_tasks: BackgroundTasks):
     Returns:
         扫描结果
     """
-    mon = get_monitor()
+    engine = get_engine()
+    config = get_config()
 
     # 在后台执行扫描
     def run_scan():
-        signals = mon.scan_all_stocks()
-        if signals:
+        result = engine.scan_all()
+        if result.signals:
             # 发送通知
-            config = mon.config
             sender = create_sender_from_config(config)
-            for signal in signals:
+            for signal in result.signals:
                 sender.send_signal(signal)
-            # 保存信号
-            mon.save_signals()
 
     background_tasks.add_task(run_scan)
 
@@ -84,25 +82,24 @@ async def start_monitor(background_tasks: BackgroundTasks):
         启动结果
     """
     state = get_state_manager().monitor_state
+    config = get_config()
 
     if not state.start():
         return {"status": "already_running", "message": "监控已在运行中"}
 
     def run_monitor():
-        mon = get_monitor()
-        config = mon.config
+        engine = get_engine()
         sender = create_sender_from_config(config)
 
-        interval = config.get('strategy', {}).get('scan_interval', 60)
+        interval = config.strategy.scan_interval
 
         while state.is_running:
             try:
-                if mon.stock_fetcher.is_trading_time():
-                    signals = mon.scan_all_stocks()
-                    if signals:
-                        for signal in signals:
+                if engine.stock_fetcher.is_trading_time():
+                    result = engine.scan_all()
+                    if result.signals:
+                        for signal in result.signals:
                             sender.send_signal(signal)
-                        mon.save_signals()
                     state.increment_scan_count()
 
                 time.sleep(interval)

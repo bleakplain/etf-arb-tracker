@@ -44,9 +44,9 @@ async def get_stock_etf_mapping():
     Returns:
         映射关系字典
     """
-    from backend.api.dependencies import get_monitor
-    mon = get_monitor()
-    return mon.stock_etf_mapping
+    from backend.api.dependencies import get_engine
+    engine = get_engine()
+    return engine.get_security_fund_mapping()
 
 
 @router.get("/api/plugins")

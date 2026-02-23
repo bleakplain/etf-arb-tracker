@@ -168,12 +168,6 @@ def Lock() -> AsyncLock:
     return AsyncLock()
 
 
-# 向后兼容的别名
-def get_monitor() -> ArbitrageEngineCN:
-    """获取引擎实例（向后兼容）"""
-    return get_engine()
-
-
 # 暴露配置实例
 def get_config() -> Config:
     """获取配置实例"""

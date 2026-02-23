@@ -7,11 +7,12 @@
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 
-from backend.api.dependencies import get_monitor, get_limit_up_cache
+from backend.api.dependencies import get_engine, get_limit_up_cache, get_config
 from backend.api.models import StockQuoteResponse, LimitUpStockResponse
 from backend.data.limit_up_stocks import LimitUpStocksFetcher
 from backend.data.kline import KlineDataFetcher
 from backend.data.etf_holdings import ETFHoldingsFetcher
+from backend.market import CandidateETF
 
 router = APIRouter()
 
@@ -24,10 +25,11 @@ async def get_stocks():
     Returns:
         自选股行情列表
     """
-    mon = get_monitor()
-    stock_codes = [s.code for s in mon.watch_stocks]
+    engine = get_engine()
+    config = get_config()
+    stock_codes = [s.code for s in config.my_stocks]
 
-    quotes = mon.stock_fetcher.get_batch_quotes(stock_codes)
+    quotes = engine.stock_fetcher.get_batch_quotes(stock_codes)
 
     result = []
     for code in stock_codes:
@@ -57,45 +59,47 @@ async def get_related_etfs(code: str):
     Returns:
         相关ETF列表（仅包含持仓>=5%的ETF）
     """
-    mon = get_monitor()
+    engine = get_engine()
+    config = get_config()
 
-    # 使用带真实权重验证的方法，只返回持仓占比 >= 5% 的 ETF
-    etfs = mon.find_related_etfs_with_real_weight(code)
+    # 获取符合条件的ETF（已按权重筛选）
+    funds: list[CandidateETF] = engine.get_eligible_funds(code)
 
     # 如果没有符合条件的ETF，返回空列表
-    if not etfs:
+    if not funds:
         return []
 
     # 获取ETF实时行情
-    etf_codes = [e['etf_code'] for e in etfs]
-    quotes = mon.etf_fetcher.get_etf_batch_quotes(etf_codes)
+    etf_codes = [f.etf_code for f in funds]
+    quotes = engine.etf_fetcher.get_etf_batch_quotes(etf_codes)
 
     result = []
-    for etf in etfs:
-        etf_code = etf['etf_code']
-        quote = quotes.get(etf_code)
+    for fund in funds:
+        quote = quotes.get(fund.etf_code)
+        category_name = _get_category_name(fund.category, config)
+
         if quote:
             result.append({
-                "etf_code": etf_code,
-                "etf_name": etf['etf_name'],
-                "weight": etf['weight'],
-                "rank": etf.get('rank', -1),
-                "in_top10": etf.get('in_top10', False),
-                "category": etf.get('category', '宽基'),
+                "etf_code": fund.etf_code,
+                "etf_name": fund.etf_name,
+                "weight": fund.weight,
+                "rank": fund.rank,
+                "in_top10": fund.in_top10,
+                "category": category_name,
                 "price": quote['price'],
                 "change_pct": quote['change_pct'],
-                "volume": quote['amount'],
+                "volume": quote.get('amount', 0),
                 "premium": quote.get('premium')
             })
         else:
             # 即使获取不到行情，也返回基本信息
             result.append({
-                "etf_code": etf_code,
-                "etf_name": etf['etf_name'],
-                "weight": etf['weight'],
-                "rank": etf.get('rank', -1),
-                "in_top10": etf.get('in_top10', False),
-                "category": etf.get('category', '宽基'),
+                "etf_code": fund.etf_code,
+                "etf_name": fund.etf_name,
+                "weight": fund.weight,
+                "rank": fund.rank,
+                "in_top10": fund.in_top10,
+                "category": category_name,
                 "price": 0,
                 "change_pct": 0,
                 "volume": 0,
@@ -103,6 +107,17 @@ async def get_related_etfs(code: str):
             })
 
     return result
+
+
+def _get_category_name(category, config) -> str:
+    """获取分类名称"""
+    category_map = {
+        'broad_index': '宽基',
+        'tech': '科技',
+        'consumer': '消费',
+        'financial': '金融',
+    }
+    return category_map.get(category.value if hasattr(category, 'value') else category, '其他')
 
 
 @router.get("/api/limit-up", response_model=list[LimitUpStockResponse])
@@ -120,10 +135,10 @@ async def get_limit_up_stocks():
         """加载涨停股数据"""
         fetcher = LimitUpStocksFetcher()
 
-        # 尝试从监控器获取缓存的股票数据
+        # 尝试从引擎获取缓存的股票数据
         try:
-            mon = get_monitor()
-            stock_df = mon.stock_fetcher._get_spot_data()
+            engine = get_engine()
+            stock_df = engine.stock_fetcher._get_spot_data()
             stocks = fetcher.get_today_limit_ups(stock_df)
         except Exception as e:
             logger.warning(f"Failed to get cached spot data, using fresh fetch: {e}")

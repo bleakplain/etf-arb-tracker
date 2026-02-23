@@ -166,15 +166,20 @@ class ArbitrageEngineCN:
             DEFAULT_MIN_TIME_TO_CLOSE,
         )
 
+        # 从Config中读取策略配置，如果没有则使用默认值
+        min_weight = self._config.strategy.min_weight if self._config else CNMarketConstants.DEFAULT_MIN_WEIGHT
+        min_time_to_close = self._config.strategy.min_time_to_close if self._config else DEFAULT_MIN_TIME_TO_CLOSE
+        min_daily_amount = self._config.strategy.min_etf_volume * 10000 if self._config else CNMarketConstants.DEFAULT_MIN_DAILY_AMOUNT
+
         return ArbitrageEngineConfig(
             event_detector="limit_up_cn",
             fund_selector="highest_weight",
             signal_filters=["time_filter_cn", "liquidity_filter"],
             event_config={'min_change_pct': CNMarketConstants.DEFAULT_LIMIT_UP_THRESHOLD},
-            fund_config={'min_weight': CNMarketConstants.DEFAULT_MIN_WEIGHT},
+            fund_config={'min_weight': min_weight},
             filter_configs={
-                'time_filter_cn': {'min_time_to_close': DEFAULT_MIN_TIME_TO_CLOSE},
-                'liquidity_filter': {'min_daily_amount': CNMarketConstants.DEFAULT_MIN_DAILY_AMOUNT}
+                'time_filter_cn': {'min_time_to_close': min_time_to_close},
+                'liquidity_filter': {'min_daily_amount': min_daily_amount}
             }
         )
 
@@ -211,8 +216,17 @@ class ArbitrageEngineCN:
 
     def _build_or_load_mapping(self) -> None:
         """构建或加载证券-基金映射"""
+        import json
+        from pathlib import Path
+
         try:
             self._security_fund_mapping = self._mapping_repository.load_mapping() or {}
+        except FileNotFoundError:
+            logger.info("映射文件不存在，将重新构建")
+            self._security_fund_mapping = {}
+        except json.JSONDecodeError as e:
+            logger.warning(f"映射文件格式错误: {e}，将重新构建")
+            self._security_fund_mapping = {}
         except Exception as e:
             logger.warning(f"加载映射关系失败: {e}，将重新构建")
             self._security_fund_mapping = {}
@@ -222,11 +236,19 @@ class ArbitrageEngineCN:
         else:
             logger.info("未找到已有映射，开始构建...")
             fund_codes = self._get_watch_fund_codes()
-            self._security_fund_mapping = self._etf_holder_provider.build_stock_etf_mapping(
-                self._watch_securities, fund_codes
-            )
-            self._mapping_repository.save_mapping(self._security_fund_mapping)
-            logger.info(f"映射构建完成，覆盖 {len(self._security_fund_mapping)} 只证券")
+            if not fund_codes:
+                logger.warning("未配置监控ETF列表，无法构建映射")
+                return
+
+            try:
+                self._security_fund_mapping = self._etf_holder_provider.build_stock_etf_mapping(
+                    self._watch_securities, fund_codes
+                )
+                self._mapping_repository.save_mapping(self._security_fund_mapping)
+                logger.info(f"映射构建完成，覆盖 {len(self._security_fund_mapping)} 只证券")
+            except Exception as e:
+                logger.error(f"构建映射关系失败: {e}")
+                self._security_fund_mapping = {}
 
     def _get_watch_fund_codes(self) -> List[str]:
         """获取监控的基金代码列表"""
@@ -306,8 +328,16 @@ class ArbitrageEngineCN:
 
         return self._strategy_executor.execute(quote, eligible_funds)
 
-    def scan_security(self, security_code: str) -> Optional[TradingSignal]:
-        """扫描单个证券"""
+    def analyze_security(self, security_code: str) -> Optional[TradingSignal]:
+        """
+        分析单个证券并生成套利信号
+
+        Args:
+            security_code: 证券代码
+
+        Returns:
+            交易信号，如果没有套利机会则返回None
+        """
         quote = self._quote_fetcher.get_stock_quote(security_code)
         if not quote:
             logger.debug(f"未获取到证券 {security_code} 的行情数据")
@@ -339,7 +369,7 @@ class ArbitrageEngineCN:
 
         for security_code in self._watch_securities:
             try:
-                signal = self.scan_security(security_code)
+                signal = self.analyze_security(security_code)
                 if signal:
                     signals.append(signal)
                     self._signal_history.append(signal)
@@ -348,8 +378,8 @@ class ArbitrageEngineCN:
                     filtered_count += 1
 
             except Exception as e:
-                logger.error(f"扫描证券 {security_code} 失败: {e}")
-                all_logs.append(f"✗ 扫描失败 {security_code}: {e}")
+                logger.error(f"分析证券 {security_code} 失败: {e}")
+                all_logs.append(f"✗ 分析失败 {security_code}: {e}")
 
         all_logs.append(f"扫描完成，生成 {len(signals)} 个信号")
 

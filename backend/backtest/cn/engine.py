@@ -118,7 +118,7 @@ class CNBacktestEngine:
                 # 扫描所有股票
                 for stock_code in self.config.stock_codes:
                     try:
-                        signal, logs = self.arbitrage_engine.scan_security(stock_code)
+                        signal = self.arbitrage_engine.analyze_security(stock_code)
 
                         if signal:
                             self.signals.append(signal)

@@ -7,7 +7,7 @@
 from fastapi import APIRouter
 from datetime import datetime
 
-from backend.api.dependencies import get_monitor
+from backend.api.dependencies import get_engine
 from backend.api.models import SignalResponse
 
 router = APIRouter()
@@ -25,9 +25,9 @@ async def get_signals(limit: int = 20, today_only: bool = True):
     Returns:
         信号列表
     """
-    mon = get_monitor()
+    engine = get_engine()
 
-    signals = mon.signal_history
+    signals = engine.signal_history
 
     if today_only:
         today = datetime.now().strftime("%Y-%m-%d")

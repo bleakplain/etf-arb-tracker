@@ -5,8 +5,8 @@ strategy:
   # 扫描间隔（秒）- 控制后端监控扫描频率，防止请求过于频繁被封禁
   scan_interval: 120
 
-  # ETF中最小持仓权重（1%）
-  min_weight: 0.01
+  # ETF中最小持仓权重（5%）- 股票在ETF中占比需达到此阈值才符合套利条件
+  min_weight: 0.05
 
   # 最小封单量（亿元）
   min_order_amount: 10
