@@ -9,7 +9,11 @@ from abc import ABC, abstractmethod
 from typing import Dict, Tuple, Type, Optional
 from datetime import datetime
 
-from config.strategy import SignalEvaluationConfig
+from config.strategy import (
+    SignalEvaluationConfig,
+    ConservativeEvaluationConfig,
+    AggressiveEvaluationConfig
+)
 from backend.signal.interfaces import ISignalEvaluator
 from backend.utils.plugin_registry import evaluator_registry
 from backend.utils.clock import Clock, SystemClock, CHINA_TZ
@@ -133,37 +137,43 @@ class DefaultSignalEvaluator(SignalEvaluator):
     version="1.0.0"
 )
 class ConservativeEvaluator(SignalEvaluator):
-    """保守型评估器 - 更严格的评估标准"""
+    """保守型评估器 - 使用 ConservativeEvaluationConfig 配置"""
+
+    def __init__(self, config: SignalEvaluationConfig = None, clock: Optional[Clock] = None):
+        # 确保使用 ConservativeEvaluationConfig
+        if config is None or isinstance(config, SignalEvaluationConfig):
+            config = ConservativeEvaluationConfig()
+        super().__init__(config, clock)
 
     def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
-        """保守型评估 - 偏向低置信度、高风险"""
+        """保守型评估 - 使用配置中的严格阈值"""
         weight = etf_holding.weight
         rank = etf_holding.rank
 
-        # 更严格的权重要求
-        if weight >= 0.15:
+        # 使用配置的权重阈值
+        if weight >= self.config.confidence_high_weight:
             confidence = "高"
-        elif weight >= 0.08:
+        elif weight >= self.config.confidence_medium_weight:
             confidence = "中"
         else:
             confidence = "低"
 
-        # 更严格的排名要求
-        if rank > 5:
+        # 使用配置的排名阈值
+        if rank > self.config.confidence_strict_rank:
             confidence = "低"
 
-        # 更保守的时间评估
+        # 使用配置的时间阈值
         time_to_close = self._get_time_to_close()
-        if time_to_close < HIGH_RISK_TIME_THRESHOLD:  # 30分钟内即为高风险
+        if time_to_close < self.config.risk_high_time_seconds:
             risk_level = "高"
-        elif time_to_close > 7200:  # 2小时以上才低风险
+        elif time_to_close > self.config.risk_low_time_seconds:
             risk_level = "低"
         else:
             risk_level = "中"
 
-        # 持仓集中度风险
+        # 使用配置的前10持仓集中度阈值
         top10_ratio = etf_holding.top10_ratio
-        if top10_ratio > 0.60:  # 前10占比超过60%即高风险
+        if top10_ratio > self.config.risk_top10_ratio_high:
             risk_level = "高"
 
         return confidence, risk_level
@@ -176,34 +186,47 @@ class ConservativeEvaluator(SignalEvaluator):
     version="1.0.0"
 )
 class AggressiveEvaluator(SignalEvaluator):
-    """激进型评估器 - 更宽松的评估标准"""
+    """激进型评估器 - 使用 AggressiveEvaluationConfig 配置"""
+
+    def __init__(self, config: SignalEvaluationConfig = None, clock: Optional[Clock] = None):
+        # 确保使用 AggressiveEvaluationConfig
+        if config is None or isinstance(config, SignalEvaluationConfig):
+            config = AggressiveEvaluationConfig()
+        super().__init__(config, clock)
 
     def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
-        """激进型评估 - 偏向高置信度、低风险"""
+        """激进型评估 - 使用配置中的宽松阈值"""
         weight = etf_holding.weight
         rank = etf_holding.rank
 
-        # 更宽松的权重要求
-        if weight >= 0.08:
+        # 使用配置的权重阈值
+        if weight >= self.config.confidence_high_weight:
             confidence = "高"
-        elif weight >= 0.03:
+        elif weight >= self.config.confidence_medium_weight:
             confidence = "中"
         else:
             confidence = "低"
 
-        # 更宽松的排名要求
-        if rank <= 20:
-            if confidence == "低":
-                confidence = "中"
+        # 使用配置的排名阈值
+        if rank <= self.config.confidence_high_rank and confidence == "低":
+            confidence = "中"
+        if rank > self.config.confidence_low_rank and confidence == "高":
+            confidence = "中"
 
-        # 更激进的时间评估
+        # 使用配置的时间阈值
         time_to_close = self._get_time_to_close()
-        if time_to_close < 300:  # 5分钟内才高风险
+        if time_to_close < self.config.risk_high_time_seconds:
             risk_level = "高"
-        elif time_to_close > HIGH_RISK_TIME_THRESHOLD:  # 30分钟以上即低风险
+        elif time_to_close > self.config.risk_low_time_seconds:
             risk_level = "低"
         else:
             risk_level = "中"
+
+        # 使用配置的前10持仓集中度阈值
+        top10_ratio = etf_holding.top10_ratio
+        if top10_ratio > self.config.risk_top10_ratio_high:
+            if risk_level == "低":
+                risk_level = "中"
 
         return confidence, risk_level
 

@@ -94,7 +94,7 @@ class RiskControlSettings:
 
 @dataclass
 class SignalEvaluationConfig:
-    """信号评估配置"""
+    """信号评估配置 - 默认值"""
 
     # 置信度评估 - 权重阈值
     confidence_high_weight: float = 0.10      # 权重>=10%为高置信度
@@ -127,3 +127,46 @@ class SignalEvaluationConfig:
             risk_top10_ratio_high=data.get("risk_top10_ratio_high", 0.70),
             risk_morning_hour=data.get("risk_morning_hour", 10),
         )
+
+
+@dataclass
+class ConservativeEvaluationConfig(SignalEvaluationConfig):
+    """保守型评估配置 - 更严格的阈值"""
+
+    # 更严格的权重要求（覆盖默认值）
+    confidence_high_weight: float = 0.15      # 15%以上才高置信度
+    confidence_medium_weight: float = 0.08     # 8%以上为中等置信度
+    confidence_low_weight: float = 0.05        # 5%以下为低置信度
+
+    # 更严格的排名要求
+    confidence_high_rank: int = 3              # 排名<=3为高置信度
+    confidence_strict_rank: int = 5            # 排名>5即降为低置信度
+
+    # 更保守的时间评估
+    risk_high_time_seconds: int = 1800         # 30分钟内即高风险
+    risk_low_time_seconds: int = 7200          # 2小时以上才低风险
+
+    # 更严格的前10持仓集中度要求
+    risk_top10_ratio_high: float = 0.60        # 前10占比>60%即高风险
+
+
+@dataclass
+class AggressiveEvaluationConfig(SignalEvaluationConfig):
+    """激进型评估配置 - 更宽松的阈值"""
+
+    # 更宽松的权重要求（覆盖默认值）
+    confidence_high_weight: float = 0.08      # 8%以上即为高置信度
+    confidence_medium_weight: float = 0.03     # 3%以上为中等置信度
+    confidence_low_weight: float = 0.01        # 1%以下才低置信度
+
+    # 更宽松的排名要求
+    confidence_high_rank: int = 5              # 排名<=5为高置信度
+    confidence_low_rank: int = 15              # 排名>15才低置信度
+
+    # 更宽松的时间评估
+    risk_high_time_seconds: int = 300          # 5分钟内才高风险
+    risk_low_time_seconds: int = 1800          # 30分钟以上即低风险
+
+    # 更宽松的持仓集中度要求
+    risk_top10_ratio_high: float = 0.80        # 前10占比>80%才高风险
+
