@@ -20,6 +20,7 @@ from backend.arbitrage.cn.strategies.interfaces import (
     ISignalFilter,
 )
 from backend.arbitrage.cn.strategy_executor import StrategyExecutor
+from backend.signal.repository import FileSignalRepository, InMemorySignalRepository, ISignalRepository
 from config import Config
 
 # 延迟导入以避免循环依赖
@@ -76,7 +77,8 @@ class ArbitrageEngineCN:
         signal_evaluator: 'ISignalEvaluator' = None,
         config: Config = None,
         strategy_manager_instance: StrategyManager = None,
-        mapping_repository: IMappingRepository = None
+        mapping_repository: IMappingRepository = None,
+        signal_repository: ISignalRepository = None
     ):
         """
         初始化A股套利引擎
@@ -92,6 +94,7 @@ class ArbitrageEngineCN:
             config: 应用配置
             strategy_manager_instance: 策略管理器（用于测试，默认使用全局实例）
             mapping_repository: 映射仓储（用于测试，默认使用文件仓储）
+            signal_repository: 信号仓储（用于测试，默认使用内存仓储）
         """
         self._quote_fetcher = quote_fetcher
         self._etf_holder_provider = etf_holder_provider
@@ -101,6 +104,7 @@ class ArbitrageEngineCN:
         self._config = config or Config.load()
         self._strategy_manager = strategy_manager_instance or strategy_manager
         self._mapping_repository = mapping_repository or FileMappingRepository("data/cn_stock_etf_mapping.json")
+        self._signal_repository = signal_repository or InMemorySignalRepository()
 
         # 加载默认监控列表
         if watch_securities is None:
@@ -119,6 +123,10 @@ class ArbitrageEngineCN:
         self._signal_filters: List[ISignalFilter] = []
         self._strategy_executor: Optional[StrategyExecutor] = None
 
+        # ETF持仓缓存（减少重复查询）
+        self._etf_holdings_cache: Dict[str, Dict] = {}
+        self._holdings_cache_ttl: int = 3600  # 1小时缓存
+
         # 构建证券-基金映射
         self._security_fund_mapping: Dict[str, List[Dict]] = {}
         self._build_or_load_mapping()
@@ -132,8 +140,10 @@ class ArbitrageEngineCN:
         logger.info(f"监控证券数量: {len(self._watch_securities)}")
         logger.info(f"覆盖基金数量: {len(self.get_all_fund_codes())}")
 
-        # 信号历史
-        self._signal_history: List[TradingSignal] = []
+        # 从仓储加载信号历史
+        self._signal_history = self._signal_repository.get_all_signals()
+        if self._signal_history:
+            logger.info(f"从仓储加载信号历史，共 {len(self._signal_history)} 条")
 
     # ========================================================================
     # API便捷属性
@@ -269,8 +279,9 @@ class ArbitrageEngineCN:
         return list(fund_set)
 
     def get_eligible_funds(self, security_code: str) -> List[CandidateETF]:
-        """获取符合条件的基金列表"""
+        """获取符合条件的基金列表（带缓存）"""
         from backend.utils.code_utils import normalize_stock_code
+        import time
 
         normalized_code = normalize_stock_code(security_code)
         mapped_funds = self._security_fund_mapping.get(normalized_code, [])
@@ -280,10 +291,23 @@ class ArbitrageEngineCN:
 
         fund_names = {f['etf_code']: f['etf_name'] for f in mapped_funds}
         results = []
+        current_time = time.time()
 
         for fund in mapped_funds:
             fund_code = fund['etf_code']
-            holdings_data = self._etf_holdings_provider.get_etf_top_holdings(fund_code)
+
+            # 检查缓存
+            cached = self._etf_holdings_cache.get(fund_code)
+            if cached and current_time - cached['timestamp'] < self._holdings_cache_ttl:
+                holdings_data = cached['data']
+            else:
+                holdings_data = self._etf_holdings_provider.get_etf_top_holdings(fund_code)
+                # 更新缓存
+                self._etf_holdings_cache[fund_code] = {
+                    'timestamp': current_time,
+                    'data': holdings_data
+                }
+
             if not holdings_data or not holdings_data.get('top_holdings'):
                 continue
 
@@ -297,13 +321,26 @@ class ArbitrageEngineCN:
                     break
 
             from backend.utils.constants import CNMarketConstants
+            from backend.market.models import ETFCategory
             min_weight = self._engine_config.fund_config.get('min_weight', CNMarketConstants.DEFAULT_MIN_WEIGHT)
             if weight >= min_weight:
+                # 获取ETF分类
+                category = ETFCategory.OTHER
+                if self._config:
+                    category_str = self._config.etf_categories.get_category(fund_code)
+                    category_map = {
+                        'broad_index': ETFCategory.BROAD_INDEX,
+                        'tech': ETFCategory.SECTOR,
+                        'consumer': ETFCategory.SECTOR,
+                        'financial': ETFCategory.SECTOR,
+                    }
+                    category = category_map.get(category_str, ETFCategory.OTHER)
+
                 results.append(CandidateETF(
                     etf_code=fund_code,
                     etf_name=fund_names.get(fund_code, f'ETF{fund_code}'),
                     weight=weight,
-                    category='other',
+                    category=category,
                     rank=rank,
                     in_top10=rank > 0 and rank <= 10,
                     top10_ratio=holdings_data.get('total_weight', 0)
@@ -373,6 +410,8 @@ class ArbitrageEngineCN:
                 if signal:
                     signals.append(signal)
                     self._signal_history.append(signal)
+                    # 持久化信号到仓储
+                    self._signal_repository.save(signal)
                     total_events += 1
                 else:
                     filtered_count += 1
@@ -414,3 +453,23 @@ class ArbitrageEngineCN:
     def get_security_fund_mapping(self) -> Dict:
         """获取证券-基金映射关系"""
         return self._security_fund_mapping.copy()
+
+    def get_signal_history(self, limit: int = None) -> List[TradingSignal]:
+        """
+        获取信号历史
+
+        Args:
+            limit: 限制返回数量，None表示返回全部
+
+        Returns:
+            信号列表
+        """
+        if limit is None:
+            return self._signal_history.copy()
+        # 返回最近N条信号
+        return self._signal_history[-limit:] if len(self._signal_history) > limit else self._signal_history.copy()
+
+    def clear_etf_holdings_cache(self) -> None:
+        """清空ETF持仓缓存"""
+        self._etf_holdings_cache.clear()
+        logger.info("ETF持仓缓存已清空")

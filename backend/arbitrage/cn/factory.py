@@ -13,6 +13,7 @@ from backend.arbitrage.interfaces import InMemoryMappingRepository
 from backend.arbitrage.strategy_registry import StrategyManager, create_test_strategy_manager
 from backend.market.interfaces import IQuoteFetcher, IETFHoldingProvider
 from backend.signal.interfaces import ISignalEvaluator
+from backend.signal.repository import InMemorySignalRepository
 from config import Config
 
 
@@ -94,6 +95,7 @@ class ArbitrageEngineFactory:
         # 创建测试专用的策略管理器和仓储
         strategy_manager = create_test_strategy_manager()
         mapping_repository = InMemoryMappingRepository()
+        signal_repository = InMemorySignalRepository()
 
         # 如果有预定义映射，直接设置
         if predefined_mapping:
@@ -110,7 +112,8 @@ class ArbitrageEngineFactory:
             signal_evaluator=None,
             config=None,
             strategy_manager_instance=strategy_manager,
-            mapping_repository=mapping_repository
+            mapping_repository=mapping_repository,
+            signal_repository=signal_repository
         )
 
         return engine
