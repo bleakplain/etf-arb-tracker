@@ -34,101 +34,6 @@ const AppState = {
 };
 
 // ============================================================================
-// API CLIENT
-// ============================================================================
-
-const API = {
-    baseUrl: '',
-
-    async request(endpoint, options = {}) {
-        const url = `${this.baseUrl}${endpoint}`;
-        const defaults = {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        };
-
-        try {
-            const response = await fetch(url, { ...defaults, ...options });
-            if (!response.ok) {
-                throw new Error(`API Error: ${response.status} ${response.statusText}`);
-            }
-            return await response.json();
-        } catch (error) {
-            console.error(`API request failed: ${endpoint}`, error);
-            throw error;
-        }
-    },
-
-    // Status endpoints
-    getStatus() {
-        return this.request('/api/status');
-    },
-
-    // Stock endpoints
-    getStocks() {
-        return this.request('/api/stocks');
-    },
-
-    getRelatedETFs(code) {
-        return this.request(`/api/stocks/${code}/related-etfs`);
-    },
-
-    // Limit-up endpoints
-    getLimitUpStocks() {
-        return this.request('/api/limit-up');
-    },
-
-    // Signal endpoints
-    getSignals() {
-        return this.request('/api/signals');
-    },
-
-    // Monitor endpoints
-    startMonitor() {
-        return this.request('/api/monitor/start', { method: 'POST' });
-    },
-
-    stopMonitor() {
-        return this.request('/api/monitor/stop', { method: 'POST' });
-    },
-
-    manualScan() {
-        return this.request('/api/monitor/scan', { method: 'POST' });
-    },
-
-    // Backtest endpoints
-    startBacktest(config) {
-        return this.request('/api/backtest/start', {
-            method: 'POST',
-            body: JSON.stringify(config)
-        });
-    },
-
-    getBacktestStatus(jobId) {
-        return this.request(`/api/backtest/${jobId}`);
-    },
-
-    getBacktestJobs() {
-        return this.request('/api/backtest/jobs');
-    },
-
-    getBacktestResult(jobId) {
-        return this.request(`/api/backtest/${jobId}/result`);
-    },
-
-    getBacktestSignals(jobId) {
-        return this.request(`/api/backtest/${jobId}/signals`);
-    },
-
-    deleteBacktestJob(jobId) {
-        return this.request(`/api/backtest/${jobId}`, {
-            method: 'DELETE'
-        });
-    }
-};
-
-// ============================================================================
 // NAVIGATION
 // ============================================================================
 
@@ -668,7 +573,7 @@ async function startMonitor() {
         if (liveIndicator) liveIndicator.style.display = 'inline-flex';
     } catch (error) {
         console.error('Failed to start monitor:', error);
-        showToastMessage('启动监控失败', 'error');
+        showToast('启动监控失败', 'error');
     }
 }
 
@@ -697,7 +602,7 @@ async function stopMonitor() {
         if (liveIndicator) liveIndicator.style.display = 'none';
     } catch (error) {
         console.error('Failed to stop monitor:', error);
-        showToastMessage('停止监控失败', 'error');
+        showToast('停止监控失败', 'error');
     }
 }
 
@@ -720,10 +625,10 @@ async function manualScan() {
             await loadLimitUpStocks();
         }
 
-        showToastMessage('扫描完成', 'success');
+        showToast('扫描完成', 'success');
     } catch (error) {
         console.error('Manual scan failed:', error);
-        showToastMessage('扫描失败', 'error');
+        showToast('扫描失败', 'error');
     } finally {
         if (btn) {
             btn.disabled = false;
@@ -822,7 +727,7 @@ async function performStockSearch(query, resultsContainer) {
 }
 
 async function addStockToWatchlist(code) {
-    showToastMessage(`添加股票 ${code} 功能需要后端支持`, 'info');
+    showToast(`添加股票 ${code} 功能需要后端支持`, 'info');
     // In production, this would call an API endpoint
 }
 
@@ -929,7 +834,7 @@ async function startBacktest() {
     const interpolationInput = document.getElementById('backtestInterpolation');
 
     if (!startDateInput.value || !endDateInput.value) {
-        showToastMessage('请选择日期范围', 'error');
+        showToast('请选择日期范围', 'error');
         return;
     }
 
@@ -1104,98 +1009,12 @@ async function exportBacktestSignals(jobId) {
         a.click();
         window.URL.revokeObjectURL(url);
 
-        showToastMessage('导出成功', 'success');
+        showToast('导出成功', 'success');
     } catch (error) {
         console.error('Export failed:', error);
-        showToastMessage('导出失败', 'error');
+        showToast('导出失败', 'error');
     }
 }
-
-// ============================================================================
-// TOAST NOTIFICATIONS
-// ============================================================================
-
-function showToastMessage(message, type = 'info') {
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.className = 'terminal-toast';
-    toast.style.cssText = `
-        position: fixed;
-        bottom: var(--space-lg);
-        right: var(--space-lg);
-        padding: var(--space-md) var(--space-lg);
-        background: var(--terminal-panel);
-        border: 1px solid var(--terminal-border);
-        border-left-width: 4px;
-        border-radius: 4px;
-        font-family: var(--font-mono);
-        font-size: 13px;
-        z-index: 10000;
-        animation: toast-in 0.3s ease-out;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    `;
-
-    // Set color based on type
-    const colors = {
-        success: 'var(--market-up)',
-        error: 'var(--market-down)',
-        warning: 'var(--status-warning)',
-        info: 'var(--electric-blue)'
-    };
-    toast.style.borderLeftColor = colors[type] || colors.info;
-
-    // Set icon
-    const icons = {
-        success: 'bi-check-circle',
-        error: 'bi-exclamation-triangle',
-        warning: 'bi-exclamation-circle',
-        info: 'bi-info-circle'
-    };
-    const icon = icons[type] || icons.info;
-
-    toast.innerHTML = `
-        <div style="display: flex; align-items: center; gap: var(--space-sm);">
-            <i class="bi ${icon}" style="color: ${colors[type] || colors.info};"></i>
-            <span>${message}</span>
-        </div>
-    `;
-
-    // Add to DOM
-    document.body.appendChild(toast);
-
-    // Remove after delay
-    setTimeout(() => {
-        toast.style.animation = 'toast-out 0.3s ease-out forwards';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-// Add toast animations
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes toast-in {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    @keyframes toast-out {
-        from {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        to {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-    }
-`;
-document.head.appendChild(style);
 
 // ============================================================================
 // INITIALIZATION
