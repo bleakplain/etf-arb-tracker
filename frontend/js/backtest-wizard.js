@@ -461,8 +461,12 @@ async function runBacktest() {
 }
 
 function pollBacktestStatus(jobId) {
-    const interval = setInterval(async () => {
-        try {
+    if (WizardState.pollingManager) {
+        WizardState.pollingManager.stop();
+    }
+
+    WizardState.pollingManager = new PollingManager({
+        callback: async () => {
             const status = await API.getBacktestStatus(jobId);
 
             const progressBar = document.getElementById('backtestProgressBar');
@@ -477,15 +481,17 @@ function pollBacktestStatus(jobId) {
             }
 
             if (status.status === 'completed') {
-                clearInterval(interval);
                 WizardState.data.results = status;
                 displayResults(status);
+                return false;
             } else if (status.status === 'failed') {
-                clearInterval(interval);
                 throw new Error(status.message || '回测失败');
             }
-        } catch (error) {
-            clearInterval(interval);
+
+            return true;
+        },
+        interval: Config.POLLING.BACKTEST,
+        onError: (error) => {
             const container = document.getElementById('resultsContent');
             container.innerHTML = `
                 <div class="empty-state">
@@ -499,7 +505,9 @@ function pollBacktestStatus(jobId) {
                 </div>
             `;
         }
-    }, 2000);
+    });
+
+    WizardState.pollingManager.start();
 }
 
 function displayResults(result) {

@@ -477,28 +477,28 @@ function updateStatusBadge(isRunning) {
 }
 
 function startStatusPolling() {
-    if (AppState.monitor.statusCheckInterval) {
-        clearInterval(AppState.monitor.statusCheckInterval);
+    if (AppState.monitor.statusPolling) {
+        AppState.monitor.statusPolling.stop();
     }
 
-    // Define polling function
-    const poll = async () => {
-        // Skip if page is hidden
-        if (document.hidden) return;
+    AppState.monitor.statusPolling = new PollingManager({
+        callback: async () => {
+            if (document.hidden) return;
+            await loadStatus();
+            if (AppState.ui.currentTab === 'watchlist') {
+                await loadStocks();
+            }
+        },
+        interval: Config.POLLING.STATUS
+    });
 
-        await loadStatus();
-        if (AppState.ui.currentTab === 'watchlist') {
-            await loadStocks();
-        }
-    };
-
-    AppState.monitor.statusCheckInterval = setInterval(poll, 5000);
+    AppState.monitor.statusPolling.start();
 }
 
 function stopStatusPolling() {
-    if (AppState.monitor.statusCheckInterval) {
-        clearInterval(AppState.monitor.statusCheckInterval);
-        AppState.monitor.statusCheckInterval = null;
+    if (AppState.monitor.statusPolling) {
+        AppState.monitor.statusPolling.stop();
+        AppState.monitor.statusPolling = null;
     }
 }
 
@@ -527,7 +527,7 @@ function searchStock(event) {
     // Debounce search
     searchDebounceTimer = setTimeout(() => {
         performStockSearch(query, resultsContainer);
-    }, 300);
+    }, Config.POLLING.SEARCH_DEBOUNCE);
 }
 
 async function performStockSearch(query, resultsContainer) {
@@ -697,63 +697,77 @@ async function startBacktest() {
 }
 
 function startBacktestStatusCheck() {
-    if (AppState.backtest.statusCheckInterval) {
-        clearInterval(AppState.backtest.statusCheckInterval);
+function startBacktestStatusCheck() {
+    if (AppState.backtest.statusPolling) {
+        AppState.backtest.statusPolling.stop();
     }
 
-    checkBacktestStatus();
-    AppState.backtest.statusCheckInterval = setInterval(checkBacktestStatus, 3000);
-}
+    AppState.backtest.statusPolling = new PollingManager({
+        callback: async () => {
+            const jobId = AppState.backtest.currentJob;
+            if (!jobId) return false;
 
-async function checkBacktestStatus() {
-    const jobId = AppState.backtest.currentJob;
-    if (!jobId) return;
+            try {
+                const status = await API.getBacktestStatus(jobId);
 
-    try {
-        const status = await API.getBacktestStatus(jobId);
-
-        if (status.status === 'completed') {
-            stopBacktestStatusCheck();
-            await viewBacktestResult(jobId);
-            await loadBacktestJobs();
-        } else if (status.status === 'failed') {
-            stopBacktestStatusCheck();
-            const resultsContainer = document.getElementById('backtestResults');
-            resultsContainer.innerHTML = `
-                <div class="terminal-empty">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <div class="terminal-empty-text">回测失败: ${status.message || '未知错误'}</div>
-                </div>
-            `;
-        } else {
-            // Update progress
-            const resultsContainer = document.getElementById('backtestResults');
-            const progress = status.progress !== undefined ? Math.round(status.progress * 100) : 0;
-            resultsContainer.innerHTML = `
-                <div class="terminal-panel">
-                    <div class="terminal-panel-header">
-                        <span class="terminal-panel-title">回测进行中</span>
-                    </div>
-                    <div class="terminal-panel-body">
-                        <div class="progress" style="margin-bottom: var(--space-md);">
-                            <div class="progress-bar" style="width: ${progress}%"></div>
+                if (status.status === 'completed') {
+                    await viewBacktestResult(jobId);
+                    await loadBacktestJobs();
+                    return false;
+                } else if (status.status === 'failed') {
+                    const resultsContainer = document.getElementById('backtestResults');
+                    resultsContainer.innerHTML = `
+                        <div class="terminal-empty">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <div class="terminal-empty-text">回测失败: ${status.message || '未知错误'}</div>
                         </div>
-                        <div style="text-align: center; font-family: var(--font-mono); font-size: 12px; color: var(--status-inactive);">
-                            ${status.message || '处理中...'} (${progress}%)
+                    `;
+                    return false;
+                } else {
+                    // Update progress
+                    const resultsContainer = document.getElementById('backtestResults');
+                    const progress = status.progress !== undefined ? Math.round(status.progress * 100) : 0;
+                    resultsContainer.innerHTML = `
+                        <div class="terminal-panel">
+                            <div class="terminal-panel-header">
+                                <span class="terminal-panel-title">回测进行中</span>
+                            </div>
+                            <div class="terminal-panel-body">
+                                <div class="progress" style="margin-bottom: var(--space-md);">
+                                    <div class="progress-bar" style="width: ${progress}%"></div>
+                                </div>
+                                <div style="text-align: center; font-family: var(--font-mono); font-size: 12px; color: var(--status-inactive);">
+                                    ${status.message || '处理中...'} (${progress}%)
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
-            `;
-        }
-    } catch (error) {
-        console.error('Failed to check backtest status:', error);
-    }
+                    `;
+                    return true;
+                }
+            } catch (error) {
+                console.error('Failed to check backtest status:', error);
+                return false;
+            }
+        },
+        interval: Config.POLLING.BACKTEST,
+        immediate: true
+    });
+
+    AppState.backtest.statusPolling.start();
 }
 
 function stopBacktestStatusCheck() {
-    if (AppState.backtest.statusCheckInterval) {
-        clearInterval(AppState.backtest.statusCheckInterval);
-        AppState.backtest.statusCheckInterval = null;
+    if (AppState.backtest.statusPolling) {
+        AppState.backtest.statusPolling.stop();
+        AppState.backtest.statusPolling = null;
+    }
+}
+
+async function checkBacktestStatus() {
+    // Deprecated: Use startBacktestStatusCheck() instead
+    // Kept for backward compatibility
+    if (!AppState.backtest.statusPolling) {
+        startBacktestStatusCheck();
     }
 }
 
