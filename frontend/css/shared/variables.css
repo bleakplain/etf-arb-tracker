@@ -1,0 +1,62 @@
+/**
+ * ETF Arbitrage Terminal - Shared CSS Variables
+ *
+ * Centralized CSS custom properties for consistent theming
+ */
+
+:root {
+    /* Terminal Palette - Deep Navy & Electric Blue */
+    --terminal-bg: #0a0e17;
+    --terminal-panel: #111827;
+    --terminal-panel-light: #1a2332;
+    --terminal-border: #1e293b;
+    --terminal-border-accent: #334155;
+
+    /* Electric Accents */
+    --electric-blue: #00d4ff;
+    --electric-cyan: #22d3ee;
+    --electric-purple: #a855f7;
+    --electric-pink: #ec4899;
+
+    /* Status Colors */
+    --status-active: #10b981;
+    --status-inactive: #64748b;
+    --status-warning: #f59e0b;
+    --status-error: #ef4444;
+
+    /* Market Colors */
+    --market-up: #22c55e;
+    --market-down: #ef4444;
+    --market-flat: #6b7280;
+
+    /* Typography */
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Space Grotesk', sans-serif;
+
+    /* Spacing */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+
+    /* Effects */
+    --glow-blue: 0 0 20px rgba(0, 212, 255, 0.3);
+    --glow-green: 0 0 20px rgba(34, 197, 94, 0.3);
+    --glow-red: 0 0 20px rgba(239, 68, 68, 0.3);
+
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+
+    /* Transitions */
+    --transition-fast: 0.15s;
+    --transition-normal: 0.3s;
+    --transition-slow: 0.5s;
+
+    /* Z-index layers */
+    --z-dropdown: 100;
+    --z-modal: 1000;
+    --z-toast: 10000;
+}

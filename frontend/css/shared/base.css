@@ -1,0 +1,59 @@
+/**
+ * ETF Arbitrage Terminal - Shared Base Styles
+ *
+ * Reset and base styles
+ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--terminal-bg);
+    color: #e2e8f0;
+    font-family: var(--font-display);
+    font-size: 14px;
+    line-height: 1.5;
+    overflow-x: hidden;
+}
+
+/* Focus States */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--electric-blue);
+    outline-offset: 2px;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--terminal-panel);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--terminal-border-accent);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--status-inactive);
+}
+
+/* Selection */
+::selection {
+    background: var(--electric-blue);
+    color: var(--terminal-bg);
+}
+
+::-moz-selection {
+    background: var(--electric-blue);
+    color: var(--terminal-bg);
+}

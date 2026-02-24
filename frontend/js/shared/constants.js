@@ -14,8 +14,8 @@ const Config = {
 
     // Table configuration
     TABLE: {
-        STOCKS_COLUMNS: 5,      // Number of columns in stocks table
-        LIMITUP_COLUMNS: 5,     // Number of columns in limit-up table
+        STOCKS_COLUMNS: 6,      // Number of columns in stocks table
+        LIMITUP_COLUMNS: 6,     // Number of columns in limit-up table
     },
 
     // API endpoints

@@ -87,23 +87,20 @@ function getEtfActionButton(code, name) {
  */
 function createStockTableRow(stock, isLimitUp = false) {
     const priceClass = getPriceClass(stock.change_pct);
-    const percentClass = getPriceClass(stock.change_pct);
     const formattedPercent = formatPercentage(stock.change_pct);
     const formattedPrice = formatPrice(stock.price);
 
     if (isLimitUp) {
-        // Limit-up table row with amount and turnover
-        const amountStr = formatAmount(stock.amount);
-        const turnoverStr = stock.turnover !== undefined ? stock.turnover.toFixed(2) + '%' : '-';
+        // Limit-up table row with limit time
+        const limitTime = stock.limit_time || '-';
 
         return `
             <tr>
                 <td><span class="terminal-table-code">${stock.code}</span></td>
                 <td><span class="terminal-table-name">${stock.name}</span></td>
-                <td><span class="terminal-table-price up">${formattedPrice}</span></td>
-                <td><span class="terminal-table-percent up">${formattedPercent}</span></td>
-                <td>${amountStr}</td>
-                <td>${turnoverStr}</td>
+                <td><span class="terminal-table-price ${priceClass}">${formattedPrice}</span></td>
+                <td><span class="terminal-table-percent ${priceClass}">${formattedPercent}</span></td>
+                <td>${limitTime}</td>
                 <td>${getEtfActionButton(stock.code, stock.name)}</td>
             </tr>
         `;
@@ -115,7 +112,7 @@ function createStockTableRow(stock, isLimitUp = false) {
             <td><span class="terminal-table-code">${stock.code}</span></td>
             <td><span class="terminal-table-name">${stock.name}</span></td>
             <td><span class="terminal-table-price ${priceClass}">${formattedPrice}</span></td>
-            <td><span class="terminal-table-percent ${percentClass}">${formattedPercent}</span></td>
+            <td><span class="terminal-table-percent ${priceClass}">${formattedPercent}</span></td>
             <td>${getStatusBadge(stock.is_limit_up)}</td>
             <td>${getEtfActionButton(stock.code, stock.name)}</td>
         </tr>

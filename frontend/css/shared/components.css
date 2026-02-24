@@ -1,0 +1,393 @@
+/**
+ * ETF Arbitrage Terminal - Shared Component Styles
+ *
+ * Reusable component styles
+ */
+
+/* === BUTTONS === */
+.terminal-btn {
+    width: 100%;
+    padding: var(--space-md);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid var(--terminal-border-accent);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: var(--terminal-panel);
+    color: #e2e8f0;
+}
+
+.terminal-btn:hover {
+    border-color: var(--electric-blue);
+    box-shadow: var(--glow-blue);
+}
+
+.terminal-btn:active {
+    transform: scale(0.98);
+}
+
+.terminal-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.terminal-btn-primary {
+    background: linear-gradient(135deg, var(--electric-blue), var(--electric-cyan));
+    border-color: transparent;
+    color: var(--terminal-bg);
+    font-weight: 600;
+}
+
+.terminal-btn-primary:hover {
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+}
+
+.terminal-btn-sm {
+    padding: var(--space-sm) var(--space-md);
+    font-size: 12px;
+}
+
+.terminal-btn-lg {
+    padding: var(--space-md) var(--space-lg);
+    font-size: 14px;
+}
+
+/* === BADGES === */
+.terminal-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px var(--space-sm);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+    background: var(--terminal-panel-light);
+    border: 1px solid var(--terminal-border);
+}
+
+.terminal-badge.limitup {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: var(--market-up);
+    color: var(--market-up);
+}
+
+.terminal-badge.normal {
+    background: rgba(100, 116, 139, 0.1);
+    border-color: var(--status-inactive);
+    color: var(--status-inactive);
+}
+
+.terminal-badge.alert {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--status-error);
+    color: var(--status-error);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* === PANELS === */
+.terminal-panel {
+    background: var(--terminal-panel);
+    border: 1px solid var(--terminal-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+}
+
+.terminal-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--terminal-border);
+}
+
+.terminal-panel-title {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--electric-blue);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.terminal-panel-body {
+    font-size: 13px;
+}
+
+/* === TABLES === */
+.terminal-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.terminal-table thead {
+    background: var(--terminal-panel-light);
+    border-bottom: 2px solid var(--terminal-border-accent);
+}
+
+.terminal-table th {
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--status-inactive);
+}
+
+.terminal-table th.sortable {
+    cursor: pointer;
+    transition: color var(--transition-fast);
+}
+
+.terminal-table th.sortable:hover {
+    color: var(--electric-blue);
+}
+
+.terminal-table th.sort-asc::after,
+.terminal-table th.sort-desc::after {
+    content: ' ▼';
+    font-size: 8px;
+}
+
+.terminal-table th.sort-asc::after {
+    content: ' ▲';
+}
+
+.terminal-table tbody tr {
+    border-bottom: 1px solid var(--terminal-border);
+    transition: background var(--transition-fast);
+}
+
+.terminal-table tbody tr:hover {
+    background: var(--terminal-panel-light);
+}
+
+.terminal-table tbody tr.even {
+    background: rgba(30, 41, 59, 0.3);
+}
+
+.terminal-table td {
+    padding: var(--space-sm) var(--space-md);
+}
+
+/* === LOADING STATES === */
+.terminal-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl);
+    gap: var(--space-md);
+}
+
+.terminal-loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--terminal-border);
+    border-top-color: var(--electric-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.terminal-loading-text {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--status-inactive);
+}
+
+/* === EMPTY STATES === */
+.terminal-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl);
+    gap: var(--space-md);
+    color: var(--status-inactive);
+}
+
+.terminal-empty i {
+    font-size: 48px;
+    opacity: 0.5;
+}
+
+.terminal-empty-text {
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+/* === ERROR STATES === */
+.terminal-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl);
+    gap: var(--space-md);
+    color: var(--status-error);
+}
+
+.terminal-error i {
+    font-size: 48px;
+}
+
+/* === MODAL === */
+.terminal-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-normal);
+}
+
+.terminal-modal.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.terminal-modal-content {
+    background: var(--terminal-panel);
+    border: 1px solid var(--terminal-border-accent);
+    border-radius: var(--radius-lg);
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+/* === TOAST NOTIFICATIONS === */
+.terminal-toast {
+    position: fixed;
+    bottom: var(--space-lg);
+    right: var(--space-lg);
+    padding: var(--space-md) var(--space-lg);
+    background: var(--terminal-panel);
+    border: 1px solid var(--terminal-border);
+    border-left-width: 4px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    z-index: var(--z-toast);
+    animation: toast-in 0.3s ease-out;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes toast-out {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+}
+
+/* === PROGRESS BAR === */
+.progress {
+    width: 100%;
+    height: 8px;
+    background: var(--terminal-panel-light);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--electric-blue), var(--electric-cyan));
+    border-radius: 4px;
+    transition: width var(--transition-normal);
+}
+
+/* === FORM INPUTS === */
+.terminal-input {
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    background: var(--terminal-panel-light);
+    border: 1px solid var(--terminal-border);
+    border-radius: var(--radius-sm);
+    color: #e2e8f0;
+    transition: border-color var(--transition-fast);
+}
+
+.terminal-input:focus {
+    border-color: var(--electric-blue);
+    outline: none;
+}
+
+.terminal-input::placeholder {
+    color: var(--status-inactive);
+}
+
+/* === PRICE INDICATORS === */
+.price-up {
+    color: var(--market-up);
+}
+
+.price-down {
+    color: var(--market-down);
+}
+
+.price-flat {
+    color: var(--market-flat);
+}
+
+/* === UTILITY CLASSES === */
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-muted { color: var(--status-inactive); }
+.text-small { font-size: 12px; }
+.text-large { font-size: 16px; }
+
+.mt-sm { margin-top: var(--space-sm); }
+.mt-md { margin-top: var(--space-md); }
+.mt-lg { margin-top: var(--space-lg); }
+
+.mb-sm { margin-bottom: var(--space-sm); }
+.mb-md { margin-bottom: var(--space-md); }
+.mb-lg { margin-bottom: var(--space-lg); }
+
+.p-sm { padding: var(--space-sm); }
+.p-md { padding: var(--space-md); }
+.p-lg { padding: var(--space-lg); }

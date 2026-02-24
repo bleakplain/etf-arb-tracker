@@ -9,68 +9,19 @@
 // ============================================================================
 
 async function loadStocks() {
-    const tbody = document.getElementById('stocksTableBody');
-    if (!tbody) return;
+    showTableLoading('stocksTableBody', Config.TABLE.STOCKS_COLUMNS);
 
     try {
         const stocks = await API.getStocks();
         AppState.data.stocks = stocks;
         renderStocksTable(stocks);
     } catch (error) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6">
-                    <div class="terminal-empty">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <div class="terminal-empty-text">加载失败</div>
-                    </div>
-                </td>
-            </tr>
-        `;
+        showTableError('stocksTableBody', '加载失败', Config.TABLE.STOCKS_COLUMNS);
     }
 }
 
 function renderStocksTable(stocks) {
-    const tbody = document.getElementById('stocksTableBody');
-    if (!tbody) return;
-
-    if (!stocks || stocks.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6">
-                    <div class="terminal-empty">
-                        <i class="bi bi-inbox"></i>
-                        <div class="terminal-empty-text">暂无自选股</div>
-                    </div>
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    tbody.innerHTML = stocks.map(stock => {
-        const priceClass = stock.change_pct > 0 ? 'up' : stock.change_pct < 0 ? 'down' : '';
-        const percentClass = stock.change_pct > 0 ? 'up' : stock.change_pct < 0 ? 'down' : '';
-        const percentSign = stock.change_pct > 0 ? '+' : '';
-        const statusBadge = stock.is_limit_up
-            ? '<span class="terminal-badge limitup">涨停</span>'
-            : '<span class="terminal-badge normal">正常</span>';
-
-        return `
-            <tr>
-                <td><span class="terminal-table-code">${stock.code}</span></td>
-                <td><span class="terminal-table-name">${stock.name}</span></td>
-                <td><span class="terminal-table-price ${priceClass}">${stock.price ? stock.price.toFixed(2) : '-'}</span></td>
-                <td><span class="terminal-table-percent ${percentClass}">${stock.change_pct !== undefined ? percentSign + stock.change_pct.toFixed(2) + '%' : '-'}</span></td>
-                <td>${statusBadge}</td>
-                <td>
-                    <button class="terminal-action-btn" onclick="showRelatedETFs('${stock.code}', '${stock.name}')">
-                        <i class="bi bi-list-ul"></i> ETF
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join('');
+    renderTableBody('stocksTableBody', stocks, createStockTableRow, Config.TABLE.STOCKS_COLUMNS);
 
     // Update refresh time
     const refreshTimeEl = document.getElementById('stocksRefreshTime');
@@ -174,19 +125,7 @@ function closeEtfModal() {
 // ============================================================================
 
 async function loadLimitUpStocks() {
-    const tbody = document.getElementById('limitupTableBody');
-    if (!tbody) return;
-
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="7">
-                <div class="terminal-loading">
-                    <div class="terminal-loading-spinner"></div>
-                    <div class="terminal-loading-text">加载中...</div>
-                </div>
-            </td>
-        </tr>
-    `;
+    showTableLoading('limitupTableBody', Config.TABLE.LIMITUP_COLUMNS);
 
     try {
         const stocks = await API.getLimitUpStocks();
@@ -197,61 +136,12 @@ async function loadLimitUpStocks() {
         updateBadge('limitupBadge', stocks.length, stocks.length > 0);
         updateMetric('limitupCount', stocks.length);
     } catch (error) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="7">
-                    <div class="terminal-empty">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <div class="terminal-empty-text">加载失败</div>
-                    </div>
-                </td>
-            </tr>
-        `;
+        showTableError('limitupTableBody', '加载失败', Config.TABLE.LIMITUP_COLUMNS);
     }
 }
 
 function renderLimitupTable(stocks) {
-    const tbody = document.getElementById('limitupTableBody');
-    if (!tbody) return;
-
-    if (!stocks || stocks.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="7">
-                    <div class="terminal-empty">
-                        <i class="bi bi-fire"></i>
-                        <div class="terminal-empty-text">今日暂无涨停股</div>
-                    </div>
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    tbody.innerHTML = stocks.map(stock => {
-        const amountStr = stock.amount
-            ? (stock.amount >= 100000000
-                ? (stock.amount / 100000000).toFixed(2) + '亿'
-                : (stock.amount / 10000).toFixed(2) + '万')
-            : '-';
-        const turnoverStr = stock.turnover !== undefined ? stock.turnover.toFixed(2) + '%' : '-';
-
-        return `
-            <tr>
-                <td><span class="terminal-table-code">${stock.code}</span></td>
-                <td><span class="terminal-table-name">${stock.name}</span></td>
-                <td><span class="terminal-table-price up">${stock.price ? stock.price.toFixed(2) : '-'}</span></td>
-                <td><span class="terminal-table-percent up">+${stock.change_pct ? stock.change_pct.toFixed(2) : '-'}%</span></td>
-                <td>${amountStr}</td>
-                <td>${turnoverStr}</td>
-                <td>
-                    <button class="terminal-action-btn" onclick="showRelatedETFs('${stock.code}', '${stock.name}')">
-                        <i class="bi bi-list-ul"></i> ETF
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join('');
+    renderTableBody('limitupTableBody', stocks, (stock) => createStockTableRow(stock, true), Config.TABLE.LIMITUP_COLUMNS);
 
     // Initialize sorting
     initTableSorting('limitupTableBody', 'limitup');
