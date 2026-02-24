@@ -12,7 +12,7 @@ from backend.arbitrage.cn.arbitrage_engine import ArbitrageEngineCN
 from backend.arbitrage.cn.factory import ArbitrageEngineFactory
 from backend.arbitrage.config import ArbitrageEngineConfig
 from backend.arbitrage.models import TradingSignal
-from backend.signal.repository import InMemorySignalRepository
+from backend.signal.memory_repository import InMemorySignalRepository
 from backend.utils.clock import FrozenClock, set_clock, reset_clock, CHINA_TZ
 from backend.market import LimitUpEvent, CandidateETF, ETFCategory
 

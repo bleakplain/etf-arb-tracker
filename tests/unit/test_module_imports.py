@@ -199,11 +199,11 @@ class TestDependencyValidation:
             InMemoryMappingRepository,
             IMappingRepository
         )
-        from backend.signal.repository import (
-            FileSignalRepository,
-            InMemorySignalRepository as SignalInMemoryRepository,
+        from backend.signal.memory_repository import (
+            InMemorySignalRepository,
             ISignalRepository
         )
+        from backend.signal.db_repository import DBSignalRepository
         from backend.data.backtest_repository import BacktestRepository
 
         # 验证可以被实例化

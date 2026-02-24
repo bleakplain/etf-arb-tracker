@@ -13,7 +13,7 @@ from backend.arbitrage.interfaces import InMemoryMappingRepository
 from backend.arbitrage.strategy_registry import StrategyManager, create_test_strategy_manager
 from backend.market.interfaces import IQuoteFetcher, IETFHoldingProvider
 from backend.signal.interfaces import ISignalEvaluator
-from backend.signal.repository import InMemorySignalRepository
+from backend.signal.memory_repository import InMemorySignalRepository
 from config import Config
 
 
