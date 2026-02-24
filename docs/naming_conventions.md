@@ -51,7 +51,7 @@ def get_selection_reason(self, fund: CandidateETF) -> str:
 
 ### 仓储类
 - 接口以 `I` 开头：`IStockETFMappingRepository`, `ISignalRepository`
-- 实现类添加存储类型：`FileSignalRepository`, `InMemorySignalRepository`
+- 实现类添加存储类型：`DBSignalRepository`, `InMemorySignalRepository`
 
 ## 方法命名
 

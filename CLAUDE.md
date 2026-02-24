@@ -77,7 +77,7 @@ backend/
    - `LimitChecker` checks if stock is limit-up
    - `ETFSelector` finds ETFs with stock weight >= 5%
    - `SignalGenerator` creates trading signals
-   - `FileSignalRepository` persists signals to `data/signals.json`
+   - `DBSignalRepository` persists signals to `data/app.db` (SQLite)
 
 3. **Data Sources** (`backend/data/sources/`):
    - `tencent_source.py` - Primary: Tencent Finance API (free, high-frequency)
@@ -93,7 +93,7 @@ backend/
 | `backend/api/app.py:1-622` | FastAPI application and all endpoints |
 | `config/settings.yaml` | System configuration (strategy params, trading hours) |
 | `config/stocks.yaml` | User watchlist configuration |
-| `data/stock_etf_mapping.json` | Stock-to-ETF mapping cache (built via `init`) |
+| `data/app.db` | 信号和自选股数据库 (SQLite) |
 
 ## Configuration
 
@@ -141,7 +141,6 @@ Key sections:
 3. **Trading hours**: 09:30-11:30, 13:00-15:00 China time
 4. **Weight threshold**: Default 5% (`strategy.min_weight`) - hardcoded policy
 5. **Rate limiting**: `strategy.scan_interval` (default 120s) prevents API bans
-6. **Cache files**: `data/stock_etf_mapping.json` must exist (run `init` if missing)
 
 ## Extension Points
 
@@ -154,7 +153,7 @@ Key sections:
 
 - **Strategy Pattern**: `signal_evaluators.py` - Different evaluation strategies
 - **Factory Pattern**: `SignalEvaluatorFactory`, data source factories
-- **Repository Pattern**: `FileSignalRepository` - Signal persistence
+- **Repository Pattern**: `DBSignalRepository` - Signal persistence (SQLite)
 - **Dependency Injection**: All monitor dependencies injected via constructor
 - **Adapter Pattern**: Multiple data sources with unified interface
 - **Singleton**: `get_api_state_manager()` for state management

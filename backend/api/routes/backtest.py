@@ -20,7 +20,7 @@ from backend.api.dependencies import (
 )
 from backend.api.models import BacktestRequest, BacktestResponse
 from backend.data.backtest_repository import get_backtest_repository
-from backend.backtest import CNBacktestEngine as BacktestEngine, BacktestConfig
+from backend.backtest import CNBacktestEngine, BacktestConfig
 
 
 class TimeGranularity(Enum):
@@ -100,7 +100,7 @@ async def start_backtest(request: BacktestRequest, background_tasks: BackgroundT
             progress_callback = create_progress_callback(job_id)
 
             # 创建回测引擎
-            engine = BacktestEngine(
+            engine = CNBacktestEngine(
                 config=config,
                 stocks=stocks,
                 etf_codes=etf_codes,
