@@ -324,10 +324,7 @@ async function manualScan() {
     const btn = document.getElementById('btnScan');
 
     try {
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<div class="terminal-loading-spinner" style="width: 16px; height: 16px;"></div> 扫描中...';
-        }
+        DOMUtils.setButtonLoading('btnScan', true, '扫描中...');
 
         await API.manualScan();
 
@@ -344,10 +341,7 @@ async function manualScan() {
         console.error('Manual scan failed:', error);
         showToast('扫描失败', 'error');
     } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-search"></i> 立即扫描';
-        }
+        DOMUtils.setButtonLoading('btnScan', false);
     }
 }
 
@@ -396,17 +390,14 @@ function stopStatusPolling() {
 // STOCK SEARCH
 // ============================================================================
 
-let searchDebounceTimer = null;
+const debouncedSearch = DOMUtils.debounce(async (query, resultsContainer) => {
+    performStockSearch(query, resultsContainer);
+}, Config.POLLING.SEARCH_DEBOUNCE);
 
 function searchStock(event) {
     const input = event.target;
     const query = input.value.trim();
     const resultsContainer = document.getElementById('searchResults');
-
-    // Clear previous timer
-    if (searchDebounceTimer) {
-        clearTimeout(searchDebounceTimer);
-    }
 
     // Clear results if empty
     if (query.length === 0) {
@@ -415,19 +406,26 @@ function searchStock(event) {
     }
 
     // Debounce search
-    searchDebounceTimer = setTimeout(() => {
-        performStockSearch(query, resultsContainer);
-    }, Config.POLLING.SEARCH_DEBOUNCE);
+    debouncedSearch(query, resultsContainer);
 }
 
 async function performStockSearch(query, resultsContainer) {
-    // This is a simplified search - in production, you'd call a search API
-    // For now, just show a message
+    // Check if query is valid stock code
+    if (!Config.VALIDATION.STOCK_CODE_PATTERN.test(query)) {
+        resultsContainer.innerHTML = `
+            <div style="padding: var(--space-md); background: var(--terminal-panel-light); border: 1px solid var(--terminal-border); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 12px; color: var(--status-inactive);">
+                请输入完整6位股票代码添加到自选股<br>
+                <span style="color: var(--electric-blue);">示例: 600519</span>
+            </div>
+        `;
+        return;
+    }
+
+    // Show add button for valid stock code
     resultsContainer.innerHTML = `
-        <div style="padding: var(--space-md); background: var(--terminal-panel-light); border: 1px solid var(--terminal-border); border-radius: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--status-inactive);">
-            请输入完整6位股票代码添加到自选股<br>
-            <span style="color: var(--electric-blue);">示例: 600519</span>
-        </div>
+        <button class="terminal-btn terminal-btn-primary" style="margin-top: var(--space-sm);" onclick="addStockToWatchlist('${query}')">
+            <i class="bi bi-plus"></i> 添加 ${query} 到自选股
+        </button>
     `;
 
     // If query is 6 digits, show add button
@@ -587,7 +585,6 @@ async function startBacktest() {
 }
 
 function startBacktestStatusCheck() {
-function startBacktestStatusCheck() {
     if (AppState.backtest.statusPolling) {
         AppState.backtest.statusPolling.stop();
     }
@@ -726,18 +723,8 @@ async function viewBacktestResult(jobId) {
 
 async function exportBacktestSignals(jobId) {
     try {
-        const response = await fetch(`/api/backtest/${jobId}/signals`);
-        if (!response.ok) throw new Error('Export failed');
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `backtest_signals_${jobId}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-
-        showToast('导出成功', 'success');
+        const response = await API.getBacktestSignals(jobId);
+        ExportUtils.exportSignalsToCSV(response, `backtest_signals_${jobId}.csv`);
     } catch (error) {
         console.error('Export failed:', error);
         showToast('导出失败', 'error');
