@@ -5,8 +5,10 @@
 import json
 import os
 import threading
+import tempfile
 from typing import List, Optional
 from abc import ABC, abstractmethod
+from pathlib import Path
 from loguru import logger
 
 from backend.signal.interfaces import ISignalRepository
@@ -159,13 +161,35 @@ class FileSignalRepository(BaseSignalRepository):
         self._save_to_file()
 
     def _save_to_file(self) -> None:
-        """保存信号到文件"""
+        """保存信号到文件（原子操作）"""
         os.makedirs(os.path.dirname(self._filepath) or '.', exist_ok=True)
 
         data = [s.to_dict() for s in self._signals]
 
-        with open(self._filepath, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        # 使用临时文件实现原子写入
+        try:
+            # 先写入临时文件
+            temp_path = f"{self._filepath}.tmp"
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                f.flush()
+                os.fsync(f.fileno())  # 确保数据写入磁盘
+
+            # 原子性替换原文件
+            if os.path.exists(self._filepath):
+                os.replace(temp_path, self._filepath)
+            else:
+                os.rename(temp_path, self._filepath)
+
+        except Exception as e:
+            logger.error(f"保存信号文件失败: {e}")
+            # 清理临时文件
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+            raise
 
 
 class InMemorySignalRepository(BaseSignalRepository):

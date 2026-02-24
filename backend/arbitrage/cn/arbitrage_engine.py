@@ -7,6 +7,7 @@ A股套利引擎
 from typing import List, Optional, Dict, Any, Tuple, TYPE_CHECKING
 from loguru import logger
 from dataclasses import dataclass
+import threading
 
 from backend.arbitrage.config import ArbitrageEngineConfig
 from backend.arbitrage.models import TradingSignal
@@ -123,9 +124,13 @@ class ArbitrageEngineCN:
         self._signal_filters: List[ISignalFilter] = []
         self._strategy_executor: Optional[StrategyExecutor] = None
 
-        # ETF持仓缓存（减少重复查询）
+        # ETF持仓缓存（减少重复查询，带大小限制防止内存泄漏）
         self._etf_holdings_cache: Dict[str, Dict] = {}
         self._holdings_cache_ttl: int = 3600  # 1小时缓存
+        self._holdings_cache_max_size: int = 1000  # 最大缓存条目数
+
+        # 信号历史锁
+        self._signal_history_lock = threading.Lock()
 
         # 构建证券-基金映射
         self._security_fund_mapping: Dict[str, List[Dict]] = {}
@@ -141,7 +146,8 @@ class ArbitrageEngineCN:
         logger.info(f"覆盖基金数量: {len(self.get_all_fund_codes())}")
 
         # 从仓储加载信号历史
-        self._signal_history = self._signal_repository.get_all_signals()
+        with self._signal_history_lock:
+            self._signal_history = self._signal_repository.get_all_signals()
         if self._signal_history:
             logger.info(f"从仓储加载信号历史，共 {len(self._signal_history)} 条")
 
@@ -302,7 +308,11 @@ class ArbitrageEngineCN:
                 holdings_data = cached['data']
             else:
                 holdings_data = self._etf_holdings_provider.get_etf_top_holdings(fund_code)
-                # 更新缓存
+                # 更新缓存，带大小限制防止内存泄漏
+                if len(self._etf_holdings_cache) >= self._holdings_cache_max_size:
+                    # 删除最老的缓存条目
+                    oldest_key = min(self._etf_holdings_cache.items(), key=lambda x: x[1]['timestamp'])[0]
+                    del self._etf_holdings_cache[oldest_key]
                 self._etf_holdings_cache[fund_code] = {
                     'timestamp': current_time,
                     'data': holdings_data
@@ -409,7 +419,8 @@ class ArbitrageEngineCN:
                 signal = self.analyze_security(security_code)
                 if signal:
                     signals.append(signal)
-                    self._signal_history.append(signal)
+                    with self._signal_history_lock:
+                        self._signal_history.append(signal)
                     # 持久化信号到仓储
                     self._signal_repository.save(signal)
                     total_events += 1
@@ -456,7 +467,7 @@ class ArbitrageEngineCN:
 
     def get_signal_history(self, limit: int = None) -> List[TradingSignal]:
         """
-        获取信号历史
+        获取信号历史（线程安全）
 
         Args:
             limit: 限制返回数量，None表示返回全部
@@ -464,10 +475,11 @@ class ArbitrageEngineCN:
         Returns:
             信号列表
         """
-        if limit is None:
-            return self._signal_history.copy()
-        # 返回最近N条信号
-        return self._signal_history[-limit:] if len(self._signal_history) > limit else self._signal_history.copy()
+        with self._signal_history_lock:
+            if limit is None:
+                return self._signal_history.copy()
+            # 返回最近N条信号
+            return self._signal_history[-limit:] if len(self._signal_history) > limit else self._signal_history.copy()
 
     def clear_etf_holdings_cache(self) -> None:
         """清空ETF持仓缓存"""

@@ -12,6 +12,7 @@ from loguru import logger
 from datetime import datetime
 from dataclasses import replace
 import threading
+from itertools import count
 
 from backend.arbitrage.models import TradingSignal
 from backend.market import CandidateETF
@@ -27,17 +28,13 @@ from backend.market.events import MarketEvent
 if TYPE_CHECKING:
     from backend.signal.interfaces import ISignalEvaluator
 
-# 全局信号计数器（线程安全）
-_signal_counter = 0
-_signal_counter_lock = threading.Lock()
+# 全局信号计数器（线程安全 - itertools.count 原子操作）
+_signal_counter = count()
 
 
 def _generate_signal_id(stock_code: str) -> str:
     """生成唯一信号ID"""
-    global _signal_counter
-    with _signal_counter_lock:
-        _signal_counter += 1
-        counter = _signal_counter
+    counter = next(_signal_counter)
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
     return f"SIG_{timestamp}_{counter:04d}_{stock_code}"
 
