@@ -6,7 +6,7 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple, Type, Optional
+from typing import Type
 from datetime import datetime
 
 from config.strategy import (
@@ -32,16 +32,16 @@ class SignalEvaluator(ISignalEvaluator, ABC):
             def __init__(self, config: SignalEvaluationConfig):
                 self.config = config
 
-            def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
+            def evaluate(self, market_event, etf_holding) -> tuple[str, str]:
                 return "高", "低"
     """
 
-    def __init__(self, config: SignalEvaluationConfig, clock: Optional[Clock] = None):
+    def __init__(self, config: SignalEvaluationConfig, clock: Clock | None = None):
         self.config = config
         self._clock = clock or SystemClock()
 
     @abstractmethod
-    def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
+    def evaluate(self, market_event, etf_holding) -> tuple[str, str]:
         """
         评估信号质量
 
@@ -79,7 +79,7 @@ class SignalEvaluator(ISignalEvaluator, ABC):
 class DefaultSignalEvaluator(SignalEvaluator):
     """默认信号评估器"""
 
-    def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
+    def evaluate(self, market_event, etf_holding) -> tuple[str, str]:
         """
         评估信号质量
 
@@ -139,13 +139,13 @@ class DefaultSignalEvaluator(SignalEvaluator):
 class ConservativeEvaluator(SignalEvaluator):
     """保守型评估器 - 使用 ConservativeEvaluationConfig 配置"""
 
-    def __init__(self, config: SignalEvaluationConfig = None, clock: Optional[Clock] = None):
+    def __init__(self, config: SignalEvaluationConfig | None = None, clock: Clock | None = None):
         # 确保使用 ConservativeEvaluationConfig
         if config is None or isinstance(config, SignalEvaluationConfig):
             config = ConservativeEvaluationConfig()
         super().__init__(config, clock)
 
-    def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
+    def evaluate(self, market_event, etf_holding) -> tuple[str, str]:
         """保守型评估 - 使用配置中的严格阈值"""
         weight = etf_holding.weight
         rank = etf_holding.rank
@@ -188,13 +188,13 @@ class ConservativeEvaluator(SignalEvaluator):
 class AggressiveEvaluator(SignalEvaluator):
     """激进型评估器 - 使用 AggressiveEvaluationConfig 配置"""
 
-    def __init__(self, config: SignalEvaluationConfig = None, clock: Optional[Clock] = None):
+    def __init__(self, config: SignalEvaluationConfig | None = None, clock: Clock | None = None):
         # 确保使用 AggressiveEvaluationConfig
         if config is None or isinstance(config, SignalEvaluationConfig):
             config = AggressiveEvaluationConfig()
         super().__init__(config, clock)
 
-    def evaluate(self, market_event, etf_holding) -> Tuple[str, str]:
+    def evaluate(self, market_event, etf_holding) -> tuple[str, str]:
         """激进型评估 - 使用配置中的宽松阈值"""
         weight = etf_holding.weight
         rank = etf_holding.rank

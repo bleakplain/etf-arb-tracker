@@ -3,7 +3,6 @@
 """
 
 from dataclasses import dataclass
-from typing import List, Dict, Optional
 from datetime import datetime
 
 from backend.market import CandidateETF
@@ -18,11 +17,11 @@ class BacktestConfig:
     """
     start_date: str
     end_date: str
-    stock_codes: List[str]
-    etf_codes: List[str]
+    stock_codes: list[str]
+    etf_codes: list[str]
 
     # 持仓数据（可选）
-    stock_etf_mapping: Optional[Dict[str, List[CandidateETF]]] = None
+    stock_etf_mapping: dict[str, list[CandidateETF]] | None = None
 
     # 策略参数
     min_weight: float = 0.05
@@ -51,7 +50,7 @@ class BacktestConfig:
             raise
 
     @property
-    def trading_days(self) -> List[str]:
+    def trading_days(self) -> list[str]:
         """
         获取交易日列表（排除周末）
 

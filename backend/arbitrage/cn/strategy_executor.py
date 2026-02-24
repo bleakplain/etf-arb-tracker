@@ -7,7 +7,7 @@
 3. 评估信号质量
 """
 
-from typing import List, Dict, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Tuple, Optional
 from loguru import logger
 from datetime import datetime
 from dataclasses import replace
@@ -21,7 +21,6 @@ from backend.arbitrage.cn.strategies.interfaces import (
     IFundSelector,
     ISignalFilter,
 )
-from backend.market.cn.events import LimitUpEvent
 from backend.market.events import MarketEvent
 
 # 延迟导入以避免循环依赖
@@ -54,7 +53,7 @@ class StrategyExecutor:
         self,
         event_detector: IEventDetector,
         fund_selector: IFundSelector,
-        signal_filters: List[ISignalFilter],
+        signal_filters: list[ISignalFilter],
         etf_quote_provider: IQuoteFetcher,
         signal_evaluator: 'ISignalEvaluator' = None
     ):
@@ -76,9 +75,9 @@ class StrategyExecutor:
 
     def execute(
         self,
-        quote: Dict,
-        eligible_funds: List[CandidateETF]
-    ) -> Tuple[Optional[TradingSignal], List[str]]:
+        quote: dict,
+        eligible_funds: list[CandidateETF]
+    ) -> tuple[TradingSignal | None, list[str]]:
         """
         执行完整策略流程
 
@@ -120,7 +119,7 @@ class StrategyExecutor:
 
         return signal, logs
 
-    def _detect_event(self, quote: Dict, logs: List[str]) -> Optional[MarketEvent]:
+    def _detect_event(self, quote: dict, logs: list[str]) -> MarketEvent | None:
         """检测市场事件"""
         event = self._event_detector.detect(quote)
         if not event:
@@ -138,10 +137,10 @@ class StrategyExecutor:
 
     def _select_fund(
         self,
-        eligible_funds: List[CandidateETF],
+        eligible_funds: list[CandidateETF],
         event: MarketEvent,
-        logs: List[str]
-    ) -> Optional[CandidateETF]:
+        logs: list[str]
+    ) -> CandidateETF | None:
         """选择最优基金"""
         if not eligible_funds:
             logs.append("无符合条件的候选基金")
@@ -161,8 +160,8 @@ class StrategyExecutor:
     def _get_etf_quote(
         self,
         selected_fund: CandidateETF,
-        logs: List[str]
-    ) -> Optional[Dict]:
+        logs: list[str]
+    ) -> dict | None:
         """获取ETF行情"""
         etf_quote = self._etf_quote_provider.get_etf_quote(selected_fund.etf_code)
         if not etf_quote:
@@ -175,19 +174,14 @@ class StrategyExecutor:
         self,
         event: MarketEvent,
         selected_fund: CandidateETF,
-        etf_quote: Dict,
-        logs: List[str]
-    ) -> Optional[TradingSignal]:
+        etf_quote: dict,
+        logs: list[str]
+    ) -> TradingSignal | None:
         """生成交易信号"""
-        # 获取事件特有的属性（A股特有）
-        limit_time = ""
-        locked_amount = 0
-        if isinstance(event, LimitUpEvent):
-            limit_time = event.limit_time
-            locked_amount = event.locked_amount
-            event_desc = f"涨停 ({event.change_pct*100:.2f}%)"
-        else:
-            event_desc = f"{event.event_type} ({event.change_pct*100:.2f}%)"
+        # 使用 getattr 获取可选属性，避免 isinstance 检查
+        limit_time = getattr(event, 'limit_time', '')
+        locked_amount = getattr(event, 'locked_amount', 0)
+        change_pct_str = f"涨停 ({event.change_pct*100:.2f}%)" if limit_time else f"{event.event_type} ({event.change_pct*100:.2f}%)"
 
         signal = TradingSignal(
             signal_id=_generate_signal_id(event.stock_code),
@@ -204,7 +198,7 @@ class StrategyExecutor:
             etf_price=etf_quote.get('price', 0.0),
             etf_premium=etf_quote.get('premium', 0.0),
             etf_amount=etf_quote.get('amount', 0.0),
-            reason=f"{event.stock_name} {event_desc}，"
+            reason=f"{event.stock_name} {change_pct_str}，"
                    f"在 {selected_fund.etf_name} 中持仓占比 {selected_fund.weight_pct:.2f}% "
                    f"(排名第{selected_fund.rank})",
             confidence="",

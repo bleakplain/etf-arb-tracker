@@ -13,6 +13,7 @@ from backend.data.limit_up_stocks import LimitUpStocksFetcher
 from backend.data.kline import KlineDataFetcher
 from backend.data.etf_holdings import ETFHoldingsFetcher
 from backend.market import CandidateETF
+from backend.api.routes.error_handlers import handle_api_errors
 
 router = APIRouter()
 
@@ -164,6 +165,7 @@ async def get_limit_up_stocks():
 
 
 @router.get("/api/stocks/{code}/kline")
+@handle_api_errors("获取K线数据")
 async def get_stock_kline(code: str, days: int = 60):
     """
     获取股票K线数据
@@ -185,6 +187,7 @@ async def get_stock_kline(code: str, days: int = 60):
 
 
 @router.get("/api/etfs/{code}/kline")
+@handle_api_errors("获取ETF K线数据")
 async def get_etf_kline(code: str, days: int = 60):
     """
     获取ETF K线数据
@@ -206,6 +209,7 @@ async def get_etf_kline(code: str, days: int = 60):
 
 
 @router.get("/api/etfs/{code}/holdings")
+@handle_api_errors("获取ETF持仓")
 async def get_etf_holdings(code: str):
     """
     获取ETF的前十大持仓

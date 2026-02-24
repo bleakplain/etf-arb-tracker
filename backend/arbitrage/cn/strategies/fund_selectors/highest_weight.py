@@ -10,7 +10,6 @@ from backend.market.events import MarketEvent
 from backend.arbitrage.strategy_registry import fund_selector_registry
 from backend.market import CandidateETF
 from backend.utils.constants import CNMarketConstants
-from typing import List, Optional
 
 
 @fund_selector_registry.register(
@@ -42,9 +41,9 @@ class HighestWeightSelector(IFundSelector):
 
     def select(
         self,
-        eligible_funds: List[CandidateETF],
+        eligible_funds: list[CandidateETF],
         event: MarketEvent
-    ) -> Optional[CandidateETF]:
+    ) -> CandidateETF | None:
         """
         选择权重最高的ETF
 

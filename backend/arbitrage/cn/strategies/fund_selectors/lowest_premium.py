@@ -9,7 +9,6 @@ from backend.arbitrage.cn.strategies.interfaces import IFundSelector
 from backend.market.events import MarketEvent
 from backend.arbitrage.strategy_registry import fund_selector_registry
 from backend.market import CandidateETF
-from typing import List, Optional
 
 
 @fund_selector_registry.register(
@@ -36,9 +35,9 @@ class LowestPremiumSelector(IFundSelector):
 
     def select(
         self,
-        eligible_funds: List[CandidateETF],
+        eligible_funds: list[CandidateETF],
         event: MarketEvent
-    ) -> Optional[CandidateETF]:
+    ) -> CandidateETF | None:
         """
         选择溢价最低的ETF
 
