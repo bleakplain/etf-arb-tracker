@@ -1,7 +1,7 @@
 """信号模块 - 信号管理、通知"""
 
 from backend.signal.interfaces import ISignalRepository, ISignalSender, ISignalEvaluator
-from backend.signal.repository import InMemorySignalRepository
+from backend.signal.memory_repository import InMemorySignalRepository
 from backend.signal.db_repository import DBSignalRepository
 from backend.signal.manager import SignalManager
 from backend.signal.evaluator import SignalEvaluator, SignalEvaluatorFactory

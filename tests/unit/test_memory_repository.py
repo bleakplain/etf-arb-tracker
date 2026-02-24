@@ -1,7 +1,7 @@
 """
 Unit tests for Signal Repository
 
-Tests the InMemorySignalRepository and DBSignalRepository implementations.
+Tests the InMemorySignalRepository implementation.
 """
 
 import pytest
@@ -10,7 +10,7 @@ import tempfile
 import json
 from pathlib import Path
 
-from backend.signal.repository import InMemorySignalRepository
+from backend.signal.memory_repository import InMemorySignalRepository
 from backend.signal.db_repository import DBSignalRepository
 from backend.arbitrage.models import TradingSignal
 from backend.utils.clock import FrozenClock, reset_clock, set_clock, CHINA_TZ
