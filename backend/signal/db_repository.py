@@ -238,37 +238,28 @@ class DBSignalRepository(BaseDBRepository):
         row = cursor.fetchone()
         return self._row_to_signal(row) if row else None
 
-    def get_signals_by_stock(self, stock_code: str, limit: int = None) -> List:
+    def _get_signals_by_field(self, field_name: str, value: str, limit: int = None) -> List:
+        """按字段查询信号的通用方法"""
         conn = self._get_connection()
         cursor = conn.cursor()
+
         if limit:
             cursor.execute(
-                "SELECT * FROM signals WHERE stock_code = ? ORDER BY timestamp DESC LIMIT ?;",
-                (stock_code, limit)
+                f"SELECT * FROM signals WHERE {field_name} = ? ORDER BY timestamp DESC LIMIT ?;",
+                (value, limit)
             )
         else:
             cursor.execute(
-                "SELECT * FROM signals WHERE stock_code = ? ORDER BY timestamp DESC;",
-                (stock_code,)
+                f"SELECT * FROM signals WHERE {field_name} = ? ORDER BY timestamp DESC;",
+                (value,)
             )
-        rows = cursor.fetchall()
-        return [self._row_to_signal(row) for row in rows]
+        return [self._row_to_signal(row) for row in cursor.fetchall()]
+
+    def get_signals_by_stock(self, stock_code: str, limit: int = None) -> List:
+        return self._get_signals_by_field('stock_code', stock_code, limit)
 
     def get_signals_by_etf(self, etf_code: str, limit: int = None) -> List:
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        if limit:
-            cursor.execute(
-                "SELECT * FROM signals WHERE etf_code = ? ORDER BY timestamp DESC LIMIT ?;",
-                (etf_code, limit)
-            )
-        else:
-            cursor.execute(
-                "SELECT * FROM signals WHERE etf_code = ? ORDER BY timestamp DESC;",
-                (etf_code,)
-            )
-        rows = cursor.fetchall()
-        return [self._row_to_signal(row) for row in rows]
+        return self._get_signals_by_field('etf_code', etf_code, limit)
 
     def get_signals_by_date_range(self, start_date: str, end_date: str) -> List:
         conn = self._get_connection()

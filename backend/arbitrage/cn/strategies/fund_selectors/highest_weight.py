@@ -54,11 +54,7 @@ class HighestWeightSelector(IFundSelector):
         Returns:
             选中的ETF，无符合条件的返回None
         """
-        if not eligible_funds:
-            return None
-
-        # 按权重降序排序，选择第一个
-        return sorted(eligible_funds, key=lambda x: x.weight, reverse=True)[0]
+        return self.select_by_weight(eligible_funds)
 
     def get_selection_reason(self, fund: CandidateETF) -> str:
         """获取选择原因"""

@@ -175,19 +175,14 @@ class StrategyExecutor:
         logs: list[str]
     ) -> TradingSignal | None:
         """生成交易信号"""
-        # 使用 getattr 获取可选属性，避免 isinstance 检查
-        limit_time = getattr(event, 'limit_time', '')
-        locked_amount = getattr(event, 'locked_amount', 0)
-        change_pct_str = f"涨停 ({event.change_pct*100:.2f}%)" if limit_time else f"{event.event_type} ({event.change_pct*100:.2f}%)"
-
-        signal = TradingSignal(
+        return TradingSignal(
             signal_id=_generate_signal_id(event.stock_code),
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             stock_code=event.stock_code,
             stock_name=event.stock_name,
             stock_price=event.price,
-            limit_time=limit_time,
-            locked_amount=locked_amount,
+            limit_time=getattr(event, 'limit_time', ''),
+            locked_amount=getattr(event, 'locked_amount', 0),
             change_pct=event.change_pct,
             etf_code=selected_fund.etf_code,
             etf_name=selected_fund.etf_name,
@@ -195,9 +190,7 @@ class StrategyExecutor:
             etf_price=etf_quote.get('price', 0.0),
             etf_premium=etf_quote.get('premium', 0.0),
             etf_amount=etf_quote.get('amount', 0.0),
-            reason=f"{event.stock_name} {change_pct_str}，"
-                   f"在 {selected_fund.etf_name} 中持仓占比 {selected_fund.weight_pct:.2f}% "
-                   f"(排名第{selected_fund.rank})",
+            reason=self._build_reason(event, selected_fund),
             confidence="",
             risk_level="",
             actual_weight=selected_fund.weight,
@@ -205,7 +198,12 @@ class StrategyExecutor:
             top10_ratio=selected_fund.top10_ratio
         )
 
-        return signal
+    @staticmethod
+    def _build_reason(event: MarketEvent, fund: CandidateETF) -> str:
+        """构建信号原因"""
+        limit_time = getattr(event, 'limit_time', '')
+        change_pct_str = f"涨停 ({event.change_pct*100:.2f}%)" if limit_time else f"{event.event_type} ({event.change_pct*100:.2f}%)"
+        return f"{event.stock_name} {change_pct_str}，在 {fund.etf_name} 中持仓占比 {fund.weight_pct:.2f}% (排名第{fund.rank})"
 
     def _apply_signal_filters(
         self,

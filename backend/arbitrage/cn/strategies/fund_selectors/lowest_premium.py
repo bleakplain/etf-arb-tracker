@@ -51,12 +51,9 @@ class LowestPremiumSelector(IFundSelector):
         Returns:
             选中的ETF
         """
-        if not eligible_funds:
-            return None
-
         # 简化实现：选择权重最高的
         # 实际应该查询ETF的溢价率
-        return sorted(eligible_funds, key=lambda x: x.weight, reverse=True)[0]
+        return self.select_by_weight(eligible_funds)
 
     def get_selection_reason(self, fund: CandidateETF) -> str:
         """获取选择原因"""

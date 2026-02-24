@@ -10,6 +10,9 @@ from backend.arbitrage.strategy_registry import signal_filter_registry
 from backend.arbitrage.models import TradingSignal
 from backend.market import CandidateETF
 
+# 置信度等级映射
+CONFIDENCE_LEVELS = {"低": 1, "中": 2, "高": 3}
+
 
 @signal_filter_registry.register(
     "confidence_filter",
@@ -31,8 +34,7 @@ class ConfidenceFilter(ISignalFilter):
         Args:
             min_confidence: 最低置信度要求（"低"/"中"/"高"）
         """
-        confidence_order = {"低": 1, "中": 2, "高": 3}
-        self.min_confidence_level = confidence_order.get(min_confidence, 2)
+        self.min_confidence_level = CONFIDENCE_LEVELS.get(min_confidence, 2)
 
     @property
     def strategy_name(self) -> str:
@@ -45,8 +47,7 @@ class ConfidenceFilter(ISignalFilter):
         signal: TradingSignal
     ) -> tuple[bool, str]:
         """判断是否过滤该信号"""
-        confidence_order = {"低": 1, "中": 2, "高": 3}
-        signal_level = confidence_order.get(signal.confidence, 2)
+        signal_level = CONFIDENCE_LEVELS.get(signal.confidence, 2)
 
         if signal_level < self.min_confidence_level:
             return True, f"置信度过低（{signal.confidence}）"

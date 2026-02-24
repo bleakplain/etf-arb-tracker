@@ -19,6 +19,13 @@ from backend.utils.plugin_registry import evaluator_registry
 from backend.utils.clock import Clock, SystemClock, CHINA_TZ
 from backend.utils.constants import HIGH_RISK_TIME_THRESHOLD
 
+# 风险等级转换映射
+RISK_LEVEL_TRANSITION = {
+    "低": "中",
+    "中": "高",
+    "高": "高"  # 已经是最高风险
+}
+
 
 class SignalEvaluator(ISignalEvaluator, ABC):
     """
@@ -116,10 +123,7 @@ class DefaultSignalEvaluator(SignalEvaluator):
         # 4. 风险等级 - 持仓集中度
         top10_ratio = etf_holding.top10_ratio
         if top10_ratio > self.config.risk_top10_ratio_high:
-            if risk_level == "低":
-                risk_level = "中"
-            elif risk_level == "中":
-                risk_level = "高"
+            risk_level = RISK_LEVEL_TRANSITION.get(risk_level, risk_level)
 
         # 5. 涨停时间因素
         current_hour = self._clock.now(CHINA_TZ).hour

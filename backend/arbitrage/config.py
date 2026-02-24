@@ -6,7 +6,7 @@
 """
 
 from typing import Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from loguru import logger
 
 
@@ -24,22 +24,12 @@ class ArbitrageEngineConfig:
     # 策略选择
     event_detector: str = ""                      # 事件检测策略名称
     fund_selector: str = ""                       # 基金选择策略名称
-    signal_filters: list[str] | None = None       # 信号过滤策略名称列表
+    signal_filters: list[str] = field(default_factory=list)  # 信号过滤策略名称列表
 
     # 策略参数配置
-    event_config: dict | None = None              # 事件检测策略参数
-    fund_config: dict | None = None               # 基金选择策略参数
-    filter_configs: dict | None = None            # 过滤策略参数 {name: config}
-
-    def __post_init__(self):
-        if self.signal_filters is None:
-            self.signal_filters = []
-        if self.event_config is None:
-            self.event_config = {}
-        if self.fund_config is None:
-            self.fund_config = {}
-        if self.filter_configs is None:
-            self.filter_configs = {}
+    event_config: dict = field(default_factory=dict)  # 事件检测策略参数
+    fund_config: dict = field(default_factory=dict)    # 基金选择策略参数
+    filter_configs: dict = field(default_factory=dict)  # 过滤策略参数 {name: config}
 
     @classmethod
     def from_dict(cls, data: dict) -> 'ArbitrageEngineConfig':

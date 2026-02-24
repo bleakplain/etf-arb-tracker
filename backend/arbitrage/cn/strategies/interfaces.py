@@ -87,6 +87,21 @@ class IFundSelector(ABC):
         """获取选择原因说明"""
         pass
 
+    @staticmethod
+    def select_by_weight(funds: List[CandidateETF]) -> Optional[CandidateETF]:
+        """
+        按权重降序选择第一个基金（通用方法）
+
+        Args:
+            funds: 候选基金列表
+
+        Returns:
+            权重最高的基金，如果列表为空则返回None
+        """
+        if not funds:
+            return None
+        return max(funds, key=lambda x: x.weight)
+
     @classmethod
     def from_config(cls: Type[U], config: Optional[Dict] = None) -> U:
         """
