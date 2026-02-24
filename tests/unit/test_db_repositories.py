@@ -7,7 +7,7 @@ import pytest
 import tempfile
 
 from backend.signal.db_repository import DBSignalRepository
-from backend.mystock.db_repository import MyStockRepository, MyStock
+from config.mystock import MyStockRepository, MyStock
 from backend.arbitrage.models import TradingSignal
 
 
