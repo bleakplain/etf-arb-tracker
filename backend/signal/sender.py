@@ -12,7 +12,6 @@ Example:
             pass
 """
 
-from typing import List
 from loguru import logger
 
 from backend.arbitrage.models import TradingSignal
@@ -39,6 +38,12 @@ class NotificationSender:
         raise NotImplementedError
 
 
+@sender_registry.register(
+    "log",
+    priority=0,
+    description="日志输出（默认）",
+    version="1.0.0"
+)
 class LogSender(NotificationSender):
     """
     日志输出发送器（默认）
@@ -67,6 +72,12 @@ class LogSender(NotificationSender):
         return True
 
 
+@sender_registry.register(
+    "null",
+    priority=0,
+    description="空发送器（禁用通知）",
+    version="1.0.0"
+)
 class NullSender(NotificationSender):
     """
     空发送器（不发送通知）
@@ -77,29 +88,6 @@ class NullSender(NotificationSender):
     def send_signal(self, signal: TradingSignal) -> bool:
         """不发送任何通知，返回成功"""
         return True
-
-
-# 注册默认发送器
-@sender_registry.register(
-    "log",
-    priority=0,
-    description="日志输出（默认）",
-    version="1.0.0"
-)
-class LogSenderRegistered(LogSender):
-    """注册版本的日志发送器"""
-    pass
-
-
-@sender_registry.register(
-    "null",
-    priority=0,
-    description="空发送器（禁用通知）",
-    version="1.0.0"
-)
-class NullSenderRegistered(NullSender):
-    """注册版本的空发送器"""
-    pass
 
 
 def create_sender_from_config(config) -> NotificationSender:
@@ -123,42 +111,3 @@ def create_sender_from_config(config) -> NotificationSender:
 
     # 默认使用日志发送器
     return LogSender()
-
-
-# 测试代码
-if __name__ == "__main__":
-    from backend.arbitrage.models import TradingSignal
-    from datetime import datetime
-
-    # 创建测试信号
-    test_signal = TradingSignal(
-        signal_id="TEST_001",
-        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        stock_code="300750",
-        stock_name="宁德时代",
-        stock_price=256.80,
-        limit_time="14:35:00",
-        locked_amount=1500000000,
-        change_pct=10.01,
-        etf_code="516160",
-        etf_name="新能源车ETF",
-        etf_weight=0.085,
-        etf_price=1.234,
-        etf_premium=2.5,
-        reason="宁德时代涨停，在新能源车ETF中权重达8.5%",
-        confidence="高",
-        risk_level="中",
-        actual_weight=0.085,
-        weight_rank=3,
-        top10_ratio=0.65
-    )
-
-    # 测试日志发送器
-    sender = LogSender()
-    sender.send_signal(test_signal)
-
-    # 测试插件注册表
-    print("\n可用的通知渠道:")
-    for name in sender_registry.list_names():
-        meta = sender_registry.get_metadata(name)
-        print(f"  - {name}: {meta.get('description', 'N/A')}")

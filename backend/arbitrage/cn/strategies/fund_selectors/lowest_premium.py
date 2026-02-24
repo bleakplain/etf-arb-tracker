@@ -25,10 +25,6 @@ class LowestPremiumSelector(IFundSelector):
     溢价低意味着买入成本更接近实际价值。
     """
 
-    def __init__(self):
-        """初始化溢价选择器"""
-        pass
-
     @property
     def strategy_name(self) -> str:
         return "lowest_premium"

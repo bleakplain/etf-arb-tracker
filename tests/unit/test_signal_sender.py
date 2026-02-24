@@ -12,8 +12,6 @@ from backend.signal.sender import (
     NotificationSender,
     LogSender,
     NullSender,
-    LogSenderRegistered,
-    NullSenderRegistered,
     create_sender_from_config,
 )
 from backend.arbitrage.models import TradingSignal
@@ -171,7 +169,7 @@ class TestRegisteredSenders:
         """测试注册的日志发送器类可用"""
         sender_class = sender_registry.get("log")
         # sender_registry.get() 返回的是类，不是实例
-        assert sender_class in (LogSender, LogSenderRegistered, type(LogSender()))
+        assert sender_class is LogSender
         # 创建实例并验证
         sender = sender_class()
         assert isinstance(sender, NotificationSender)
@@ -180,7 +178,7 @@ class TestRegisteredSenders:
         """测试注册的空发送器类可用"""
         sender_class = sender_registry.get("null")
         # sender_registry.get() 返回的是类，不是实例
-        assert sender_class in (NullSender, NullSenderRegistered, type(NullSender()))
+        assert sender_class is NullSender
         # 创建实例并验证
         sender = sender_class()
         assert isinstance(sender, NotificationSender)
@@ -327,11 +325,3 @@ class TestSenderInheritance:
     def test_null_sender_is_notification_sender(self):
         """测试NullSender是NotificationSender的子类"""
         assert issubclass(NullSender, NotificationSender)
-
-    def test_registered_log_sender_inherits_log_sender(self):
-        """测试注册的LogSender继承自LogSender"""
-        assert issubclass(LogSenderRegistered, LogSender)
-
-    def test_registered_null_sender_inherits_null_sender(self):
-        """测试注册的NullSender继承自NullSender"""
-        assert issubclass(NullSenderRegistered, NullSender)

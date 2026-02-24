@@ -11,9 +11,6 @@ from loguru import logger
 class KlineDataFetcher:
     """K线数据获取器"""
 
-    def __init__(self):
-        pass
-
     def get_kline_for_chart(self, code: str, days: int = 60) -> Optional[List[Dict]]:
         """
         获取股票K线数据（用于图表展示）

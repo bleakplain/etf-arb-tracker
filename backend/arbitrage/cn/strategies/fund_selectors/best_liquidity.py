@@ -25,10 +25,6 @@ class BestLiquiditySelector(IFundSelector):
     流动性好意味着更容易买卖，滑点更小。
     """
 
-    def __init__(self):
-        """初始化流动性选择器"""
-        pass
-
     @property
     def strategy_name(self) -> str:
         return "best_liquidity"
