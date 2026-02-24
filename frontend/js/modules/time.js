@@ -90,3 +90,8 @@ async function loadStatus() {
         console.error('Failed to load status:', error);
     }
 }
+
+async function loadBacktestJobs() {
+    // Placeholder - backtest jobs loading
+}
+

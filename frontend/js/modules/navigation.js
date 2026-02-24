@@ -41,17 +41,16 @@ function switchTab(tabName) {
     // Load tab-specific data
     switch (tabName) {
         case 'watchlist':
-            loadStocks();
+            StockUI.loadStocks();
             break;
         case 'limitup':
-            loadLimitUpStocks();
+            LimitUpUI.loadLimitUpStocks();
             break;
         case 'signals':
-            loadSignals();
+            SignalUI.loadSignals();
             break;
         case 'backtest':
-            initBacktestDates();
-            loadBacktestJobs();
+            BacktestUI.initDates();
             break;
     }
 }

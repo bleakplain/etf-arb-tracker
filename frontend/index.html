@@ -1142,13 +1142,13 @@
                 </div>
                 <div class="terminal-panel-body">
                     <div class="terminal-btn-group">
-                        <button class="terminal-btn terminal-btn-success" id="btnStart" onclick="startMonitor()">
+                        <button class="terminal-btn terminal-btn-success" id="btnStart" onclick="MonitorUI.startMonitor()">
                             <i class="bi bi-play-fill"></i> 启动监控
                         </button>
-                        <button class="terminal-btn terminal-btn-danger" id="btnStop" onclick="stopMonitor()" disabled>
+                        <button class="terminal-btn terminal-btn-danger" id="btnStop" onclick="MonitorUI.stopMonitor()" disabled>
                             <i class="bi bi-stop-fill"></i> 停止监控
                         </button>
-                        <button class="terminal-btn terminal-btn-primary" id="btnScan" onclick="manualScan()">
+                        <button class="terminal-btn terminal-btn-primary" id="btnScan" onclick="MonitorUI.manualScan()">
                             <i class="bi bi-search"></i> 立即扫描
                         </button>
                     </div>
@@ -1165,7 +1165,7 @@
                 <div class="terminal-panel-body">
                     <div class="terminal-search">
                         <i class="bi bi-search"></i>
-                        <input type="text" id="searchStock" placeholder="代码/名称 (如: 600519)" onkeyup="searchStock(event)">
+                        <input type="text" id="searchStock" placeholder="代码/名称 (如: 600519)" onkeyup="SearchUI.handleSearch(event)">
                     </div>
                     <div id="searchResults" style="margin-top: var(--space-sm);"></div>
                 </div>
@@ -1260,7 +1260,7 @@
                         <div class="terminal-table-title">
                             <i class="bi bi-fire"></i> 今日涨停股
                         </div>
-                        <button class="terminal-action-btn" onclick="loadLimitUpStocks()">
+                        <button class="terminal-action-btn" onclick="LimitUpUI.loadLimitUpStocks()">
                             <i class="bi bi-arrow-clockwise"></i> 刷新
                         </button>
                     </div>
@@ -1352,7 +1352,7 @@
                                     </select>
                                 </div>
                                 <div class="terminal-btn-group" style="margin-top: var(--space-lg);">
-                                    <button type="button" class="terminal-btn terminal-btn-primary" onclick="startBacktest()">
+                                    <button type="button" class="terminal-btn terminal-btn-primary" onclick="BacktestUI.startBacktest()">
                                         <i class="bi bi-play-fill"></i> 开始回测
                                     </button>
                                     <button type="button" class="terminal-btn terminal-action-btn" onclick="loadBacktestJobs()">
@@ -1380,7 +1380,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title" id="etfModalTitle">相关ETF</h3>
-                <button class="modal-close" onclick="closeEtfModal()" aria-label="关闭对话框">
+                <button class="modal-close" onclick="StockUI.closeEtfModal()" aria-label="关闭对话框">
                     <i class="bi bi-x" aria-hidden="true"></i>
                 </button>
             </div>
@@ -1393,22 +1393,37 @@
         </div>
     </div>
 
-    <!-- Shared Utilities -->
-    <script src="/frontend/js/shared/constants.js"></script>
-    <script src="/frontend/js/shared/dom-utils.js"></script>
-    <script src="/frontend/js/shared/table-helpers.js"></script>
-    <script src="/frontend/js/shared/templates.js"></script>
-    <script src="/frontend/js/shared/data-loader.js"></script>
-    <script src="/frontend/js/shared/polling-manager.js"></script>
-    <script src="/frontend/js/shared/export-utils.js"></script>
-    <!-- Shared Components -->
-    <script src="/frontend/js/shared/api-client.js"></script>
-    <script src="/frontend/js/shared/toast.js"></script>
+    <!-- Core -->
+    <script src="/frontend/js/core/config.js"></script>
+    <script src="/frontend/js/core/state.js"></script>
+    <script src="/frontend/js/core/events.js"></script>
+    <!-- Utils -->
+    <script src="/frontend/js/utils/api.js"></script>
+    <script src="/frontend/js/utils/dom.js"></script>
+    <script src="/frontend/js/utils/polling.js"></script>
+    <script src="/frontend/js/utils/templates.js"></script>
+    <script src="/frontend/js/utils/table.js"></script>
+    <script src="/frontend/js/utils/export.js"></script>
+    <!-- Components -->
+    <script src="/frontend/js/components/toast.js"></script>
     <!-- Modules -->
-    <script src="/frontend/js/modules/state.js"></script>
     <script src="/frontend/js/modules/navigation.js"></script>
     <script src="/frontend/js/modules/time.js"></script>
-    <!-- Main Application -->
-    <script src="/frontend/js/app.js"></script>
+    <!-- Feature Modules -->
+    <script src="/frontend/js/modules/common/sorting.js"></script>
+    <script src="/frontend/js/modules/stock/service.js"></script>
+    <script src="/frontend/js/modules/stock/ui.js"></script>
+    <script src="/frontend/js/modules/limitup/service.js"></script>
+    <script src="/frontend/js/modules/limitup/ui.js"></script>
+    <script src="/frontend/js/modules/signal/service.js"></script>
+    <script src="/frontend/js/modules/signal/ui.js"></script>
+    <script src="/frontend/js/modules/monitor/service.js"></script>
+    <script src="/frontend/js/modules/monitor/ui.js"></script>
+    <script src="/frontend/js/modules/search/service.js"></script>
+    <script src="/frontend/js/modules/search/ui.js"></script>
+    <script src="/frontend/js/modules/backtest/service.js"></script>
+    <script src="/frontend/js/modules/backtest/ui.js"></script>
+    <!-- Main Entry Point -->
+    <script src="/frontend/js/main.js"></script>
 </body>
 </html>
