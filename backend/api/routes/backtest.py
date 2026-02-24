@@ -68,9 +68,9 @@ async def start_backtest(request: BacktestRequest, background_tasks: BackgroundT
             # 将字符串转换为 TimeGranularity 枚举
             granularity_map = {
                 "daily": TimeGranularity.DAILY,
-                "5m": TimeGranularity.MINUTE_5,
-                "15m": TimeGranularity.MINUTE_15,
-                "30m": TimeGranularity.MINUTE_30,
+                "5m": TimeGranularity.MIN_5,
+                "15m": TimeGranularity.MIN_15,
+                "30m": TimeGranularity.MIN_30,
             }
             time_granularity = granularity_map.get(request.granularity, TimeGranularity.DAILY)
 

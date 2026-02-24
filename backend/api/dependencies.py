@@ -133,6 +133,8 @@ def get_engine() -> ArbitrageEngineCN:
     """获取或创建套利引擎实例"""
     global _engine_instance, _config_instance
     if _engine_instance is None:
+        # 首先注册策略（避免循环导入）
+        register_strategies()
         _config_instance = Config.load()
         _engine_instance = _create_engine(_config_instance)
     return _engine_instance
@@ -203,6 +205,30 @@ async def delete_backtest_job(job_id: str):
 def load_historical_backtest_jobs():
     """启动时加载历史回测任务到内存"""
     return _backtest_manager.load_historical_jobs()
+
+
+def register_strategies():
+    """
+    注册所有策略模块
+
+    延迟导入策略以避免循环导入问题。
+    必须在 ArbitrageEngineCN 创建之前调用。
+    """
+    # 导入所有策略模块以确保装饰器注册
+    from backend.arbitrage.cn.strategies.event_detectors import limit_up
+    from backend.arbitrage.cn.strategies.fund_selectors import (
+        highest_weight,
+        balanced,
+        lowest_premium,
+        best_liquidity,
+    )
+    from backend.arbitrage.cn.strategies.signal_filters import (
+        confidence,
+        time_filter,
+        liquidity,
+    )
+    # 导入即完成注册（装饰器在模块导入时执行）
+    return True
 
 
 # 暴露配置实例
