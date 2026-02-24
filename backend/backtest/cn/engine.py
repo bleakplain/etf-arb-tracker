@@ -160,9 +160,8 @@ class CNBacktestEngine:
         # 统计每个 ETF 的出现次数
         etf_signal_count: Dict[str, int] = {}
         for signal in self.signals:
-            for etf in signal.candidate_etfs:
-                etf_code = etf.etf_code
-                etf_signal_count[etf_code] = etf_signal_count.get(etf_code, 0) + 1
+            etf_code = signal.etf_code
+            etf_signal_count[etf_code] = etf_signal_count.get(etf_code, 0) + 1
 
         # 按日期统计
         daily_signal_count: Dict[str, int] = {}
@@ -179,16 +178,12 @@ class CNBacktestEngine:
                     "date": self.signal_dates[i],
                     "stock_code": s.stock_code,
                     "stock_name": s.stock_name,
-                    "etf_count": len(s.candidate_etfs),
+                    "etf_code": s.etf_code,
+                    "etf_name": s.etf_name,
+                    "etf_weight": s.etf_weight,
                     "confidence": s.confidence,
-                    "candidate_etfs": [
-                        {
-                            "etf_code": e.etf_code,
-                            "etf_name": e.etf_name,
-                            "weight": e.weight
-                        }
-                        for e in s.candidate_etfs
-                    ]
+                    "risk_level": s.risk_level,
+                    "reason": s.reason
                 }
                 for i, s in enumerate(self.signals)
             ],

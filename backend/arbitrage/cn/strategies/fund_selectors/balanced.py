@@ -65,14 +65,10 @@ class BalancedSelector(IFundSelector):
         if not eligible_funds:
             return None
 
-        # 简化实现：计算综合得分
+        # 计算综合得分
         def calc_score(fund: CandidateETF) -> float:
             # 权重得分（归一化到0-1）
             weight_score = min(fund.weight / 0.20, 1.0)
-
-            # 这里可以添加流动性和溢价的计算
-            # 当前简化为只使用权重
-
             return weight_score * self.weight_score
 
         # 选择得分最高的

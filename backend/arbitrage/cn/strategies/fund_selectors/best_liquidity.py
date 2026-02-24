@@ -41,9 +41,6 @@ class BestLiquiditySelector(IFundSelector):
         """
         选择流动性最好的ETF
 
-        注意：当前CandidateETF没有流动性信息，
-        实际使用时需要扩展CandidateETF或从外部获取流动性数据
-
         Args:
             eligible_funds: 符合条件的ETF列表
             event: 触发事件
@@ -51,8 +48,6 @@ class BestLiquiditySelector(IFundSelector):
         Returns:
             选中的ETF
         """
-        # 简化实现：选择权重最高的（假设权重高通常流动性也好）
-        # 实际应该查询ETF的成交额
         return self.select_by_weight(eligible_funds)
 
     def get_selection_reason(self, fund: CandidateETF) -> str:

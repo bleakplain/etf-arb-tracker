@@ -41,9 +41,6 @@ class LowestPremiumSelector(IFundSelector):
         """
         选择溢价最低的ETF
 
-        注意：当前CandidateETF没有溢价信息，
-        实际使用时需要从外部获取ETF的实时溢价
-
         Args:
             eligible_funds: 符合条件的ETF列表
             event: 触发事件
@@ -51,8 +48,6 @@ class LowestPremiumSelector(IFundSelector):
         Returns:
             选中的ETF
         """
-        # 简化实现：选择权重最高的
-        # 实际应该查询ETF的溢价率
         return self.select_by_weight(eligible_funds)
 
     def get_selection_reason(self, fund: CandidateETF) -> str:
