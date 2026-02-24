@@ -550,18 +550,8 @@ async function exportBacktestSignals() {
     if (!jobId) return;
 
     try {
-        const response = await fetch(`/api/backtest/${jobId}/signals`);
-        if (!response.ok) throw new Error('Export failed');
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `backtest_signals_${jobId}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-
-        showToast('信号导出成功', 'success');
+        const response = await API.getBacktestSignals(jobId);
+        ExportUtils.exportSignalsToCSV(response, `backtest_signals_${jobId}.csv`);
     } catch (error) {
         console.error('Export failed:', error);
         showToast('导出失败', 'error');

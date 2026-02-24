@@ -42,12 +42,7 @@ async function showRelatedETFs(code, name) {
     AppState.lastFocusedElement = document.activeElement;
 
     title.textContent = `${name} (${code}) - 相关ETF`;
-    body.innerHTML = `
-        <div class="terminal-loading">
-            <div class="terminal-loading-spinner"></div>
-            <div class="terminal-loading-text">加载中...</div>
-        </div>
-    `;
+    body.innerHTML = Templates.loading('加载中...');
     modal.classList.add('active');
 
     // Focus the close button for keyboard users
@@ -60,12 +55,7 @@ async function showRelatedETFs(code, name) {
         const etfs = await API.getRelatedETFs(code);
 
         if (!etfs || etfs.length === 0) {
-            body.innerHTML = `
-                <div class="terminal-empty">
-                    <i class="bi bi-inbox"></i>
-                    <div class="terminal-empty-text">未找到相关ETF</div>
-                </div>
-            `;
+            body.innerHTML = Templates.empty('未找到相关ETF');
             return;
         }
 
@@ -81,23 +71,10 @@ async function showRelatedETFs(code, name) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${etfs.map(etf => {
-                        const weightClass = etf.weight >= 0.1 ? 'text-up' : etf.weight >= 0.05 ? '' : 'text-muted';
-                        const priceClass = etf.change_pct > 0 ? 'up' : etf.change_pct < 0 ? 'down' : '';
-                        const percentSign = etf.change_pct > 0 ? '+' : '';
-
-                        return `
-                            <tr>
-                                <td><span class="terminal-table-code">${etf.etf_code}</span></td>
-                                <td><span class="terminal-table-name">${etf.etf_name || '-'}</span></td>
-                                <td><span class="${weightClass}">${(etf.weight * 100).toFixed(2)}%</span></td>
-                                <td><span class="terminal-table-price ${priceClass}">${etf.price ? etf.price.toFixed(2) : '-'}</span></td>
-                                <td><span class="terminal-table-percent ${priceClass}">${etf.change_pct !== undefined ? percentSign + etf.change_pct.toFixed(2) + '%' : '-'}</span></td>
-                            </tr>
-                        `;
-                    }).join('')}
+                    ${etfs.map(createEtfTableRow).join('')}
                 </tbody>
             </table>
+        `;
         `;
     } catch (error) {
         body.innerHTML = `
@@ -439,8 +416,31 @@ async function performStockSearch(query, resultsContainer) {
 }
 
 async function addStockToWatchlist(code) {
-    showToast(`添加股票 ${code} 功能需要后端支持`, 'info');
-    // In production, this would call an API endpoint
+    try {
+        // First get stock info to validate code
+        const stocks = await API.getStocks();
+        const stock = stocks.find(s => s.code === code);
+
+        const response = await API.addToWatchlist(
+            code,
+            stock?.name || '',
+            'sh',
+            ''
+        );
+
+        if (response.status === 'already_exists') {
+            showToast(response.message, 'warning');
+        } else if (response.status === 'success') {
+            showToast(response.message, 'success');
+            // Reload stocks to show the newly added stock
+            await loadStocks();
+        } else {
+            showToast('添加失败', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to add stock to watchlist:', error);
+        showToast('添加失败', 'error');
+    }
 }
 
 // ============================================================================

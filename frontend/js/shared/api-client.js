@@ -88,6 +88,22 @@ const API = {
 
     deleteBacktestJob(jobId) {
         return this.request(`/api/backtest/${jobId}`, { method: 'DELETE' });
+    },
+
+    // Watchlist endpoints
+    getWatchlist() {
+        return this.request('/api/watchlist');
+    },
+
+    addToWatchlist(code, name, market = 'sh', notes = '') {
+        return this.request('/api/watchlist/add', {
+            method: 'POST',
+            body: JSON.stringify({ code, name, market, notes })
+        });
+    },
+
+    removeFromWatchlist(code) {
+        return this.request(`/api/watchlist/${code}`, { method: 'DELETE' });
     }
 };
 
