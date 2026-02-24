@@ -125,12 +125,9 @@ def build_mapping():
 
 def run_monitor():
     """运行监控器"""
-    try:
-        from backend.monitor.limit_monitor import main
-        main()
-    except Exception as e:
-        logger.exception(f"监控器运行异常: {e}")
-        raise
+    # 监控功能已集成到API中，使用API模式
+    logger.info("监控功能已集成到API服务中，启动API模式...")
+    run_api()
 
 
 def run_api():
@@ -145,39 +142,19 @@ def run_api():
 
 def run_both():
     """同时运行监控和API"""
-    import multiprocessing
-
-    # 启动API服务
-    api_process = multiprocessing.Process(target=run_api)
-    api_process.start()
+    # 监控功能已集成到API中，只需启动API
+    logger.info("监控功能已集成到API服务中")
 
     print(f"\n{'='*60}")
     print("🚀 A股涨停ETF溢价监控系统")
     print(f"{'='*60}")
     print(f"\n📊 Web监控界面: http://localhost:8000/frontend/index.html")
     print(f"📖 API文档: http://localhost:8000/docs")
+    print(f"🔧 监控控制: http://localhost:8000/api/monitor/start")
     print(f"\n按 Ctrl+C 停止服务\n")
 
-    # 启动监控器
-    try:
-        run_monitor()
-    except KeyboardInterrupt:
-        logger.info("收到停止信号")
-        print("\n\n正在停止服务...")
-        api_process.terminate()
-        api_process.join(timeout=5)
-        if api_process.is_alive():
-            logger.warning("API进程未能正常结束，强制终止")
-            api_process.kill()
-        print("服务已停止")
-    except Exception as e:
-        logger.exception(f"服务运行异常: {e}")
-        print(f"\n错误: {e}")
-        api_process.terminate()
-        api_process.join(timeout=5)
-        if api_process.is_alive():
-            api_process.kill()
-        sys.exit(1)
+    # 直接运行API服务（监控已集成）
+    run_api()
 
 
 def run_backtest(args):
@@ -251,11 +228,6 @@ def main():
         parser = argparse.ArgumentParser(description='A股涨停ETF溢价监控系统')
         subparsers = parser.add_subparsers(dest='command', help='可用命令')
 
-        # 默认命令（向后兼容）
-        parser.add_argument('command_legacy', nargs='?', default='both',
-                           choices=['monitor', 'api', 'both', 'init'],
-                           help='命令: monitor=只运行监控, api=只运行API, both=同时运行, init=初始化数据')
-
         # 回测命令
         backtest_parser = subparsers.add_parser('backtest', help='运行策略回测')
         backtest_parser.add_argument('--start-date', help='开始日期 (YYYYMMDD)')
@@ -266,11 +238,28 @@ def main():
         backtest_parser.add_argument('--evaluator-type', choices=['default', 'conservative', 'aggressive'],
                                     help='信号评估器类型')
 
+        # API命令（启动API服务，监控功能已集成）
+        api_parser = subparsers.add_parser('api', help='启动API服务（监控功能已集成到API中）')
+        api_parser.set_defaults(func=lambda args: run_api())
+
+        # Both命令（同api，保持向后兼容）
+        both_parser = subparsers.add_parser('both', help='启动API服务（同api，向后兼容）')
+        both_parser.set_defaults(func=lambda args: run_both())
+
+        # Init命令
+        init_parser = subparsers.add_parser('init', help='初始化数据（构建股票-ETF映射）')
+        init_parser.set_defaults(func=lambda args: build_mapping())
+
+        # Monitor命令（已废弃，重定向到api）
+        monitor_parser = subparsers.add_parser('monitor', help='启动API服务（monitor已废弃，使用api）')
+        monitor_parser.set_defaults(func=lambda args: run_api())
+
         args = parser.parse_args()
 
-        # 处理旧的命令格式
-        if args.command is None and args.command_legacy:
-            args.command = args.command_legacy
+        # 如果没有指定命令，默认运行 both
+        if args.command is None:
+            args.command = 'both'
+            logger.info("未指定命令，使用默认: both")
 
         logger.info(f"系统启动，命令: {args.command}")
 
@@ -294,7 +283,7 @@ def main():
             logger.info("初始化完成")
 
         elif args.command == 'monitor':
-            logger.info("启动监控模式")
+            logger.info("启动监控模式（已重定向到API）")
             run_monitor()
 
         elif args.command == 'api':
