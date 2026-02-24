@@ -21,12 +21,11 @@ from backend.arbitrage.cn.strategies.interfaces import (
     ISignalFilter,
 )
 from backend.arbitrage.cn.strategy_executor import StrategyExecutor
-from backend.signal.repository import FileSignalRepository, InMemorySignalRepository, ISignalRepository
 from config import Config
 
 # 延迟导入以避免循环依赖
 if TYPE_CHECKING:
-    from backend.signal.interfaces import ISignalEvaluator
+    from backend.signal.interfaces import ISignalRepository, ISignalEvaluator
 
 
 @dataclass
@@ -79,7 +78,7 @@ class ArbitrageEngineCN:
         config: Config = None,
         strategy_manager_instance: StrategyManager = None,
         mapping_repository: IMappingRepository = None,
-        signal_repository: ISignalRepository = None
+        signal_repository: 'ISignalRepository' = None
     ):
         """
         初始化A股套利引擎
@@ -105,7 +104,13 @@ class ArbitrageEngineCN:
         self._config = config or Config.load()
         self._strategy_manager = strategy_manager_instance or strategy_manager
         self._mapping_repository = mapping_repository or FileMappingRepository("data/cn_stock_etf_mapping.json")
-        self._signal_repository = signal_repository or InMemorySignalRepository()
+
+        # 延迟导入信号仓储避免循环依赖
+        if signal_repository is None:
+            from backend.signal.db_repository import DBSignalRepository
+            self._signal_repository = DBSignalRepository("data/app.db")
+        else:
+            self._signal_repository = signal_repository
 
         # 加载默认监控列表
         if watch_securities is None:

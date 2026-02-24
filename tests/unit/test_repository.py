@@ -1,7 +1,7 @@
 """
 Unit tests for Signal Repository
 
-Tests the FileSignalRepository and InMemorySignalRepository implementations.
+Tests the InMemorySignalRepository and DBSignalRepository implementations.
 """
 
 import pytest
@@ -10,7 +10,8 @@ import tempfile
 import json
 from pathlib import Path
 
-from backend.signal.repository import FileSignalRepository, InMemorySignalRepository
+from backend.signal.repository import InMemorySignalRepository
+from backend.signal.db_repository import DBSignalRepository
 from backend.arbitrage.models import TradingSignal
 from backend.utils.clock import FrozenClock, reset_clock, set_clock, CHINA_TZ
 from datetime import datetime
@@ -279,85 +280,3 @@ class TestInMemorySignalRepository:
 
         # 验证所有信号都已保存
         assert self.repository.get_count() == 30
-
-
-@pytest.mark.unit
-class TestFileSignalRepository:
-    """测试FileSignalRepository - 文件仓储"""
-
-    def setup_method(self):
-        """每个测试前创建临时文件"""
-        self.temp_dir = tempfile.mkdtemp()
-        self.filepath = os.path.join(self.temp_dir, "test_signals.json")
-        self.repository = FileSignalRepository(self.filepath)
-
-    def teardown_method(self):
-        """每个测试后清理临时文件"""
-        if os.path.exists(self.filepath):
-            os.remove(self.filepath)
-        os.rmdir(self.temp_dir)
-
-    def test_save_and_load_from_file(self):
-        """测试保存和加载文件"""
-        signal = TradingSignal(
-            signal_id="test_signal_001",
-            timestamp="2024-01-15 14:30:00",
-            stock_code="600519",
-            stock_name="贵州茅台",
-            stock_price=1680.0,
-            change_pct=10.0,
-            etf_code="510300",
-            etf_name="沪深300ETF",
-            etf_weight=0.08,
-            etf_price=4.5,
-            etf_premium=0.5,
-            reason="涨停套利",
-            confidence="高",
-            risk_level="中",
-            actual_weight=0.08,
-            weight_rank=1,
-            top10_ratio=0.25
-        )
-
-        self.repository.save(signal)
-
-        # 创建新仓储实例，应该能加载之前保存的数据
-        new_repository = FileSignalRepository(self.filepath)
-        assert new_repository.get_count() == 1
-
-        loaded_signal = new_repository.get_signal("test_signal_001")
-        assert loaded_signal.stock_code == "600519"
-
-    def test_file_persistence(self):
-        """测试文件持久化"""
-        signal = TradingSignal(
-            signal_id="test_signal_001",
-            timestamp="2024-01-15 14:30:00",
-            stock_code="600519",
-            stock_name="贵州茅台",
-            stock_price=1680.0,
-            change_pct=10.0,
-            etf_code="510300",
-            etf_name="沪深300ETF",
-            etf_weight=0.08,
-            etf_price=4.5,
-            etf_premium=0.5,
-            reason="涨停套利",
-            confidence="高",
-            risk_level="中",
-            actual_weight=0.08,
-            weight_rank=1,
-            top10_ratio=0.25
-        )
-
-        self.repository.save(signal)
-
-        # 验证文件存在
-        assert os.path.exists(self.filepath)
-
-        # 读取文件内容
-        with open(self.filepath, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-
-        assert len(data) == 1
-        assert data[0]['stock_code'] == '600519'
