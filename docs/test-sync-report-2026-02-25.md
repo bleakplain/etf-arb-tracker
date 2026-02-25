@@ -44,16 +44,27 @@ python3 -m pytest tests/unit/ -v --tb=short
 
 ### 2. 集成测试
 
-**抽样验证结果**: ✅ 全部通过
+**完整测试结果**: **31/32 通过** ✅ (96.9%)
 
 | 测试类 | 测试数 | 状态 |
 |--------|--------|------|
 | TestAPIRoutesIntegration | 6 | ✅ |
+| TestAPIRoutesWithMockData | 4 | ✅ |
 | TestBacktestAPIRoutes | 3 | ✅ |
+| TestWatchlistAPIRoutes | 3 | ✅ |
+| TestMonitorAPIRoutes | 2 | ⚠️ (1跳过) |
+| TestConfigAPIRoutes | 1 | ✅ |
 | TestArbitrageWorkflow | 5 | ✅ |
-| **总计 (抽样)** | **14** | **✅** |
+| TestErrorHandlingWorkflow | 2 | ✅ |
+| TestRepositoryWorkflow | 1 | ✅ |
+| TestTimeBasedWorkflow | 2 | ✅ |
+| TestConfigurationWorkflow | 2 | ✅ |
+| **总计** | **31/32** | **✅ 96.9%** |
 
-**完整测试套件**: 32个测试 (完整运行约需20分钟)
+**运行耗时**: ~121秒 (2分钟)
+
+**已知问题**:
+- `test_start_monitor_endpoint` - 测试会实际启动监控服务，需要重构（添加超时或mock）
 
 ### 3. 端到端验证
 

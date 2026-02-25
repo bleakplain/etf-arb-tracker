@@ -104,8 +104,14 @@ pytest -m "not slow"
 
 | 测试模块 | 测试文件 | 测试数 | 状态 |
 |---------|---------|-------|------|
-| **API路由** | test_api_routes.py | 18 | ✅ 完整 (运行较慢) |
-| **套利工作流** | test_arbitrage_workflow.py | 14 | ✅ 完整 (运行较慢) |
+| **API路由** | test_api_routes.py | 18 | ✅ 完整 (1个需重构) |
+| **套利工作流** | test_arbitrage_workflow.py | 14 | ✅ 完整 |
+
+**完整测试结果**: 31/32 通过 (96.9%)
+**运行耗时**: ~121秒 (2分钟)
+
+**已知问题**:
+- `test_start_monitor_endpoint` - 需要重构，添加超时或mock机制
 
 ## 待补充测试
 
@@ -121,12 +127,14 @@ pytest -m "not slow"
 - **测试覆盖**: 核心功能覆盖完整
 
 ### 已知问题 ⚠️
-1. **集成测试性能**: 每个测试需要30-60秒，完整运行需要20-30分钟
-   - 原因: FastAPI TestClient开销，每个测试完整初始化应用
-   - 影响: CI/CD流程缓慢
+1. **test_start_monitor_endpoint**: 测试会实际启动监控服务，需要重构
+   - 建议: 添加超时机制或使用mock
+
+2. **集成测试性能**: 完整运行约需2分钟
+   - 原因: FastAPI TestClient开销
    - 建议: 使用共享fixtures或mock减少初始化开销
 
-2. **测试依赖**: httpx必须安装才能运行集成测试
+3. **测试依赖**: httpx必须安装才能运行集成测试
    - 状态: 已在requirements.txt中包含
    - 建议: 添加CI依赖检查
 
