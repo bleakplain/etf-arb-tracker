@@ -78,23 +78,95 @@ pytest -m "not slow"
 
 ## 当前测试覆盖
 
-| 市场模块 | 测试文件 | 测试数 | 状态 |
+### 单元测试 (272个 - 全部通过)
+
+| 测试模块 | 测试文件 | 测试数 | 状态 |
 |---------|---------|-------|------|
-| **CN (A股)** | test_arbitrage_engine_cn.py | 9 | ✓ 完整 |
-| | test_market_strategies_cn.py | 6 | ✓ 完整 |
-| | test_backtest_cn.py | 11 | ✓ 完整 |
-| **HK (港股)** | test_market_hk.py | 3 | 框架 |
-| | test_backtest_hk.py | 1 | 框架 |
-| **US (美股)** | test_market_us.py | 3 | 框架 |
-| | test_backtest_us.py | 1 | 框架 |
-| **跨市场** | test_signal_evaluator.py | 14 | ✓ 完整 |
-| | test_utils.py | 35 | ✓ 完整 (含Clock抽象测试) |
-| | test_repository.py | 10 | ✓ 完整 (仓储测试) |
+| **引擎测试** | test_arbitrage_engine_cn.py | 9 | ✅ 完整 |
+| **市场策略** | test_market_strategies_cn.py | 6 | ✅ 完整 |
+| **回测** | test_backtest_cn.py | 11 | ✅ 完整 |
+| **信号评估** | test_signal_evaluator.py | 14 | ✅ 完整 |
+| **信号过滤** | test_signal_filters_cn.py | 24 | ✅ 完整 |
+| **信号管理** | test_signal_manager.py | 9 | ✅ 完整 |
+| **信号发送** | test_signal_sender.py | 20 | ✅ 完整 |
+| **数据源** | test_etf_holding_provider_cn.py | 4 | ✅ 完整 |
+| | test_etf_quote_cn.py | 9 | ✅ 完整 |
+| | test_quote_fetcher_cn.py | 4 | ✅ 完整 |
+| **仓储** | test_db_repositories.py | 18 | ✅ 完整 |
+| | test_memory_repository.py | 27 | ✅ 完整 |
+| | test_mapping_repository.py | 34 | ✅ 完整 |
+| **API状态** | test_api_state.py | 16 | ✅ 完整 |
+| **模块导入** | test_module_imports.py | 12 | ✅ 完整 |
+| **配置** | test_config_validation.py | 9 | ✅ 完整 |
+| **工具** | test_utils.py | 56 | ✅ 完整 |
+
+### 集成测试 (32个)
+
+| 测试模块 | 测试文件 | 测试数 | 状态 |
+|---------|---------|-------|------|
+| **API路由** | test_api_routes.py | 18 | ✅ 完整 (运行较慢) |
+| **套利工作流** | test_arbitrage_workflow.py | 14 | ✅ 完整 (运行较慢) |
 
 ## 待补充测试
 
-- [ ] API端点集成测试
-- [ ] 信号管理器测试
-- [ ] 信号仓储测试
 - [ ] 港股/美股功能测试（待实现功能）
-- [ ] 边界条件和错误处理测试
+- [ ] 集成测试性能优化 (当前每个测试30-60秒)
+- [ ] 端到端完整流程测试（实际服务器启动）
+
+## 测试同步状态 (2026-02-25)
+
+### 已验证 ✅
+- **单元测试**: 272个测试全部通过
+- **测试用例**: 与代码实现同步
+- **测试覆盖**: 核心功能覆盖完整
+
+### 已知问题 ⚠️
+1. **集成测试性能**: 每个测试需要30-60秒，完整运行需要20-30分钟
+   - 原因: FastAPI TestClient开销，每个测试完整初始化应用
+   - 影响: CI/CD流程缓慢
+   - 建议: 使用共享fixtures或mock减少初始化开销
+
+2. **测试依赖**: httpx必须安装才能运行集成测试
+   - 状态: 已在requirements.txt中包含
+   - 建议: 添加CI依赖检查
+
+### 测试用例清单
+
+#### 单元测试 (tests/unit/)
+- `test_api_state.py` - API状态管理 (16个测试)
+- `test_arbitrage_engine_cn.py` - A股套利引擎 (9个测试)
+- `test_backtest_cn.py` - A股回测 (11个测试)
+- `test_config_validation.py` - 配置验证 (9个测试)
+- `test_db_repositories.py` - 数据库仓储 (18个测试)
+- `test_etf_holding_provider_cn.py` - ETF持仓数据源 (4个测试)
+- `test_etf_quote_cn.py` - ETF行情 (9个测试)
+- `test_mapping_repository.py` - 股票-ETF映射仓储 (34个测试)
+- `test_market_strategies_cn.py` - A股市场策略 (6个测试)
+- `test_memory_repository.py` - 内存仓储 (27个测试)
+- `test_module_imports.py` - 模块导入 (12个测试)
+- `test_quote_fetcher_cn.py` - 行情获取器 (4个测试)
+- `test_signal_evaluator.py` - 信号评估器 (14个测试)
+- `test_signal_filters_cn.py` - 信号过滤器 (24个测试)
+- `test_signal_manager.py` - 信号管理器 (9个测试)
+- `test_signal_sender.py` - 信号发送器 (20个测试)
+- `test_utils.py` - 工具函数 (56个测试)
+
+#### 集成测试 (tests/integration/)
+- `test_api_routes.py` - API路由集成测试 (18个测试)
+  - 健康检查、状态查询
+  - 自选股管理
+  - 股票行情、相关ETF
+  - 信号列表、ETF分类
+  - 回测API
+  - 监控控制API
+  - 配置管理API
+- `test_arbitrage_workflow.py` - 套利工作流集成测试 (14个测试)
+  - 端到端涨停套利流程
+  - 信号生成工作流
+  - 策略过滤工作流
+  - 多股票批量扫描
+  - 基金选择优先级
+  - 错误处理工作流
+  - 信号持久化工作流
+  - 基于时间的工作流
+  - 配置工作流
