@@ -6,7 +6,7 @@ from typing import Optional, Dict
 from loguru import logger
 
 
-class CNETFQuoteFetcher:
+class CNETFQuoteProvider:
     """A股ETF行情获取器"""
 
     def __init__(self):

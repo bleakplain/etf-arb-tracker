@@ -11,7 +11,7 @@ from backend.market.models import (
 # A股
 from backend.market.cn import (
     LimitUpEvent, LimitUpStock, CNQuoteFetcher,
-    CNETFQuoteFetcher, CNETFHoldingProvider
+    CNETFQuoteProvider, CNETFHoldingProvider
 )
 
 __all__ = [
@@ -30,6 +30,6 @@ __all__ = [
     'LimitUpEvent',
     'LimitUpStock',
     'CNQuoteFetcher',
-    'CNETFQuoteFetcher',
+    'CNETFQuoteProvider',
     'CNETFHoldingProvider',
 ]

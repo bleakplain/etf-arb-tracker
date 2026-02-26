@@ -95,14 +95,14 @@ class TestModuleImports:
 
     def test_import_market_modules(self):
         """测试市场数据模块可以导入"""
-        from backend.market.cn import CNQuoteFetcher, CNETFQuoteFetcher, CNETFHoldingProvider
+        from backend.market.cn import CNQuoteFetcher, CNETFQuoteProvider, CNETFHoldingProvider
         from backend.market.interfaces import IQuoteFetcher, IETFHoldingProvider
 
         # 验证类可以被实例化
         fetcher1 = CNQuoteFetcher()
         assert fetcher1 is not None
 
-        fetcher2 = CNETFQuoteFetcher()
+        fetcher2 = CNETFQuoteProvider()
         assert fetcher2 is not None
 
         provider = CNETFHoldingProvider()

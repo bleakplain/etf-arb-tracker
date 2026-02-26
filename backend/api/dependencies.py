@@ -16,7 +16,7 @@ from backend.arbitrage.cn import ArbitrageEngineCN
 from backend.arbitrage.cn.factory import ArbitrageEngineFactory
 from backend.market.cn.quote_fetcher import CNQuoteFetcher
 from backend.market.cn.etf_holding_provider import CNETFHoldingProvider
-from backend.market.cn.etf_quote import CNETFQuoteFetcher
+from backend.market.cn.etf_quote import CNETFQuoteProvider
 from config import Config
 
 # 获取项目根目录
@@ -145,7 +145,7 @@ def _create_engine(config: Config) -> ArbitrageEngineCN:
     quote_fetcher = CNQuoteFetcher()
     etf_holder_provider = CNETFHoldingProvider()
     etf_holdings_provider = CNETFHoldingProvider()
-    etf_quote_provider = CNETFQuoteFetcher()
+    etf_quote_provider = CNETFQuoteProvider()
 
     return ArbitrageEngineFactory.create_engine(
         quote_fetcher=quote_fetcher,

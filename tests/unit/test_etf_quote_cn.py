@@ -1,22 +1,22 @@
 """
-Unit tests for CNETFQuoteFetcher
+Unit tests for CNETFQuoteProvider
 
-Tests the ETF quote fetcher for A-share market.
+Tests the ETF quote provider for A-share market.
 """
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
-from backend.market.cn.etf_quote import CNETFQuoteFetcher
+from backend.market.cn.etf_quote import CNETFQuoteProvider
 
 
 @pytest.mark.unit
-class TestCNETFQuoteFetcher:
+class TestCNETFQuoteProvider:
     """测试A股ETF行情获取器"""
 
     @pytest.fixture
     def fetcher(self):
-        return CNETFQuoteFetcher()
+        return CNETFQuoteProvider()
 
     def test_init(self, fetcher):
         """测试初始化"""

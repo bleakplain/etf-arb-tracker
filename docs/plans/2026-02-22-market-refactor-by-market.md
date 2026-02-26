@@ -363,7 +363,7 @@ from typing import Optional, Dict
 from loguru import logger
 
 
-class CNETFQuoteFetcher:
+class CNETFQuoteProvider:
     """A股ETF行情获取器"""
 
     def get_etf_quote(self, code: str) -> Optional[Dict]:
@@ -407,14 +407,14 @@ class CNHoldingProvider:
 from backend.market.cn.events import LimitUpEvent
 from backend.market.cn.models import LimitUpStock
 from backend.market.cn.quote_fetcher import CNQuoteFetcher
-from backend.market.cn.etf_quote import CNETFQuoteFetcher
+from backend.market.cn.etf_quote import CNETFQuoteProvider
 from backend.market.cn.holding_provider import CNHoldingProvider
 
 __all__ = [
     'LimitUpEvent',
     'LimitUpStock',
     'CNQuoteFetcher',
-    'CNETFQuoteFetcher',
+    'CNETFQuoteProvider',
     'CNHoldingProvider',
 ]
 ```

@@ -67,12 +67,11 @@ class BackendBridge:
     def get_etf_quote_provider(self):
         """Get or initialize ETF quote provider.
 
-        Note: Uses CNETFQuoteFetcher class which serves as the ETF quote provider.
-        The backend uses 'Fetcher' naming for quote-related classes.
+        Note: Uses CNETFQuoteProvider class which serves as the ETF quote provider.
         """
         if self._etf_quote_provider is None:
-            from backend.market.cn.etf_quote import CNETFQuoteFetcher
-            self._etf_quote_provider = CNETFQuoteFetcher()
+            from backend.market.cn.etf_quote import CNETFQuoteProvider
+            self._etf_quote_provider = CNETFQuoteProvider()
         return self._etf_quote_provider
 
     def get_arbitrage_engine(self):

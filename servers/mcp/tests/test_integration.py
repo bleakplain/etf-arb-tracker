@@ -24,7 +24,7 @@ class TestServerIntegration:
         """测试后端模块可以正确导入"""
         # 测试关键后端模块导入
         from backend.market.cn.quote_fetcher import CNQuoteFetcher
-        from backend.market.cn.etf_quote import CNETFQuoteFetcher
+        from backend.market.cn.etf_quote import CNETFQuoteProvider
         from backend.signal.db_repository import DBSignalRepository
         from backend.arbitrage.cn.factory import ArbitrageEngineFactory
         from backend.data.backtest_repository import BacktestRepository
