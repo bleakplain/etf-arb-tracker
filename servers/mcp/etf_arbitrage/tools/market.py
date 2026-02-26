@@ -15,7 +15,7 @@ from ..models.requests import (
 from ..models.enums import ResponseFormat
 from ..utils.formatters import StockFormatter
 from ..utils.errors import get_error_response
-from .base import get_backend, ToolResponse
+from .base import get_backend, ToolResponse, fetch_stock_quotes, fetch_etf_quotes
 
 
 def register_market_tools(mcp: FastMCP):

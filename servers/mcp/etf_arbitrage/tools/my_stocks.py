@@ -1,7 +1,7 @@
 """
-Configuration and watchlist management tools for ETF Arbitrage MCP Server.
+Configuration and My Stocks management tools for ETF Arbitrage MCP Server.
 
-Provides tools for managing watchlist and accessing stock-ETF mappings.
+Provides tools for managing user's stock watchlist (my_stocks) and accessing stock-ETF mappings.
 """
 
 import yaml
@@ -11,9 +11,9 @@ from mcp.server.fastmcp import FastMCP
 
 from ..models.requests import (
     GetStockETFMappingRequest,
-    ListWatchlistRequest,
-    AddWatchlistStockRequest,
-    RemoveWatchlistStockRequest,
+    ListMyStocksRequest,
+    AddMyStockRequest,
+    RemoveMyStockRequest,
 )
 from ..models.enums import ResponseFormat, MarketType
 from ..utils.errors import get_error_response, ValidationError
@@ -128,7 +128,7 @@ def register_config_tools(mcp: FastMCP):
             return ToolResponse.error(f"Failed to get mapping: {str(e)}")
 
     @mcp.tool(
-        name="etf_arbitrage_list_watchlist",
+        name="etf_arbitrage_list_my_stocks",
         annotations={
             "title": "List Watchlist",
             "readOnlyHint": True,
@@ -137,7 +137,7 @@ def register_config_tools(mcp: FastMCP):
             "openWorldHint": False,
         }
     )
-    async def list_watchlist(params: ListWatchlistRequest) -> str:
+    async def list_my_stocks(params: ListMyStocksRequest) -> str:
         """List stocks in the watchlist.
 
         This tool retrieves the current watchlist configuration, including
@@ -145,7 +145,7 @@ def register_config_tools(mcp: FastMCP):
         the watchlist, only retrieves existing entries.
 
         Args:
-            params (ListWatchlistRequest): Validated input parameters containing:
+            params (ListMyStocksRequest): Validated input parameters containing:
                 - response_format (ResponseFormat): Output format ('markdown' or 'json', default='markdown')
 
         Returns:
@@ -154,8 +154,8 @@ def register_config_tools(mcp: FastMCP):
         Examples:
             - Use when: "Show my watchlist" -> params with default values
             - Use when: "What stocks am I monitoring?" -> params with default values
-            - Don't use when: You need to add a stock (use etf_arbitrage_add_watchlist_stock instead)
-            - Don't use when: You need to remove a stock (use etf_arbitrage_remove_watchlist_stock instead)
+            - Don't use when: You need to add a stock (use etf_arbitrage_add_my_stock instead)
+            - Don't use when: You need to remove a stock (use etf_arbitrage_remove_my_stock instead)
 
         Error Handling:
             - Returns empty list if watchlist is not configured
@@ -197,7 +197,7 @@ def register_config_tools(mcp: FastMCP):
             return ToolResponse.error(f"Failed to list watchlist: {str(e)}")
 
     @mcp.tool(
-        name="etf_arbitrage_add_watchlist_stock",
+        name="etf_arbitrage_add_my_stock",
         annotations={
             "title": "Add Stock to Watchlist",
             "readOnlyHint": False,
@@ -206,7 +206,7 @@ def register_config_tools(mcp: FastMCP):
             "openWorldHint": False,
         }
     )
-    async def add_watchlist_stock(params: AddWatchlistStockRequest) -> str:
+    async def add_my_stock(params: AddMyStockRequest) -> str:
         """Add a stock to the watchlist.
 
         This tool adds a new stock to the watchlist configuration. The stock
@@ -214,7 +214,7 @@ def register_config_tools(mcp: FastMCP):
         exists in the watchlist, it will be updated with the new information.
 
         Args:
-            params (AddWatchlistStockRequest): Validated input parameters containing:
+            params (AddMyStockRequest): Validated input parameters containing:
                 - code (str): Stock code (6 digits, e.g., '600519')
                 - name (str): Stock name (e.g., '贵州茅台')
                 - market (MarketType): Market type ('sh', 'sz', or 'bj')
@@ -226,8 +226,8 @@ def register_config_tools(mcp: FastMCP):
         Examples:
             - Use when: "Add Kweichow Moutai to my watchlist" -> params with code='600519', name='贵州茅台', market='sh'
             - Use when: "Monitor China Merchants Bank" -> params with code='600036', name='招商银行', market='sh'
-            - Don't use when: You need to list all watchlist stocks (use etf_arbitrage_list_watchlist instead)
-            - Don't use when: You need to remove a stock (use etf_arbitrage_remove_watchlist_stock instead)
+            - Don't use when: You need to list all watchlist stocks (use etf_arbitrage_list_my_stocks instead)
+            - Don't use when: You need to remove a stock (use etf_arbitrage_remove_my_stock instead)
 
         Error Handling:
             - Validates stock code format (6 digits)
@@ -285,7 +285,7 @@ def register_config_tools(mcp: FastMCP):
             return ToolResponse.error(f"Failed to add stock to watchlist: {str(e)}")
 
     @mcp.tool(
-        name="etf_arbitrage_remove_watchlist_stock",
+        name="etf_arbitrage_remove_my_stock",
         annotations={
             "title": "Remove Stock from Watchlist",
             "readOnlyHint": False,
@@ -294,14 +294,14 @@ def register_config_tools(mcp: FastMCP):
             "openWorldHint": False,
         }
     )
-    async def remove_watchlist_stock(params: RemoveWatchlistStockRequest) -> str:
+    async def remove_my_stock(params: RemoveMyStockRequest) -> str:
         """Remove a stock from the watchlist.
 
         This tool removes a stock from the watchlist configuration. The stock
         will no longer be monitored for arbitrage opportunities.
 
         Args:
-            params (RemoveWatchlistStockRequest): Validated input parameters containing:
+            params (RemoveMyStockRequest): Validated input parameters containing:
                 - code (str): Stock code (6 digits, e.g., '600519')
 
         Returns:
@@ -310,8 +310,8 @@ def register_config_tools(mcp: FastMCP):
         Examples:
             - Use when: "Remove stock 600519 from my watchlist" -> params with code='600519'
             - Use when: "Stop monitoring Kweichow Moutai" -> params with code='600519'
-            - Don't use when: You need to list watchlist stocks (use etf_arbitrage_list_watchlist instead)
-            - Don't use when: You need to add a stock (use etf_arbitrage_add_watchlist_stock instead)
+            - Don't use when: You need to list watchlist stocks (use etf_arbitrage_list_my_stocks instead)
+            - Don't use when: You need to add a stock (use etf_arbitrage_add_my_stock instead)
 
         Error Handling:
             - Validates stock code format (6 digits)

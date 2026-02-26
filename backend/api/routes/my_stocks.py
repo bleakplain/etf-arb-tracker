@@ -47,10 +47,10 @@ def _clear_monitor_cache() -> None:
         config._config = None
 
 
-@router.post("/api/watchlist/add")
+@router.post("/api/my-stocks/add")
 @handle_api_errors("添加自选股")
 @handle_file_errors("添加自选股")
-async def add_to_watchlist(request: AddStockRequest):
+async def add_to_my_stocks(request: AddStockRequest):
     """
     添加股票到自选列表
 
@@ -97,9 +97,9 @@ async def add_to_watchlist(request: AddStockRequest):
     }
 
 
-@router.delete("/api/watchlist/{code}")
+@router.delete("/api/my-stocks/{code}")
 @handle_file_errors("删除自选股")
-async def remove_from_watchlist(code: str):
+async def remove_from_my_stocks(code: str):
     """
     从自选列表删除股票
 
@@ -139,9 +139,9 @@ async def remove_from_watchlist(code: str):
     }
 
 
-@router.get("/api/watchlist")
+@router.get("/api/my-stocks")
 @handle_api_errors("获取自选列表")
-async def get_watchlist():
+async def get_my_stocks():
     """
     获取自选股列表
 

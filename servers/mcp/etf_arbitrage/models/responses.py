@@ -149,8 +149,8 @@ class StockETFMapping(BaseModel):
     total_etfs: int = Field(..., description="Total number of related ETFs")
 
 
-class WatchlistStock(BaseModel):
-    """Watchlist stock entry."""
+class MyStock(BaseModel):
+    """My stock entry."""
     code: str = Field(..., description="Stock code")
     name: str = Field(..., description="Stock name")
     market: str = Field(..., description="Market (sh/sz/bj)")

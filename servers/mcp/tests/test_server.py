@@ -63,9 +63,9 @@ class TestToolRegistration:
             "etf_arbitrage_list_backtests",
             # Configuration
             "etf_arbitrage_get_stock_etf_mapping",
-            "etf_arbitrage_list_watchlist",
-            "etf_arbitrage_add_watchlist_stock",
-            "etf_arbitrage_remove_watchlist_stock",
+            "etf_arbitrage_list_my_stocks",
+            "etf_arbitrage_add_my_stock",
+            "etf_arbitrage_remove_my_stock",
             # Monitor Control
             "etf_arbitrage_get_monitor_status",
             "etf_arbitrage_start_monitor",
@@ -109,7 +109,7 @@ class TestToolAnnotations:
             "etf_arbitrage_get_backtest_result",
             "etf_arbitrage_list_backtests",
             "etf_arbitrage_get_stock_etf_mapping",
-            "etf_arbitrage_list_watchlist",
+            "etf_arbitrage_list_my_stocks",
             "etf_arbitrage_get_monitor_status",
         ]
 

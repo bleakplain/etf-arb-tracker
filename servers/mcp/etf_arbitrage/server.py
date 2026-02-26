@@ -96,13 +96,13 @@ mcp = FastMCP(
 # Register tool groups
 def register_all_tools():
     """Register all tool groups with the MCP server."""
-    from .tools import market, arbitrage, signal, backtest, watchlist, monitor
+    from .tools import market, arbitrage, signal, backtest, my_stocks, monitor
 
     market.register_market_tools(mcp)
     arbitrage.register_arbitrage_tools(mcp)
     signal.register_signal_tools(mcp)
     backtest.register_backtest_tools(mcp)
-    watchlist.register_config_tools(mcp)
+    my_stocks.register_config_tools(mcp)
     monitor.register_monitor_tools(mcp)
 
 
@@ -140,9 +140,9 @@ def get_server_info() -> dict:
             "etf_arbitrage_list_backtests",
             # Configuration
             "etf_arbitrage_get_stock_etf_mapping",
-            "etf_arbitrage_list_watchlist",
-            "etf_arbitrage_add_watchlist_stock",
-            "etf_arbitrage_remove_watchlist_stock",
+            "etf_arbitrage_list_my_stocks",
+            "etf_arbitrage_add_my_stock",
+            "etf_arbitrage_remove_my_stock",
             # Monitor Control
             "etf_arbitrage_get_monitor_status",
             "etf_arbitrage_start_monitor",

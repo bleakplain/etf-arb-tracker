@@ -72,10 +72,9 @@ def register_monitor_tools(mcp: FastMCP):
             config = backend.get_config()
 
             # Get trading hours
-            from backend.utils.clock import Clock
-            clock = Clock()
-            is_trading_time = clock.is_trading_time()
-            time_to_close = clock.seconds_until_market_close() if is_trading_time else None
+            from backend.utils import is_trading_time, get_time_to_market_close
+            is_trading_time = is_trading_time()
+            time_to_close = get_time_to_market_close() if is_trading_time else None
 
             # Get watchlist count
             try:
@@ -93,7 +92,8 @@ def register_monitor_tools(mcp: FastMCP):
             # Get signal count from repository
             try:
                 signal_repo = backend.get_signal_repository()
-                today_signals = await signal_repo.count_today()
+                today_signals_list = signal_repo.get_today_signals()
+                today_signals = len(today_signals_list)
             except:
                 today_signals = 0
 

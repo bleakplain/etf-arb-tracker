@@ -23,8 +23,8 @@ class TestServerIntegration:
     def test_backend_modules_import(self):
         """测试后端模块可以正确导入"""
         # 测试关键后端模块导入
-        from backend.market.cn.quote_fetcher import QuoteFetcherCN
-        from backend.market.cn.etf_quote_provider import ETFQuoteProvider
+        from backend.market.cn.quote_fetcher import CNQuoteFetcher
+        from backend.market.cn.etf_quote import CNETFQuoteFetcher
         from backend.signal.db_repository import DBSignalRepository
         from backend.arbitrage.cn.factory import ArbitrageEngineFactory
         from backend.data.backtest_repository import BacktestRepository
@@ -162,9 +162,9 @@ class TestToolDefinitions:
 
         config_tools = [
             "etf_arbitrage_get_stock_etf_mapping",
-            "etf_arbitrage_list_watchlist",
-            "etf_arbitrage_add_watchlist_stock",
-            "etf_arbitrage_remove_watchlist_stock",
+            "etf_arbitrage_list_my_stocks",
+            "etf_arbitrage_add_my_stock",
+            "etf_arbitrage_remove_my_stock",
         ]
 
         for tool_name in config_tools:

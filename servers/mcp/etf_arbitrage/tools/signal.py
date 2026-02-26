@@ -99,14 +99,20 @@ def register_signal_tools(mcp: FastMCP):
                     end=params.end_date
                 )
 
-            # Fetch signals with filters
-            signals, total = await signal_repo.find_signals(
-                stock_code=params.stock_code,
-                start_date=start_dt,
-                end_date=end_dt,
-                limit=params.limit,
-                offset=params.offset,
-            )
+            # Fetch signals with filters using synchronous methods
+            if params.stock_code:
+                signals = signal_repo.get_signals_by_stock(params.stock_code, limit=params.limit)
+                total = len(signals)
+            elif start_dt or end_dt:
+                start_str = start_dt.strftime("%Y-%m-%d") if start_dt else "2024-01-01"
+                end_str = end_dt.strftime("%Y-%m-%d") if end_dt else datetime.now().strftime("%Y-%m-%d")
+                signals = signal_repo.get_signals_by_date_range(start_str, end_str)
+                # Apply pagination
+                total = len(signals)
+                signals = signals[params.offset:params.offset + params.limit]
+            else:
+                signals = signal_repo.get_recent_signals(limit=params.limit)
+                total = signal_repo.get_count()
 
             if not signals:
                 return "# Trading Signals\n\nNo signals found matching the specified criteria."
@@ -115,16 +121,16 @@ def register_signal_tools(mcp: FastMCP):
             signal_dicts = []
             for s in signals:
                 signal_dicts.append({
-                    'id': s.id,
+                    'id': s.signal_id,
                     'stock_code': s.stock_code,
                     'stock_name': s.stock_name,
                     'etf_code': s.etf_code,
                     'etf_name': s.etf_name,
-                    'weight': s.weight,
-                    'event_type': s.event_type,
+                    'weight': s.etf_weight,
+                    'event_type': 'limit_up',  # Default event type
                     'confidence': s.confidence,
-                    'timestamp': s.timestamp.isoformat() if s.timestamp else None,
-                    'created_at': s.created_at.isoformat() if s.created_at else None,
+                    'timestamp': s.timestamp,
+                    'created_at': s.timestamp,  # Use timestamp as created_at
                 })
 
             # Build response
@@ -227,26 +233,26 @@ def register_signal_tools(mcp: FastMCP):
             signal_repo = backend.get_signal_repository()
 
             # Fetch signal by ID
-            signal = await signal_repo.get_by_id(params.signal_id)
+            signal = signal_repo.get_signal(params.signal_id)
 
             if not signal:
                 return get_error_response("signal_not_found", signal_id=params.signal_id)
 
             # Convert to dict format
             signal_dict = {
-                'id': signal.id,
+                'id': signal.signal_id,
                 'stock_code': signal.stock_code,
                 'stock_name': signal.stock_name,
                 'etf_code': signal.etf_code,
                 'etf_name': signal.etf_name,
-                'weight': signal.weight,
-                'weight_pct': signal.weight * 100,
-                'event_type': signal.event_type,
+                'weight': signal.etf_weight,
+                'weight_pct': signal.etf_weight * 100,
+                'event_type': 'limit_up',
                 'confidence': signal.confidence,
-                'confidence_pct': signal.confidence * 100,
-                'timestamp': signal.timestamp.isoformat() if signal.timestamp else None,
-                'created_at': signal.created_at.isoformat() if signal.created_at else None,
-                'metadata': getattr(signal, 'metadata', {}),
+                'confidence_pct': float(signal.confidence) * 100 if signal.confidence else 0,
+                'timestamp': signal.timestamp,
+                'created_at': signal.timestamp,
+                'metadata': {},
             }
 
             # Build response

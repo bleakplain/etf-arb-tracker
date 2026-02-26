@@ -23,9 +23,9 @@ from .requests import (
     GetBacktestResultRequest,
     ListBacktestsRequest,
     GetStockETFMappingRequest,
-    ListWatchlistRequest,
-    AddWatchlistStockRequest,
-    RemoveWatchlistStockRequest,
+    ListMyStocksRequest,
+    AddMyStockRequest,
+    RemoveMyStockRequest,
 )
 from .responses import (
     StockQuote,
@@ -37,7 +37,7 @@ from .responses import (
     BacktestSummary,
     BacktestResult,
     StockETFMapping,
-    WatchlistStock,
+    MyStock,
     MonitorStatus,
     PaginatedResponse,
 )
@@ -63,9 +63,9 @@ __all__ = [
     "GetBacktestResultRequest",
     "ListBacktestsRequest",
     "GetStockETFMappingRequest",
-    "ListWatchlistRequest",
-    "AddWatchlistStockRequest",
-    "RemoveWatchlistStockRequest",
+    "ListMyStocksRequest",
+    "AddMyStockRequest",
+    "RemoveMyStockRequest",
     # Responses
     "StockQuote",
     "ETFQuote",
@@ -76,7 +76,7 @@ __all__ = [
     "BacktestSummary",
     "BacktestResult",
     "StockETFMapping",
-    "WatchlistStock",
+    "MyStock",
     "MonitorStatus",
     "PaginatedResponse",
 ]

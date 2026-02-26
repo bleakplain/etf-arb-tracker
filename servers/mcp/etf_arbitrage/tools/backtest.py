@@ -91,7 +91,7 @@ def register_backtest_tools(mcp: FastMCP):
 
             backend = get_backend()
             backtest_engine = backend.get_backtest_engine()
-            backtest_repo = backend.data.backtest_repository
+            backtest_repo = backend.get_backtest_repository()
 
             # Map enum values to backend format
             granularity_map = {
@@ -114,12 +114,16 @@ def register_backtest_tools(mcp: FastMCP):
             # Generate job ID
             job_id = str(uuid.uuid4())
 
-            # Create backtest job
-            job = await backtest_repo.create_job(
-                job_id=job_id,
-                config=config,
-                status='pending',
-            )
+            # Create backtest job data
+            job_data = {
+                'job_id': job_id,
+                'config': config,
+                'status': 'pending',
+                'created_at': datetime.now().isoformat(),
+            }
+
+            # Save job
+            backtest_repo.save_job(job_id, job_data)
 
             # Run backtest asynchronously
             import asyncio
@@ -201,27 +205,27 @@ def register_backtest_tools(mcp: FastMCP):
         """
         try:
             backend = get_backend()
-            backtest_repo = backend.data.backtest_repository
+            backtest_repo = backend.get_backtest_repository()
 
             # Fetch job
-            job = await backtest_repo.get_job(params.job_id)
+            job = backtest_repo.load_job(params.job_id)
 
             if not job:
                 return get_error_response("backtest_not_found", job_id=params.job_id)
 
             # Convert to dict format
             result = {
-                'job_id': job.id,
-                'status': job.status,
-                'start_date': job.config.get('start_date'),
-                'end_date': job.config.get('end_date'),
-                'total_signals': len(job.signals) if job.signals else 0,
-                'event_detector': job.config.get('event_detector'),
-                'fund_selector': job.config.get('fund_selector'),
-                'signal_filters': job.config.get('signal_filters', []),
-                'created_at': job.created_at.isoformat() if job.created_at else None,
-                'completed_at': job.completed_at.isoformat() if job.completed_at else None,
-                'error': job.error if job.status == 'failed' else None,
+                'job_id': job.get('job_id'),
+                'status': job.get('status'),
+                'start_date': job.get('config', {}).get('start_date'),
+                'end_date': job.get('config', {}).get('end_date'),
+                'total_signals': len(job.get('signals', [])),
+                'event_detector': job.get('config', {}).get('event_detector'),
+                'fund_selector': job.get('config', {}).get('fund_selector'),
+                'signal_filters': job.get('config', {}).get('signal_filters', []),
+                'created_at': job.get('created_at'),
+                'completed_at': job.get('completed_at'),
+                'error': job.get('error') if job.get('status') == 'failed' else None,
             }
 
             # Add performance metrics if available
@@ -333,28 +337,30 @@ def register_backtest_tools(mcp: FastMCP):
         """
         try:
             backend = get_backend()
-            backtest_repo = backend.data.backtest_repository
+            backtest_repo = backend.get_backtest_repository()
 
             # Fetch jobs
-            jobs, total = await backtest_repo.list_jobs(
-                status=params.status,
-                limit=params.limit,
-                offset=params.offset,
-            )
+            jobs = backtest_repo.list_jobs(limit=params.limit + params.offset)
+            total = len(jobs)
+
+            # Apply pagination and filter
+            paginated_jobs = jobs[params.offset:params.offset + params.limit]
+            if params.status:
+                paginated_jobs = [j for j in paginated_jobs if j.get('status') == params.status]
 
             # Convert to dict format
             job_dicts = []
-            for job in jobs:
+            for job in paginated_jobs:
                 job_dicts.append({
-                    'job_id': job.id,
-                    'status': job.status,
-                    'start_date': job.config.get('start_date'),
-                    'end_date': job.config.get('end_date'),
-                    'total_signals': len(job.signals) if job.signals else 0,
-                    'event_detector': job.config.get('event_detector'),
-                    'fund_selector': job.config.get('fund_selector'),
-                    'created_at': job.created_at.isoformat() if job.created_at else None,
-                    'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+                    'job_id': job.get('job_id'),
+                    'status': job.get('status'),
+                    'start_date': job.get('config', {}).get('start_date'),
+                    'end_date': job.get('config', {}).get('end_date'),
+                    'total_signals': len(job.get('signals', [])),
+                    'event_detector': job.get('config', {}).get('event_detector'),
+                    'fund_selector': job.get('config', {}).get('fund_selector'),
+                    'created_at': job.get('created_at'),
+                    'completed_at': job.get('completed_at'),
                 })
 
             # Build response

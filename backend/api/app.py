@@ -29,7 +29,7 @@ from backend.api.routes.frontend import router as frontend_router
 from backend.api.routes.monitor import router as monitor_router
 from backend.api.routes.stocks import router as stocks_router
 from backend.api.routes.signals import router as signals_router
-from backend.api.routes.watchlist import router as watchlist_router
+from backend.api.routes.my_stocks import router as my_stocks_router
 from backend.api.routes.config import router as config_router
 from backend.api.routes.backtest import router as backtest_router
 
@@ -73,7 +73,7 @@ app.include_router(frontend_router)
 app.include_router(monitor_router)
 app.include_router(stocks_router)
 app.include_router(signals_router)
-app.include_router(watchlist_router)
+app.include_router(my_stocks_router)
 app.include_router(config_router)
 app.include_router(backtest_router)
 

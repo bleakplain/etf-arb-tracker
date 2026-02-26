@@ -257,12 +257,12 @@ class GetStockETFMappingRequest(FormattedRequest):
     )
 
 
-class ListWatchlistRequest(FormattedRequest):
+class ListMyStocksRequest(FormattedRequest):
     """Request to list watchlist stocks."""
     pass
 
 
-class AddWatchlistStockRequest(BaseRequest):
+class AddMyStockRequest(BaseRequest):
     """Request to add a stock to watchlist."""
     code: str = Field(
         ...,
@@ -295,7 +295,7 @@ class AddWatchlistStockRequest(BaseRequest):
         return v
 
 
-class RemoveWatchlistStockRequest(BaseRequest):
+class RemoveMyStockRequest(BaseRequest):
     """Request to remove a stock from watchlist."""
     code: str = Field(
         ...,

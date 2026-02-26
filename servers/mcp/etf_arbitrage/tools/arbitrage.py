@@ -17,6 +17,8 @@ from ..utils.errors import get_error_response
 from .base import (
     get_backend,
     ToolResponse,
+    fetch_stock_quotes,
+    get_etf_info,
 )
 
 
@@ -117,27 +119,28 @@ def register_arbitrage_tools(mcp: FastMCP):
                 pass
 
             # Get mapping
-            mapping = await engine.get_stock_etf_mapping(params.stock_code)
+            mapping_repo = backend.get_mapping_repository()
+            etf_list = mapping_repo.get_etf_list(params.stock_code)
 
             # Filter by weight
             related_etfs = []
-            for etf_code, weight in mapping.get('etfs', {}).items():
+            for etf_info in etf_list:
+                weight = etf_info.get('weight', etf_info.get('etf_weight', 0))
                 if weight >= params.min_weight:
                     # Get ETF details
                     try:
-                        from .base import get_etf_info
-                        etf_info = await get_etf_info(etf_code)
-                        etf_info['weight'] = weight
-                        etf_info['weight_pct'] = weight * 100
-                        related_etfs.append(etf_info)
+                        full_etf_info = await get_etf_info(etf_info['code'])
+                        full_etf_info['weight'] = weight
+                        full_etf_info['weight_pct'] = weight * 100
+                        related_etfs.append(full_etf_info)
                     except:
-                        # If we can't get full info, create basic entry
+                        # If we can't get full info, use basic entry
                         related_etfs.append({
-                            'code': etf_code,
-                            'name': etf_code,
+                            'code': etf_info['code'],
+                            'name': etf_info.get('name', etf_info['code']),
                             'weight': weight,
                             'weight_pct': weight * 100,
-                            'market': 'unknown',
+                            'market': etf_info.get('market', 'unknown'),
                         })
 
             if not related_etfs:
@@ -253,24 +256,25 @@ def register_arbitrage_tools(mcp: FastMCP):
             }
 
             # Get related ETFs
-            mapping = await engine.get_stock_etf_mapping(params.stock_code)
+            mapping_repo = backend.get_mapping_repository()
+            etf_list = mapping_repo.get_etf_list(params.stock_code)
             related_etfs = []
 
-            for etf_code, weight in mapping.get('etfs', {}).items():
+            for etf_info in etf_list:
+                weight = etf_info.get('weight', etf_info.get('etf_weight', 0))
                 if weight >= 0.05:  # 5% threshold
                     try:
-                        from .base import get_etf_info
-                        etf_info = await get_etf_info(etf_code)
-                        etf_info['weight'] = weight
-                        etf_info['weight_pct'] = weight * 100
-                        related_etfs.append(etf_info)
+                        full_etf_info = await get_etf_info(etf_info['code'])
+                        full_etf_info['weight'] = weight
+                        full_etf_info['weight_pct'] = weight * 100
+                        related_etfs.append(full_etf_info)
                     except:
                         related_etfs.append({
-                            'code': etf_code,
-                            'name': etf_code,
+                            'code': etf_info['code'],
+                            'name': etf_info.get('name', etf_info['code']),
                             'weight': weight,
                             'weight_pct': weight * 100,
-                            'market': 'unknown',
+                            'market': etf_info.get('market', 'unknown'),
                         })
 
             # Sort by weight
@@ -280,11 +284,11 @@ def register_arbitrage_tools(mcp: FastMCP):
             recent_signals = []
             if params.include_signals:
                 try:
-                    signals = await signal_repo.find_by_stock(
+                    signals = signal_repo.get_signals_by_stock(
                         params.stock_code,
                         limit=5
                     )
-                    recent_signals = [s.id for s in signals]
+                    recent_signals = [s.signal_id for s in signals]
                 except:
                     pass
 

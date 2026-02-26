@@ -1,0 +1,17 @@
+{
+  "job_id": "4c4dfc8e-95b0-4273-8c28-0f7ded36c75b",
+  "request": {
+    "start_date": "20240101",
+    "end_date": "20240131",
+    "granularity": "daily",
+    "min_weight": null,
+    "evaluator_type": "default",
+    "interpolation": "linear",
+    "max_stocks": 0,
+    "max_etfs": 0
+  },
+  "status": "failed",
+  "progress": 0.0,
+  "result": null,
+  "error": "BacktestConfig.__init__() got an unexpected keyword argument 'time_granularity'"
+}
