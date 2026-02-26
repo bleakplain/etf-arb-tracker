@@ -154,7 +154,7 @@ def register_arbitrage_tools(mcp: FastMCP):
             related_etfs.sort(key=lambda x: x['weight'], reverse=True)
 
             # Build response
-            stock_name = stock_info.name if stock_info else params.stock_code
+            stock_name = stock_info.get('name') if stock_info else params.stock_code
 
             if params.response_format == ResponseFormat.JSON:
                 import json
@@ -241,18 +241,18 @@ def register_arbitrage_tools(mcp: FastMCP):
 
             # Get stock quote
             stock_quotes = await fetch_stock_quotes([params.stock_code])
-            if not stock_quotes:
+            if not stock_quotes or not stock_quotes[0]:
                 return get_error_response("stock_not_found", code=params.stock_code)
 
             stock = stock_quotes[0]
             stock_dict = {
-                'code': stock.code,
-                'name': stock.name,
-                'price': stock.price,
-                'change': stock.change,
-                'change_pct': stock.change_pct,
-                'is_limit_up': getattr(stock, 'is_limit_up', False),
-                'market': stock.market,
+                'code': stock.get('code', params.stock_code),
+                'name': stock.get('name', ''),
+                'price': stock.get('price', 0),
+                'change': stock.get('change', 0),
+                'change_pct': stock.get('change_pct', 0),
+                'is_limit_up': stock.get('is_limit_up', False),
+                'market': stock.get('market', ''),
             }
 
             # Get related ETFs
@@ -299,9 +299,9 @@ def register_arbitrage_tools(mcp: FastMCP):
             from datetime import datetime
             analysis = {
                 'stock_code': params.stock_code,
-                'stock_name': stock.name,
+                'stock_name': stock_dict['name'],
                 'is_limit_up': stock_dict['is_limit_up'],
-                'change_pct': stock.change_pct,
+                'change_pct': stock_dict['change_pct'],
                 'related_etfs': related_etfs,
                 'best_etf': best_etf,
                 'recent_signals': recent_signals,
@@ -317,10 +317,10 @@ def register_arbitrage_tools(mcp: FastMCP):
             lines = [
                 f"# Arbitrage Opportunity Analysis",
                 "",
-                f"## Stock: {stock.name} ({params.stock_code}) {status_emoji}",
+                f"## Stock: {stock_dict['name']} ({params.stock_code}) {status_emoji}",
                 "",
-                f"- **Current Price**: {stock.price:.2f}",
-                f"- **Change**: {stock.change:+.2f} ({stock.change_pct:+.2f}%)",
+                f"- **Current Price**: {stock_dict['price']:.2f}",
+                f"- **Change**: {stock_dict['change']:+.2f} ({stock_dict['change_pct']:+.2f}%)",
                 f"- **Status**: {'🔴 LIMIT-UP - Consider buying ETF!' if stock_dict['is_limit_up'] else 'Not limit-up'}",
                 "",
             ]

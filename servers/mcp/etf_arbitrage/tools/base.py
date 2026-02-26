@@ -46,46 +46,58 @@ class BackendBridge:
     def get_quote_fetcher(self):
         """Get or initialize quote fetcher."""
         if self._quote_fetcher is None:
-            from backend.market.cn.quote_fetcher import QuoteFetcherCN
-            self._quote_fetcher = QuoteFetcherCN()
+            from backend.market.cn.quote_fetcher import CNQuoteFetcher
+            self._quote_fetcher = CNQuoteFetcher()
         return self._quote_fetcher
 
     def get_etf_holder_provider(self):
         """Get or initialize ETF holder provider."""
         if self._etf_holder_provider is None:
-            from backend.market.cn.etf_holder_provider import ETFHolderProvider
-            self._etf_holder_provider = ETFHolderProvider()
+            from backend.market.cn.etf_holding_provider import CNETFHoldingProvider
+            self._etf_holder_provider = CNETFHoldingProvider()
         return self._etf_holder_provider
 
     def get_etf_holdings_provider(self):
         """Get or initialize ETF holdings provider."""
         if self._etf_holdings_provider is None:
-            from backend.market.cn.etf_holdings_provider import ETFHoldingsProvider
-            self._etf_holdings_provider = ETFHoldingsProvider()
+            from backend.market.cn.etf_holding_provider import CNETFHoldingProvider
+            self._etf_holdings_provider = CNETFHoldingProvider()
         return self._etf_holdings_provider
 
     def get_etf_quote_provider(self):
         """Get or initialize ETF quote provider."""
         if self._etf_quote_provider is None:
-            from backend.market.cn.etf_quote_provider import ETFQuoteProvider
-            self._etf_quote_provider = ETFQuoteProvider()
+            from backend.market.cn.etf_quote import CNETFQuoteFetcher
+            self._etf_quote_provider = CNETFQuoteFetcher()
         return self._etf_quote_provider
 
     def get_arbitrage_engine(self):
         """Get or initialize arbitrage engine."""
         if self._arbitrage_engine is None:
-            from backend.arbitrage.cn.arbitrage_engine import ArbitrageEngineCN
             from backend.arbitrage.cn.factory import ArbitrageEngineFactory
-            from backend.api.dependencies import get_config, get_clock
+            from backend.api.dependencies import get_config, register_strategies
+            from config import Config
 
             # Register strategies
-            from backend.api.dependencies import register_strategies
             register_strategies()
 
+            # Get config
+            app_config = get_config()
+
+            # Create providers
+            quote_fetcher = self.get_quote_fetcher()
+            etf_holder_provider = self.get_etf_holder_provider()
+            etf_holdings_provider = self.get_etf_holdings_provider()
+            etf_quote_provider = self.get_etf_quote_provider()
+
             # Use factory to create engine
-            config = get_config()
-            clock = get_clock()
-            self._arbitrage_engine = ArbitrageEngineFactory.create_engine(config, clock)
+            self._arbitrage_engine = ArbitrageEngineFactory.create_engine(
+                quote_fetcher=quote_fetcher,
+                etf_holder_provider=etf_holder_provider,
+                etf_holdings_provider=etf_holdings_provider,
+                etf_quote_provider=etf_quote_provider,
+                config=app_config
+            )
         return self._arbitrage_engine
 
     def get_signal_repository(self):
@@ -261,8 +273,10 @@ async def fetch_stock_quotes(codes: List[str]) -> List[Dict[str, Any]]:
         results = []
         for i in range(0, len(codes), 100):
             batch = codes[i:i+100]
-            quotes = await fetcher.fetch_batch(batch)
-            results.extend(quotes)
+            quotes_dict = fetcher.get_batch_quotes(batch)
+            # Convert dict to list, filtering out None values
+            quotes_list = [q for q in quotes_dict.values() if q is not None]
+            results.extend(quotes_list)
         return results
     except Exception as e:
         raise APIError(f"Failed to fetch stock quotes: {str(e)}")
@@ -285,8 +299,10 @@ async def fetch_etf_quotes(codes: List[str]) -> List[Dict[str, Any]]:
         results = []
         for i in range(0, len(codes), 100):
             batch = codes[i:i+100]
-            quotes = await fetcher.fetch_batch(batch)
-            results.extend(quotes)
+            quotes_dict = fetcher.get_etf_batch_quotes(batch)
+            # Convert dict to list, filtering out None values
+            quotes_list = [q for q in quotes_dict.values() if q is not None]
+            results.extend(quotes_list)
         return results
     except Exception as e:
         raise APIError(f"Failed to fetch ETF quotes: {str(e)}")
@@ -308,15 +324,16 @@ async def get_stock_info(stock_code: str) -> Optional[Dict[str, Any]]:
         quotes = await fetch_stock_quotes([stock_code])
         if quotes:
             q = quotes[0]
-            return {
-                'code': q.code,
-                'name': q.name,
-                'price': q.price,
-                'change': q.change,
-                'change_pct': q.change_pct,
-                'is_limit_up': getattr(q, 'is_limit_up', False),
-                'market': q.market,
-            }
+            if q is not None:
+                return {
+                    'code': q.get('code', stock_code),
+                    'name': q.get('name', ''),
+                    'price': q.get('price', 0),
+                    'change': q.get('change', 0),
+                    'change_pct': q.get('change_pct', 0),
+                    'is_limit_up': q.get('is_limit_up', False),
+                    'market': q.get('market', ''),
+                }
     except:
         pass
 
@@ -336,23 +353,28 @@ async def get_etf_info(etf_code: str) -> Dict[str, Any]:
     fetcher = backend.get_etf_quote_provider()
 
     try:
-        quote = await fetcher.fetch_one(etf_code)
-        return {
-            'code': quote.code,
-            'name': quote.name,
-            'market': quote.market,
-            'price': quote.price,
-            'change': quote.change,
-            'change_pct': quote.change_pct,
-            'premium_rate': getattr(quote, 'premium_rate', None),
-        }
+        quote_dict = fetcher.get_etf_quote(etf_code)
+        if quote_dict:
+            return {
+                'code': quote_dict.get('code', etf_code),
+                'name': quote_dict.get('name', etf_code),
+                'market': quote_dict.get('market', 'unknown'),
+                'price': quote_dict.get('price', 0),
+                'change': quote_dict.get('change', 0),
+                'change_pct': quote_dict.get('change_pct', 0),
+                'premium_rate': quote_dict.get('premium_rate'),
+                'daily_amount': quote_dict.get('amount', 0),
+                'category': quote_dict.get('category'),
+            }
     except Exception as e:
         # Return minimal info if fetch fails
-        return {
-            'code': etf_code,
-            'name': etf_code,
-            'market': 'unknown',
-        }
+        pass
+
+    return {
+        'code': etf_code,
+        'name': etf_code,
+        'market': 'unknown',
+    }
 
 
 def validate_stock_code(code: str) -> bool:

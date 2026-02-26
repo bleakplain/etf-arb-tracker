@@ -72,9 +72,9 @@ def register_monitor_tools(mcp: FastMCP):
             config = backend.get_config()
 
             # Get trading hours
-            from backend.utils import is_trading_time, get_time_to_market_close
-            is_trading_time = is_trading_time()
-            time_to_close = get_time_to_market_close() if is_trading_time else None
+            from backend.utils.time_utils import is_trading_time, time_to_close
+            is_trading = is_trading_time()
+            seconds_to_close = time_to_close() if is_trading else None
 
             # Get watchlist count
             try:
@@ -106,8 +106,8 @@ def register_monitor_tools(mcp: FastMCP):
                 'watched_stocks': watched_stocks,
                 'total_signals': _monitor_state['total_signals'],
                 'today_signals': today_signals,
-                'is_trading_time': is_trading_time,
-                'time_to_close': time_to_close,
+                'is_trading_time': is_trading,
+                'time_to_close': seconds_to_close,
                 'timestamp': datetime.now().isoformat(),
             }
 
@@ -298,7 +298,7 @@ def register_monitor_tools(mcp: FastMCP):
             # Check for limit-up stocks
             limit_up_stocks = [
                 q for q in quotes
-                if getattr(q, 'is_limit_up', False) or q.change_pct >= 0.095
+                if q.get('is_limit_up', False) or q.get('change_pct', 0) >= 0.095
             ]
 
             # Generate signals
@@ -306,14 +306,14 @@ def register_monitor_tools(mcp: FastMCP):
             for stock in limit_up_stocks:
                 try:
                     # Get related ETFs
-                    mapping = await engine.get_stock_etf_mapping(stock.code)
+                    mapping = await engine.get_stock_etf_mapping(stock.get('code'))
 
                     for etf_code, weight in mapping.get('etfs', {}).items():
                         if weight >= 0.05:  # 5% threshold
                             # Create signal
                             signal = await signal_repo.save(
-                                stock_code=stock.code,
-                                stock_name=stock.name,
+                                stock_code=stock.get('code'),
+                                stock_name=stock.get('name'),
                                 etf_code=etf_code,
                                 etf_name=etf_code,  # Would fetch from mapping
                                 weight=weight,
@@ -341,7 +341,7 @@ def register_monitor_tools(mcp: FastMCP):
             if limit_up_stocks:
                 lines.append("**Limit-Up Stocks Found:**")
                 for stock in limit_up_stocks:
-                    lines.append(f"- {stock.name} ({stock.code}): +{stock.change_pct:.2f}%")
+                    lines.append(f"- {stock.get('name')} ({stock.get('code')}): +{stock.get('change_pct', 0):.2f}%")
 
             if new_signals:
                 lines.append("")
@@ -376,10 +376,9 @@ async def _run_monitor_loop(backend) -> None:
     try:
         while _monitor_state['is_running']:
             # Check if trading time
-            from backend.utils.clock import Clock
-            clock = Clock()
+            from backend.utils.time_utils import is_trading_time
 
-            if not clock.is_trading_time():
+            if not is_trading_time():
                 # Sleep until next trading period
                 await asyncio.sleep(60)
                 continue

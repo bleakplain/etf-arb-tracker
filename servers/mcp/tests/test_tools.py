@@ -27,8 +27,8 @@ async def test_monitor_status_tool():
     tool = mcp._tool_manager._tools["etf_arbitrage_get_monitor_status"]
     result = await tool.fn()
 
-    # Should return status information
-    assert "Monitor Status" in result or "监控状态" in result or "Error" in result
+    # Should return JSON status information
+    assert "is_running" in result or "Error" in result
     print(f"Monitor status result: {result[:200]}...")
 
 

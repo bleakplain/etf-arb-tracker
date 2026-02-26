@@ -101,26 +101,30 @@ def register_market_tools(mcp: FastMCP):
             if not quotes:
                 return ToolResponse.error("No stock quotes found", "Verify the stock codes are correct")
 
-            # Convert to dict format
+            # Quotes are already dicts from get_batch_quotes
             quote_dicts = []
             for q in quotes:
-                quote_dicts.append({
-                    'code': q.code,
-                    'name': q.name,
-                    'price': q.price,
-                    'change': q.change,
-                    'change_pct': q.change_pct,
-                    'volume': q.volume,
-                    'amount': q.amount,
-                    'high': q.high,
-                    'low': q.low,
-                    'open': q.open,
-                    'pre_close': q.pre_close,
-                    'market': q.market,
-                    'is_limit_up': getattr(q, 'is_limit_up', False),
-                    'is_limit_down': getattr(q, 'is_limit_down', False),
-                    'timestamp': getattr(q, 'timestamp', None),
-                })
+                if q is not None:
+                    quote_dicts.append({
+                        'code': q.get('code', ''),
+                        'name': q.get('name', ''),
+                        'price': q.get('price', 0),
+                        'change': q.get('change', 0),
+                        'change_pct': q.get('change_pct', 0),
+                        'volume': q.get('volume', 0),
+                        'amount': q.get('amount', 0),
+                        'high': q.get('high', 0),
+                        'low': q.get('low', 0),
+                        'open': q.get('open', 0),
+                        'pre_close': q.get('pre_close', 0),
+                        'market': q.get('market', ''),
+                        'is_limit_up': q.get('is_limit_up', False),
+                        'is_limit_down': q.get('is_limit_down', False),
+                        'timestamp': q.get('timestamp', None),
+                    })
+
+            if not quote_dicts:
+                return ToolResponse.error("No stock quotes found", "Verify the stock codes are correct")
 
             # Format response
             if params.response_format == ResponseFormat.JSON:

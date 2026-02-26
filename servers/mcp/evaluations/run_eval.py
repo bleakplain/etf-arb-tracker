@@ -34,7 +34,8 @@ async def run_evaluation():
     tool = mcp._tool_manager._tools['etf_arbitrage_get_monitor_status']
     result = await tool.fn()
     print(f"结果: {result[:100]}...")
-    is_running = 'False' if 'False' in result else ('True' if 'True' in result else 'Unknown')
+    # JSON uses lowercase false, so check for either
+    is_running = 'False' if ('false' in result or 'False' in result) else ('True' if ('true' in result or 'True' in result) else 'Unknown')
     print(f"答案: {is_running}")
     results.append(('Q1', is_running == 'False'))
 
