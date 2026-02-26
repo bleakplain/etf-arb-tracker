@@ -1,0 +1,38 @@
+<evaluation>
+   <qa_pair>
+      <question>查询当前监控服务的状态，包括是否正在运行、上次扫描时间和监控的股票数量。监控系统当前是否正在运行？回答 "True" 或 "False"。</question>
+      <answer>False</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>查看当前的自选股列表配置。配置文件中包含多少只自选股？请提供数字。</question>
+      <answer>0</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>获取股票-ETF映射关系。查询代码为 "600519" 的股票（贵州茅台）在ETF中的持仓情况。有多少个ETF持有该股票且持仓比例大于等于5%？请提供数字。</question>
+      <answer>0</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>查找持有股票 "000001"（平安银行）的ETF，要求持仓比例至少为5%。在这些ETF中，按持仓比例从高到低排序，排名第一的ETF代码是什么？请提供6位ETF代码。</question>
+      <answer>510300</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>分析股票 "600036"（招商银行）的套利机会。获取该股票的实时行情，并查找所有持仓比例≥5%的ETF。在找到的相关ETF中，有几个ETF的代码以 "51" 开头（上海市场ETF）？请提供数字。</question>
+      <answer>2</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>查询历史交易信号。获取股票代码为 "600519" 的所有历史信号记录，限制返回10条记录。在这些信号中，事件类型为 "limit_up" 的信号有多少个？请提供数字。</question>
+      <answer>0</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>获取股票 "600000"（浦发银行）和 "000002"（万科A）的实时行情。在这两只股票中，哪一只的百分比变化（change_pct）更高？请提供6位股票代码。</question>
+      <answer>600000</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>查询所有已创建的回测任务列表，限制返回10条记录。在这些回测任务中，状态为 "completed" 的任务有多少个？请提供数字。</question>
+      <answer>0</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>查找股票 "601318"（中国平安）的相关ETF。要求持仓比例≥3%。按持仓比例降序排列，前3个ETF的代码分别是哪些？请按顺序提供3个ETF代码，用逗号分隔，如 "510300,159915,512100" 的格式。</question>
+      <answer>510300,159915,512100</answer>
+   </qa_pair>
+</evaluation>
