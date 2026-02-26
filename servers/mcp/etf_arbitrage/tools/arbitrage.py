@@ -15,8 +15,6 @@ from ..models.enums import ResponseFormat
 from ..utils.formatters import ETFFormatter, StockFormatter
 from ..utils.errors import get_error_response
 from .base import (
-    find_related_etfs,
-    fetch_stock_quotes,
     get_backend,
     ToolResponse,
 )

@@ -33,42 +33,59 @@ class BackendBridge:
     def __init__(self):
         """Initialize backend connections."""
         self._quote_fetcher = None
+        self._etf_holder_provider = None
+        self._etf_holdings_provider = None
+        self._etf_quote_provider = None
         self._arbitrage_engine = None
         self._signal_repository = None
         self._mapping_repository = None
         self._backtest_engine = None
         self._config = None
+        self._backtest_repo = None
 
     def get_quote_fetcher(self):
         """Get or initialize quote fetcher."""
         if self._quote_fetcher is None:
-            from backend.market.cn.fetcher import QuoteFetcherCN
+            from backend.market.cn.quote_fetcher import QuoteFetcherCN
             self._quote_fetcher = QuoteFetcherCN()
         return self._quote_fetcher
+
+    def get_etf_holder_provider(self):
+        """Get or initialize ETF holder provider."""
+        if self._etf_holder_provider is None:
+            from backend.market.cn.etf_holder_provider import ETFHolderProvider
+            self._etf_holder_provider = ETFHolderProvider()
+        return self._etf_holder_provider
+
+    def get_etf_holdings_provider(self):
+        """Get or initialize ETF holdings provider."""
+        if self._etf_holdings_provider is None:
+            from backend.market.cn.etf_holdings_provider import ETFHoldingsProvider
+            self._etf_holdings_provider = ETFHoldingsProvider()
+        return self._etf_holdings_provider
+
+    def get_etf_quote_provider(self):
+        """Get or initialize ETF quote provider."""
+        if self._etf_quote_provider is None:
+            from backend.market.cn.etf_quote_provider import ETFQuoteProvider
+            self._etf_quote_provider = ETFQuoteProvider()
+        return self._etf_quote_provider
 
     def get_arbitrage_engine(self):
         """Get or initialize arbitrage engine."""
         if self._arbitrage_engine is None:
             from backend.arbitrage.cn.arbitrage_engine import ArbitrageEngineCN
-            from backend.arbitrage.strategy_registry import (
-                event_detector_registry,
-                fund_selector_registry,
-                signal_filter_registry,
-            )
-            from backend.api.dependencies import register_strategies
+            from backend.arbitrage.cn.factory import ArbitrageEngineFactory
+            from backend.api.dependencies import get_config, get_clock
 
             # Register strategies
+            from backend.api.dependencies import register_strategies
             register_strategies()
 
-            # Create engine
-            self._arbitrage_engine = ArbitrageEngineCN(
-                event_detector=event_detector_registry.get("limit_up_cn"),
-                fund_selector=fund_selector_registry.get("highest_weight"),
-                signal_filters=[
-                    signal_filter_registry.get("time_filter_cn"),
-                    signal_filter_registry.get("liquidity_filter"),
-                ],
-            )
+            # Use factory to create engine
+            config = get_config()
+            clock = get_clock()
+            self._arbitrage_engine = ArbitrageEngineFactory.create_engine(config, clock)
         return self._arbitrage_engine
 
     def get_signal_repository(self):
@@ -81,8 +98,8 @@ class BackendBridge:
     def get_mapping_repository(self):
         """Get or initialize mapping repository."""
         if self._mapping_repository is None:
-            from backend.data.mapping_repository import StockETFMappingRepository
-            self._mapping_repository = StockETFMappingRepository()
+            from backend.arbitrage.interfaces import InMemoryMappingRepository
+            self._mapping_repository = InMemoryMappingRepository()
         return self._mapping_repository
 
     def get_backtest_engine(self):
@@ -92,6 +109,13 @@ class BackendBridge:
             self._backtest_engine = CNBacktestEngine()
         return self._backtest_engine
 
+    def get_backtest_repository(self):
+        """Get or initialize backtest repository."""
+        if self._backtest_repo is None:
+            from backend.data.backtest_repository import BacktestRepository
+            self._backtest_repo = BacktestRepository()
+        return self._backtest_repo
+
     def get_config(self):
         """Get or load configuration."""
         if self._config is None:
@@ -100,6 +124,25 @@ class BackendBridge:
             with open(config_path, 'r', encoding='utf-8') as f:
                 self._config = yaml.safe_load(f)
         return self._config
+
+    @property
+    def PROJECT_ROOT(self):
+        """Get project root path."""
+        return project_root
+
+    @property
+    def CONFIG_DIR(self):
+        """Get config directory."""
+        return project_root / "config"
+
+    @property
+    def DATA_DIR(self):
+        """Get data directory."""
+        return project_root / "data"
+
+    def get_stocks_path(self):
+        """Get stocks configuration file path."""
+        return self.CONFIG_DIR / "stocks.yaml"
 
 
 # Global backend bridge instance
@@ -235,7 +278,7 @@ async def fetch_etf_quotes(codes: List[str]) -> List[Dict[str, Any]]:
         List of ETF quote dictionaries
     """
     backend = get_backend()
-    fetcher = backend.get_quote_fetcher()
+    fetcher = backend.get_etf_quote_provider()
 
     try:
         # Batch fetch
@@ -249,35 +292,35 @@ async def fetch_etf_quotes(codes: List[str]) -> List[Dict[str, Any]]:
         raise APIError(f"Failed to fetch ETF quotes: {str(e)}")
 
 
-async def find_related_etfs(stock_code: str, min_weight: float = 0.05) -> List[Dict[str, Any]]:
-    """Find ETFs that hold a specific stock.
+async def get_stock_info(stock_code: str) -> Optional[Dict[str, Any]]:
+    """Get stock information from available sources.
 
     Args:
         stock_code: Stock code
-        min_weight: Minimum weight threshold
 
     Returns:
-        List of related ETFs with weight information
+        Stock information dict or None
     """
     backend = get_backend()
-    engine = backend.get_arbitrage_engine()
 
     try:
-        # Get mapping
-        mapping = await engine.get_stock_etf_mapping(stock_code)
+        # Try to fetch quote
+        quotes = await fetch_stock_quotes([stock_code])
+        if quotes:
+            q = quotes[0]
+            return {
+                'code': q.code,
+                'name': q.name,
+                'price': q.price,
+                'change': q.change,
+                'change_pct': q.change_pct,
+                'is_limit_up': getattr(q, 'is_limit_up', False),
+                'market': q.market,
+            }
+    except:
+        pass
 
-        # Filter by weight
-        etfs = []
-        for etf_code, weight in mapping.get('etfs', {}).items():
-            if weight >= min_weight:
-                etf_info = await get_etf_info(etf_code)
-                etf_info['weight'] = weight
-                etf_info['weight_pct'] = weight * 100
-                etfs.append(etf_info)
-
-        return etfs
-    except Exception as e:
-        raise APIError(f"Failed to find related ETFs: {str(e)}")
+    return None
 
 
 async def get_etf_info(etf_code: str) -> Dict[str, Any]:
@@ -290,7 +333,7 @@ async def get_etf_info(etf_code: str) -> Dict[str, Any]:
         ETF information dictionary
     """
     backend = get_backend()
-    fetcher = backend.get_quote_fetcher()
+    fetcher = backend.get_etf_quote_provider()
 
     try:
         quote = await fetcher.fetch_one(etf_code)
@@ -301,10 +344,15 @@ async def get_etf_info(etf_code: str) -> Dict[str, Any]:
             'price': quote.price,
             'change': quote.change,
             'change_pct': quote.change_pct,
-            'premium_rate': quote.premium_rate if hasattr(quote, 'premium_rate') else None,
+            'premium_rate': getattr(quote, 'premium_rate', None),
         }
     except Exception as e:
-        raise APIError(f"Failed to get ETF info: {str(e)}")
+        # Return minimal info if fetch fails
+        return {
+            'code': etf_code,
+            'name': etf_code,
+            'market': 'unknown',
+        }
 
 
 def validate_stock_code(code: str) -> bool:
