@@ -4,8 +4,8 @@
       <answer>False</answer>
    </qa_pair>
    <qa_pair>
-      <question>查看当前的自选股列表配置。配置文件中包含多少只自选股？请提供数字。</question>
-      <answer>0</answer>
+      <question>查看当前的my_stocks列表配置。配置文件中包含多少只股票？请提供数字。</question>
+      <answer>1059</answer>
    </qa_pair>
    <qa_pair>
       <question>获取股票-ETF映射关系。查询代码为 "600519" 的股票（贵州茅台）在ETF中的持仓情况。有多少个ETF持有该股票且持仓比例大于等于5%？请提供数字。</question>
