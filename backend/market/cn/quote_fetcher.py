@@ -10,8 +10,8 @@ from backend.utils.clock import Clock, SystemClock, CHINA_TZ
 from backend.utils.time_utils import is_trading_time
 
 
-class CNQuoteFetcher(IQuoteFetcher):
-    """A股行情数据获取器"""
+class CNStockQuoteProvider(IQuoteFetcher):
+    """A股股票行情数据提供者"""
 
     def __init__(self, clock: Optional[Clock] = None):
         self._tencent_source = None

@@ -46,8 +46,8 @@ class BackendBridge:
     def get_quote_fetcher(self):
         """Get or initialize quote fetcher."""
         if self._quote_fetcher is None:
-            from backend.market.cn.quote_fetcher import CNQuoteFetcher
-            self._quote_fetcher = CNQuoteFetcher()
+            from backend.market.cn.quote_fetcher import CNStockQuoteProvider
+            self._quote_fetcher = CNStockQuoteProvider()
         return self._quote_fetcher
 
     def get_etf_holder_provider(self):

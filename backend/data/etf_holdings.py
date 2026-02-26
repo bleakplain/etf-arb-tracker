@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 from loguru import logger
 
 from backend.market.cn.etf_holding_provider import CNETFHoldingProvider
-from backend.market.cn.quote_fetcher import CNQuoteFetcher
+from backend.market.cn.quote_fetcher import CNStockQuoteProvider
 
 
 class ETFHoldingsFetcher:
@@ -16,7 +16,7 @@ class ETFHoldingsFetcher:
 
     def __init__(self):
         self.holding_provider = CNETFHoldingProvider()
-        self.quote_fetcher = CNQuoteFetcher()
+        self.quote_fetcher = CNStockQuoteProvider()
 
     def get_etf_top_holdings(self, etf_code: str) -> Dict:
         """

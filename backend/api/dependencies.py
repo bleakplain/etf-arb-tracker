@@ -14,7 +14,7 @@ from backend.utils.cache_utils import TTLCache
 from backend.data.backtest_repository import get_backtest_repository
 from backend.arbitrage.cn import ArbitrageEngineCN
 from backend.arbitrage.cn.factory import ArbitrageEngineFactory
-from backend.market.cn.quote_fetcher import CNQuoteFetcher
+from backend.market.cn.quote_fetcher import CNStockQuoteProvider
 from backend.market.cn.etf_holding_provider import CNETFHoldingProvider
 from backend.market.cn.etf_quote import CNETFQuoteProvider
 from config import Config
@@ -142,7 +142,7 @@ def get_engine() -> ArbitrageEngineCN:
 
 def _create_engine(config: Config) -> ArbitrageEngineCN:
     """创建套利引擎"""
-    quote_fetcher = CNQuoteFetcher()
+    quote_fetcher = CNStockQuoteProvider()
     etf_holder_provider = CNETFHoldingProvider()
     etf_holdings_provider = CNETFHoldingProvider()
     etf_quote_provider = CNETFQuoteProvider()

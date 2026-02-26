@@ -7,14 +7,14 @@
 from typing import List, Dict, Optional
 from loguru import logger
 
-from backend.market.cn.quote_fetcher import CNQuoteFetcher
+from backend.market.cn.quote_fetcher import CNStockQuoteProvider
 
 
 class LimitUpStocksFetcher:
     """涨停股票数据获取器"""
 
-    def __init__(self, quote_fetcher: Optional[CNQuoteFetcher] = None):
-        self.quote_fetcher = quote_fetcher or CNQuoteFetcher()
+    def __init__(self, quote_fetcher: Optional[CNStockQuoteProvider] = None):
+        self.quote_fetcher = quote_fetcher or CNStockQuoteProvider()
 
     def get_today_limit_ups(self, stock_df=None) -> List[Dict]:
         """

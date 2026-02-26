@@ -1,30 +1,30 @@
 """
-Unit tests for CNQuoteFetcher
+Unit tests for CNStockQuoteProvider
 
-Tests the quote fetcher for A-share market.
+Tests the quote provider for A-share market.
 """
 
 import pytest
 from unittest.mock import Mock, patch
 
-from backend.market.cn.quote_fetcher import CNQuoteFetcher
+from backend.market.cn.quote_fetcher import CNStockQuoteProvider
 from backend.utils.clock import SystemClock
 
 
 @pytest.mark.unit
-class TestCNQuoteFetcher:
-    """测试A股行情获取器"""
+class TestCNStockQuoteProvider:
+    """测试A股行情提供者"""
 
     @pytest.fixture
     def fetcher(self):
-        return CNQuoteFetcher()
+        return CNStockQuoteProvider()
 
     @pytest.fixture
     def fetcher_with_clock(self):
         from backend.utils.clock import FrozenClock
         from datetime import datetime
         frozen_time = datetime(2024, 1, 1, 10, 0, 0)
-        return CNQuoteFetcher(clock=FrozenClock(frozen_time))
+        return CNStockQuoteProvider(clock=FrozenClock(frozen_time))
 
     def test_init_default_clock(self, fetcher):
         """测试默认使用SystemClock初始化"""
