@@ -259,18 +259,14 @@ def register_market_tools(mcp: FastMCP):
             backend = get_backend()
             fetcher = backend.get_quote_fetcher()
 
-            # Get limit-up stocks from data source
-            # This uses the Eastmoney source which provides limit-up lists
-            from backend.market.cn.sources.eastmoney_source import EastmoneySource
-            source = EastmoneySource()
-
-            limit_up_stocks = await source.get_limit_up_stocks()
+            # Get limit-up stocks from quote provider
+            limit_up_stocks = fetcher.get_today_limit_ups()
 
             # Apply filter if specified
             if params.min_change_pct is not None:
                 limit_up_stocks = [
                     s for s in limit_up_stocks
-                    if s.change_pct >= params.min_change_pct
+                    if s.get('change_pct', 0) >= params.min_change_pct
                 ]
 
             # Apply pagination
@@ -284,18 +280,22 @@ def register_market_tools(mcp: FastMCP):
             for s in paginated_stocks:
                 # Get related ETF count
                 engine = backend.get_arbitrage_engine()
-                mapping = await engine.get_stock_etf_mapping(s.code)
-                related_count = len(mapping.get('etfs', {}))
+                stock_code = s.get('code', '')
+                if stock_code:
+                    mapping = await engine.get_stock_etf_mapping(stock_code)
+                    related_count = len(mapping.get('etfs', {}))
+                else:
+                    related_count = 0
 
                 stock_dicts.append({
-                    'code': s.code,
-                    'name': s.name,
-                    'price': s.price,
-                    'change_pct': s.change_pct,
-                    'volume': s.volume,
-                    'amount': s.amount,
-                    'market': s.market,
-                    'limit_up_time': getattr(s, 'limit_up_time', None),
+                    'code': s.get('code', ''),
+                    'name': s.get('name', ''),
+                    'price': s.get('price', 0),
+                    'change_pct': s.get('change_pct', 0),
+                    'volume': s.get('volume', 0),
+                    'amount': s.get('amount', 0),
+                    'market': s.get('market', ''),
+                    'limit_up_time': s.get('limit_up_time'),
                     'related_etf_count': related_count,
                 })
 
