@@ -41,9 +41,9 @@ class TestAPIRoutesIntegration:
         assert "is_trading_time" in data
         assert "watch_stocks_count" in data
 
-    def test_watchlist_endpoint(self, test_client):
+    def test_my_stocks_endpoint(self, test_client):
         """测试自选股列表端点"""
-        response = test_client.get("/api/watchlist")
+        response = test_client.get("/api/my-stocks")
 
         assert response.status_code == 200
         data = response.json()
@@ -164,7 +164,7 @@ class TestBacktestAPIRoutes:
 
 
 @pytest.mark.integration
-class TestWatchlistAPIRoutes:
+class TestMyStocksAPIRoutes:
     """测试自选股管理API路由"""
 
     @pytest.fixture
@@ -173,7 +173,7 @@ class TestWatchlistAPIRoutes:
         from backend.api.app import app
         return TestClient(app)
 
-    def test_add_to_watchlist(self, test_client):
+    def test_add_to_my_stocks(self, test_client):
         """测试添加股票到自选"""
         request_data = {
             "code": "600519",
@@ -181,14 +181,14 @@ class TestWatchlistAPIRoutes:
             "market": "sh"
         }
 
-        response = test_client.post("/api/watchlist/add", json=request_data)
+        response = test_client.post("/api/my-stocks/add", json=request_data)
 
         # 可能成功或已存在
         assert response.status_code in [200, 201]
         data = response.json()
         assert "status" in data
 
-    def test_add_to_watchlist_validation(self, test_client):
+    def test_add_to_my_stocks_validation(self, test_client):
         """测试添加股票 - 验证"""
         # 无效代码
         request_data = {
@@ -197,14 +197,14 @@ class TestWatchlistAPIRoutes:
             "market": "sh"
         }
 
-        response = test_client.post("/api/watchlist/add", json=request_data)
+        response = test_client.post("/api/my-stocks/add", json=request_data)
 
         # 应该返回验证错误
         assert response.status_code == 422
 
-    def test_remove_from_watchlist(self, test_client):
+    def test_remove_from_my_stocks(self, test_client):
         """测试从自选删除股票"""
-        response = test_client.delete("/api/watchlist/600519")
+        response = test_client.delete("/api/my-stocks/600519")
 
         # 可能成功或未找到
         assert response.status_code in [200, 404]
